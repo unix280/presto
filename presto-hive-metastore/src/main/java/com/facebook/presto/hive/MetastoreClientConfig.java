@@ -46,6 +46,7 @@ public class MetastoreClientConfig
     private boolean partitionVersioningEnabled;
     private MetastoreCacheScope metastoreCacheScope = MetastoreCacheScope.ALL;
     private boolean deleteFilesOnDrop;
+    private boolean metastoreImpersonationEnabled;
 
     public HostAndPort getMetastoreSocksProxy()
     {
@@ -235,6 +236,19 @@ public class MetastoreClientConfig
     public MetastoreClientConfig setDeleteFilesOnDrop(boolean deleteFilesOnDrop)
     {
         this.deleteFilesOnDrop = deleteFilesOnDrop;
+        return this;
+    }
+
+    public boolean isMetastoreImpersonationEnabled()
+    {
+        return metastoreImpersonationEnabled;
+    }
+
+    @Config("hive.metastore-impersonation-enabled")
+    @ConfigDescription("Should Presto user be impersonated when communicating with Hive Metastore")
+    public MetastoreClientConfig setMetastoreImpersonationEnabled(boolean metastoreImpersonationEnabled)
+    {
+        this.metastoreImpersonationEnabled = metastoreImpersonationEnabled;
         return this;
     }
 }

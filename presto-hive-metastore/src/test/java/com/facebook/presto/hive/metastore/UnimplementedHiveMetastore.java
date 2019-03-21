@@ -49,7 +49,7 @@ public class UnimplementedHiveMetastore
     }
 
     @Override
-    public Set<ColumnStatisticType> getSupportedColumnStatistics(Type type)
+    public Set<ColumnStatisticType> getSupportedColumnStatistics(MetastoreContext metastoreContext, Type type)
     {
         throw new UnsupportedOperationException();
     }
@@ -164,7 +164,8 @@ public class UnimplementedHiveMetastore
 
     @Override
     public List<String> getPartitionNamesByFilter(
-            MetastoreContext metastoreContext, String databaseName,
+            MetastoreContext metastoreContext,
+            String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
@@ -173,7 +174,8 @@ public class UnimplementedHiveMetastore
 
     @Override
     public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(
-            MetastoreContext metastoreContext, String databaseName,
+            MetastoreContext metastoreContext,
+            String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
@@ -205,37 +207,37 @@ public class UnimplementedHiveMetastore
     }
 
     @Override
-    public void createRole(String role, String grantor)
+    public void createRole(MetastoreContext metastoreContext, String role, String grantor)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void dropRole(String role)
+    public void dropRole(MetastoreContext metastoreContext, String role)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Set<String> listRoles()
+    public Set<String> listRoles(MetastoreContext metastoreContext)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void grantTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void grantTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void revokeTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void revokeTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal)
+    public Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal principal)
     {
         throw new UnsupportedOperationException();
     }
@@ -247,19 +249,19 @@ public class UnimplementedHiveMetastore
     }
 
     @Override
-    public void grantRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
+    public void grantRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void revokeRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
+    public void revokeRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Set<RoleGrant> listRoleGrants(PrestoPrincipal principal)
+    public Set<RoleGrant> listRoleGrants(MetastoreContext metastoreContext, PrestoPrincipal principal)
     {
         throw new UnsupportedOperationException();
     }

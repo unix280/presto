@@ -85,7 +85,7 @@ public interface HiveMetastore
 
     Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName);
 
-    Set<ColumnStatisticType> getSupportedColumnStatistics(Type type);
+    Set<ColumnStatisticType> getSupportedColumnStatistics(MetastoreContext metastoreContext, Type type);
 
     PartitionStatistics getTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName);
 
@@ -95,23 +95,23 @@ public interface HiveMetastore
 
     void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update);
 
-    void createRole(String role, String grantor);
+    void createRole(MetastoreContext metastoreContext, String role, String grantor);
 
-    void dropRole(String role);
+    void dropRole(MetastoreContext metastoreContext, String role);
 
-    Set<String> listRoles();
+    Set<String> listRoles(MetastoreContext metastoreContext);
 
-    void grantRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor);
+    void grantRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor);
 
-    void revokeRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor);
+    void revokeRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor);
 
-    Set<RoleGrant> listRoleGrants(PrestoPrincipal principal);
+    Set<RoleGrant> listRoleGrants(MetastoreContext metastoreContext, PrestoPrincipal principal);
 
-    void grantTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges);
+    void grantTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges);
 
-    void revokeTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges);
+    void revokeTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges);
 
-    Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal);
+    Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal principal);
 
     boolean isImpersonationEnabled();
 

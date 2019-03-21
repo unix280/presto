@@ -73,11 +73,11 @@ public class TestCachingHiveMetastore
         MockHiveCluster mockHiveCluster = new MockHiveCluster(mockClient);
         ListeningExecutorService executor = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("test-%s")));
         ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(mockHiveCluster, new MetastoreClientConfig(), null);
-        MetastoreClientConfig metastoreClientConfig = new MetastoreClientConfig();
         PartitionMutator hivePartitionMutator = new HivePartitionMutator();
         metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(thriftHiveMetastore, hivePartitionMutator),
                 executor,
+                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,
@@ -142,6 +142,7 @@ public class TestCachingHiveMetastore
 
         assertEquals(stats.getGetTable().getThriftExceptions().getTotalCount(), 0);
         assertEquals(stats.getGetTable().getTotalFailures().getTotalCount(), 0);
+        assertNotNull(stats.getGetTable().getTime());
     }
 
     @Test
@@ -213,6 +214,7 @@ public class TestCachingHiveMetastore
         CachingHiveMetastore partitionCachingEnabledmetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, mockPartitionMutator),
                 executor,
+                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,
@@ -257,6 +259,7 @@ public class TestCachingHiveMetastore
         CachingHiveMetastore partitionCachingEnabledmetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, partitionMutator),
                 executor,
+                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,
@@ -313,25 +316,25 @@ public class TestCachingHiveMetastore
     {
         assertEquals(mockClient.getAccessCount(), 0);
 
-        assertEquals(metastore.listRoles(), TEST_ROLES);
+        assertEquals(metastore.listRoles(METASTORE_CONTEXT), TEST_ROLES);
         assertEquals(mockClient.getAccessCount(), 1);
 
-        assertEquals(metastore.listRoles(), TEST_ROLES);
+        assertEquals(metastore.listRoles(METASTORE_CONTEXT), TEST_ROLES);
         assertEquals(mockClient.getAccessCount(), 1);
 
         metastore.flushCache();
 
-        assertEquals(metastore.listRoles(), TEST_ROLES);
+        assertEquals(metastore.listRoles(METASTORE_CONTEXT), TEST_ROLES);
         assertEquals(mockClient.getAccessCount(), 2);
 
-        metastore.createRole("role", "grantor");
+        metastore.createRole(METASTORE_CONTEXT, "role", "grantor");
 
-        assertEquals(metastore.listRoles(), TEST_ROLES);
+        assertEquals(metastore.listRoles(METASTORE_CONTEXT), TEST_ROLES);
         assertEquals(mockClient.getAccessCount(), 3);
 
-        metastore.dropRole("testrole");
+        metastore.dropRole(METASTORE_CONTEXT, "testrole");
 
-        assertEquals(metastore.listRoles(), TEST_ROLES);
+        assertEquals(metastore.listRoles(METASTORE_CONTEXT), TEST_ROLES);
         assertEquals(mockClient.getAccessCount(), 4);
     }
 
@@ -375,7 +378,7 @@ public class TestCachingHiveMetastore
         }
 
         @Override
-        public HiveMetastoreClient createMetastoreClient()
+        public HiveMetastoreClient createMetastoreClient(Optional<String> token)
         {
             return client;
         }

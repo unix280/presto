@@ -113,7 +113,7 @@ public class SyncPartitionMetadataProcedure
         SemiTransactionalHiveMetastore metastore = hiveMetadataFactory.get().getMetastore();
         SchemaTableName schemaTableName = new SchemaTableName(schemaName, tableName);
 
-        Table table = metastore.getTable(metastoreContext, schemaName, tableName)
+        Table table = metastore.getTable(new MetastoreContext(session.getIdentity()), schemaName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(schemaTableName));
         if (table.getPartitionColumns().isEmpty()) {
             throw new PrestoException(INVALID_PROCEDURE_ARGUMENT, "Table is not partitioned: " + schemaTableName);

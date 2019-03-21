@@ -144,7 +144,7 @@ public class TestRecordingHiveMetastore
         assertEquals(hiveMetastore.getDatabase(METASTORE_CONTEXT, "database"), Optional.of(DATABASE));
         assertEquals(hiveMetastore.getAllDatabases(METASTORE_CONTEXT), ImmutableList.of("database"));
         assertEquals(hiveMetastore.getTable(METASTORE_CONTEXT, "database", "table"), Optional.of(TABLE));
-        assertEquals(hiveMetastore.getSupportedColumnStatistics(createVarcharType(123)), ImmutableSet.of(MIN_VALUE, MAX_VALUE));
+        assertEquals(hiveMetastore.getSupportedColumnStatistics(new MetastoreContext("test_user"), createVarcharType(123)), ImmutableSet.of(MIN_VALUE, MAX_VALUE));
         assertEquals(hiveMetastore.getTableStatistics(METASTORE_CONTEXT, "database", "table"), PARTITION_STATISTICS);
         assertEquals(hiveMetastore.getPartitionStatistics(METASTORE_CONTEXT, "database", "table", ImmutableSet.of("value")), ImmutableMap.of("value", PARTITION_STATISTICS));
         assertEquals(hiveMetastore.getAllTables(METASTORE_CONTEXT, "database"), Optional.of(ImmutableList.of("table")));
@@ -156,9 +156,9 @@ public class TestRecordingHiveMetastore
         map.put(column, Domain.singleValue(VARCHAR, utf8Slice("value")));
         assertEquals(hiveMetastore.getPartitionNamesByFilter(METASTORE_CONTEXT, "database", "table", map), ImmutableList.of("value"));
         assertEquals(hiveMetastore.getPartitionsByNames(METASTORE_CONTEXT, "database", "table", ImmutableList.of("value")), ImmutableMap.of("value", Optional.of(PARTITION)));
-        assertEquals(hiveMetastore.listTablePrivileges("database", "table", new PrestoPrincipal(USER, "user")), ImmutableSet.of(PRIVILEGE_INFO));
-        assertEquals(hiveMetastore.listRoles(), ImmutableSet.of("role"));
-        assertEquals(hiveMetastore.listRoleGrants(new PrestoPrincipal(USER, "user")), ImmutableSet.of(ROLE_GRANT));
+        assertEquals(hiveMetastore.listTablePrivileges(METASTORE_CONTEXT, "database", "table", new PrestoPrincipal(USER, "user")), ImmutableSet.of(PRIVILEGE_INFO));
+        assertEquals(hiveMetastore.listRoles(METASTORE_CONTEXT), ImmutableSet.of("role"));
+        assertEquals(hiveMetastore.listRoleGrants(METASTORE_CONTEXT, new PrestoPrincipal(USER, "user")), ImmutableSet.of(ROLE_GRANT));
     }
 
     private static class TestingHiveMetastore
@@ -191,7 +191,7 @@ public class TestRecordingHiveMetastore
         }
 
         @Override
-        public Set<ColumnStatisticType> getSupportedColumnStatistics(Type type)
+        public Set<ColumnStatisticType> getSupportedColumnStatistics(MetastoreContext metastoreContext, Type type)
         {
             if (type.equals(createVarcharType(123))) {
                 return ImmutableSet.of(MIN_VALUE, MAX_VALUE);
@@ -264,7 +264,8 @@ public class TestRecordingHiveMetastore
 
         @Override
         public List<String> getPartitionNamesByFilter(
-                MetastoreContext metastoreContext, String databaseName,
+                MetastoreContext metastoreContext,
+                String databaseName,
                 String tableName,
                 Map<Column, Domain> partitionPredicates)
         {
@@ -287,7 +288,7 @@ public class TestRecordingHiveMetastore
         }
 
         @Override
-        public Set<HivePrivilegeInfo> listTablePrivileges(String database, String table, PrestoPrincipal prestoPrincipal)
+        public Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String database, String table, PrestoPrincipal prestoPrincipal)
         {
             if (database.equals("database") && table.equals("table") && prestoPrincipal.getType() == USER && prestoPrincipal.getName().equals("user")) {
                 return ImmutableSet.of(PRIVILEGE_INFO);
@@ -297,13 +298,13 @@ public class TestRecordingHiveMetastore
         }
 
         @Override
-        public Set<String> listRoles()
+        public Set<String> listRoles(MetastoreContext metastoreContext)
         {
             return ImmutableSet.of("role");
         }
 
         @Override
-        public Set<RoleGrant> listRoleGrants(PrestoPrincipal principal)
+        public Set<RoleGrant> listRoleGrants(MetastoreContext metastoreContext, PrestoPrincipal principal)
         {
             return ImmutableSet.of(ROLE_GRANT);
         }

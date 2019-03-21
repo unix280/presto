@@ -207,9 +207,9 @@ public class RecordingHiveMetastore
     }
 
     @Override
-    public Set<ColumnStatisticType> getSupportedColumnStatistics(Type type)
+    public Set<ColumnStatisticType> getSupportedColumnStatistics(MetastoreContext metastoreContext, Type type)
     {
-        return loadValue(supportedColumnStatisticsCache, type.getTypeSignature().toString(), () -> delegate.getSupportedColumnStatistics(type));
+        return loadValue(supportedColumnStatisticsCache, type.getTypeSignature().toString(), () -> delegate.getSupportedColumnStatistics(metastoreContext, type));
     }
 
     @Override
@@ -346,7 +346,8 @@ public class RecordingHiveMetastore
 
     @Override
     public List<String> getPartitionNamesByFilter(
-            MetastoreContext metastoreContext, String databaseName,
+            MetastoreContext metastoreContext,
+            String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
@@ -358,7 +359,8 @@ public class RecordingHiveMetastore
 
     @Override
     public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(
-            MetastoreContext metastoreContext, String databaseName,
+            MetastoreContext metastoreContext,
+            String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
@@ -396,12 +398,12 @@ public class RecordingHiveMetastore
     }
 
     @Override
-    public Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal)
+    public Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal principal)
     {
         return loadValue(
                 tablePrivilegesCache,
                 new UserTableKey(principal, databaseName, tableName),
-                () -> delegate.listTablePrivileges(databaseName, tableName, principal));
+                () -> delegate.listTablePrivileges(metastoreContext, databaseName, tableName, principal));
     }
 
     @Override
@@ -411,17 +413,17 @@ public class RecordingHiveMetastore
     }
 
     @Override
-    public void grantTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void grantTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         verifyRecordingMode();
-        delegate.grantTablePrivileges(databaseName, tableName, grantee, privileges);
+        delegate.grantTablePrivileges(metastoreContext, databaseName, tableName, grantee, privileges);
     }
 
     @Override
-    public void revokeTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void revokeTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         verifyRecordingMode();
-        delegate.revokeTablePrivileges(databaseName, tableName, grantee, privileges);
+        delegate.revokeTablePrivileges(metastoreContext, databaseName, tableName, grantee, privileges);
     }
 
     private Set<HivePartitionName> getHivePartitionNames(String databaseName, String tableName, Set<String> partitionNames)
@@ -432,52 +434,52 @@ public class RecordingHiveMetastore
     }
 
     @Override
-    public void createRole(String role, String grantor)
+    public void createRole(MetastoreContext metastoreContext, String role, String grantor)
     {
         verifyRecordingMode();
-        delegate.createRole(role, grantor);
+        delegate.createRole(metastoreContext, role, grantor);
     }
 
     @Override
-    public void dropRole(String role)
+    public void dropRole(MetastoreContext metastoreContext, String role)
     {
         verifyRecordingMode();
-        delegate.dropRole(role);
+        delegate.dropRole(metastoreContext, role);
     }
 
     @Override
-    public Set<String> listRoles()
+    public Set<String> listRoles(MetastoreContext metastoreContext)
     {
         if (replay) {
             return allRoles.orElseThrow(() -> new PrestoException(NOT_FOUND, "Missing entry for roles"));
         }
 
-        Set<String> result = delegate.listRoles();
+        Set<String> result = delegate.listRoles(metastoreContext);
         allRoles = Optional.of(result);
         return result;
     }
 
     @Override
-    public void grantRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
+    public void grantRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
     {
         verifyRecordingMode();
-        delegate.grantRoles(roles, grantees, withAdminOption, grantor);
+        delegate.grantRoles(metastoreContext, roles, grantees, withAdminOption, grantor);
     }
 
     @Override
-    public void revokeRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
+    public void revokeRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
     {
         verifyRecordingMode();
-        delegate.revokeRoles(roles, grantees, adminOptionFor, grantor);
+        delegate.revokeRoles(metastoreContext, roles, grantees, adminOptionFor, grantor);
     }
 
     @Override
-    public Set<RoleGrant> listRoleGrants(PrestoPrincipal principal)
+    public Set<RoleGrant> listRoleGrants(MetastoreContext metastoreContext, PrestoPrincipal principal)
     {
         return loadValue(
                 roleGrantsCache,
                 principal,
-                () -> delegate.listRoleGrants(principal));
+                () -> delegate.listRoleGrants(metastoreContext, principal));
     }
 
     private <K, V> V loadValue(Cache<K, V> cache, K key, Supplier<V> valueSupplier)

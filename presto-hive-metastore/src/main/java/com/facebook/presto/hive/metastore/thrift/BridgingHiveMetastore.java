@@ -102,9 +102,9 @@ public class BridgingHiveMetastore
     }
 
     @Override
-    public Set<ColumnStatisticType> getSupportedColumnStatistics(Type type)
+    public Set<ColumnStatisticType> getSupportedColumnStatistics(MetastoreContext metastoreContext, Type type)
     {
-        return delegate.getSupportedColumnStatistics(type);
+        return delegate.getSupportedColumnStatistics(metastoreContext, type);
     }
 
     @Override
@@ -323,57 +323,57 @@ public class BridgingHiveMetastore
     }
 
     @Override
-    public void createRole(String role, String grantor)
+    public void createRole(MetastoreContext metastoreContext, String role, String grantor)
     {
-        delegate.createRole(role, grantor);
+        delegate.createRole(metastoreContext, role, grantor);
     }
 
     @Override
-    public void dropRole(String role)
+    public void dropRole(MetastoreContext metastoreContext, String role)
     {
-        delegate.dropRole(role);
+        delegate.dropRole(metastoreContext, role);
     }
 
     @Override
-    public Set<String> listRoles()
+    public Set<String> listRoles(MetastoreContext metastoreContext)
     {
-        return delegate.listRoles();
+        return delegate.listRoles(metastoreContext);
     }
 
     @Override
-    public void grantRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
+    public void grantRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
     {
-        delegate.grantRoles(roles, grantees, withAdminOption, grantor);
+        delegate.grantRoles(metastoreContext, roles, grantees, withAdminOption, grantor);
     }
 
     @Override
-    public void revokeRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
+    public void revokeRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
     {
-        delegate.revokeRoles(roles, grantees, adminOptionFor, grantor);
+        delegate.revokeRoles(metastoreContext, roles, grantees, adminOptionFor, grantor);
     }
 
     @Override
-    public Set<RoleGrant> listRoleGrants(PrestoPrincipal principal)
+    public Set<RoleGrant> listRoleGrants(MetastoreContext metastoreContext, PrestoPrincipal principal)
     {
-        return delegate.listRoleGrants(principal);
+        return delegate.listRoleGrants(metastoreContext, principal);
     }
 
     @Override
-    public void grantTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void grantTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
-        delegate.grantTablePrivileges(databaseName, tableName, grantee, privileges);
+        delegate.grantTablePrivileges(metastoreContext, databaseName, tableName, grantee, privileges);
     }
 
     @Override
-    public void revokeTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void revokeTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
-        delegate.revokeTablePrivileges(databaseName, tableName, grantee, privileges);
+        delegate.revokeTablePrivileges(metastoreContext, databaseName, tableName, grantee, privileges);
     }
 
     @Override
-    public Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal)
+    public Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal principal)
     {
-        return delegate.listTablePrivileges(databaseName, tableName, principal);
+        return delegate.listTablePrivileges(metastoreContext, databaseName, tableName, principal);
     }
 
     @Override

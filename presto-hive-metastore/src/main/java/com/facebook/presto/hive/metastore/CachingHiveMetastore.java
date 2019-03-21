@@ -76,6 +76,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class CachingHiveMetastore
         implements ExtendedHiveMetastore
 {
+    private static final String NO_IMPERSONATION_USER = "no-impersonation-caching-user";
+
     public enum MetastoreCacheScope
     {
         ALL, PARTITION
@@ -92,11 +94,12 @@ public class CachingHiveMetastore
     private final LoadingCache<KeyAndContext<HivePartitionName>, Optional<Partition>> partitionCache;
     private final LoadingCache<KeyAndContext<PartitionFilter>, List<String>> partitionFilterCache;
     private final LoadingCache<KeyAndContext<HiveTableName>, Optional<List<String>>> partitionNamesCache;
-    private final LoadingCache<UserTableKey, Set<HivePrivilegeInfo>> tablePrivilegesCache;
-    private final LoadingCache<String, Set<String>> rolesCache;
-    private final LoadingCache<PrestoPrincipal, Set<RoleGrant>> roleGrantsCache;
+    private final LoadingCache<KeyAndContext<UserTableKey>, Set<HivePrivilegeInfo>> tablePrivilegesCache;
+    private final LoadingCache<KeyAndContext<String>, Set<String>> rolesCache;
+    private final LoadingCache<KeyAndContext<PrestoPrincipal>, Set<RoleGrant>> roleGrantsCache;
 
     private final boolean partitionVersioningEnabled;
+    private final boolean metastoreImpersonationEnabled;
 
     @Inject
     public CachingHiveMetastore(
@@ -107,6 +110,7 @@ public class CachingHiveMetastore
         this(
                 delegate,
                 executor,
+                metastoreClientConfig.isMetastoreImpersonationEnabled(),
                 metastoreClientConfig.getMetastoreCacheTtl(),
                 metastoreClientConfig.getMetastoreRefreshInterval(),
                 metastoreClientConfig.getMetastoreCacheMaximumSize(),
@@ -117,6 +121,7 @@ public class CachingHiveMetastore
     public CachingHiveMetastore(
             ExtendedHiveMetastore delegate,
             ExecutorService executor,
+            boolean metastoreImpersonationEnabled,
             Duration cacheTtl,
             Duration refreshInterval,
             long maximumSize,
@@ -126,6 +131,7 @@ public class CachingHiveMetastore
         this(
                 delegate,
                 executor,
+                metastoreImpersonationEnabled,
                 OptionalLong.of(cacheTtl.toMillis()),
                 refreshInterval.toMillis() >= cacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(refreshInterval.toMillis()),
                 maximumSize,
@@ -133,11 +139,12 @@ public class CachingHiveMetastore
                 metastoreCacheScope);
     }
 
-    public static CachingHiveMetastore memoizeMetastore(ExtendedHiveMetastore delegate, long maximumSize)
+    public static CachingHiveMetastore memoizeMetastore(ExtendedHiveMetastore delegate, boolean isMetastoreImpersonationEnabled, long maximumSize)
     {
         return new CachingHiveMetastore(
                 delegate,
                 newDirectExecutorService(),
+                isMetastoreImpersonationEnabled,
                 OptionalLong.empty(),
                 OptionalLong.empty(),
                 maximumSize,
@@ -148,6 +155,7 @@ public class CachingHiveMetastore
     private CachingHiveMetastore(
             ExtendedHiveMetastore delegate,
             ExecutorService executor,
+            boolean metastoreImpersonationEnabled,
             OptionalLong expiresAfterWriteMillis,
             OptionalLong refreshMills,
             long maximumSize,
@@ -156,6 +164,7 @@ public class CachingHiveMetastore
     {
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(executor, "executor is null");
+        this.metastoreImpersonationEnabled = metastoreImpersonationEnabled;
         this.partitionVersioningEnabled = partitionVersioningEnabled;
 
         OptionalLong cacheExpiresAfterWriteMillis;
@@ -256,10 +265,10 @@ public class CachingHiveMetastore
                 }, executor));
 
         tablePrivilegesCache = newCacheBuilder(cacheExpiresAfterWriteMillis, cacheRefreshMills, cacheMaxSize)
-                .build(asyncReloading(CacheLoader.from(key -> loadTablePrivileges(key.getDatabase(), key.getTable(), key.getPrincipal())), executor));
+                .build(asyncReloading(CacheLoader.from(this::loadTablePrivileges), executor));
 
         rolesCache = newCacheBuilder(cacheExpiresAfterWriteMillis, cacheRefreshMills, cacheMaxSize)
-                .build(asyncReloading(CacheLoader.from(() -> loadRoles()), executor));
+                .build(asyncReloading(CacheLoader.from(this::loadAllRoles), executor));
 
         roleGrantsCache = newCacheBuilder(cacheExpiresAfterWriteMillis, cacheRefreshMills, cacheMaxSize)
                 .build(asyncReloading(CacheLoader.from(this::loadRoleGrants), executor));
@@ -337,9 +346,9 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Set<ColumnStatisticType> getSupportedColumnStatistics(Type type)
+    public Set<ColumnStatisticType> getSupportedColumnStatistics(MetastoreContext metastoreContext, Type type)
     {
-        return delegate.getSupportedColumnStatistics(type);
+        return delegate.getSupportedColumnStatistics(metastoreContext, type);
     }
 
     private Optional<Table> loadTable(KeyAndContext<HiveTableName> hiveTableName)
@@ -594,9 +603,7 @@ public class CachingHiveMetastore
         invalidateTableCache(databaseName, tableName);
         invalidateTableNamesCache(databaseName);
         invalidateViewNamesCache(databaseName);
-        tablePrivilegesCache.asMap().keySet().stream()
-                .filter(userTableKey -> userTableKey.matches(databaseName, tableName))
-                .forEach(tablePrivilegesCache::invalidate);
+        invalidateTablePrivilegesCache(databaseName, tableName);
         invalidateTableStatisticsCache(databaseName, tableName);
         invalidatePartitionCache(databaseName, tableName);
     }
@@ -622,6 +629,12 @@ public class CachingHiveMetastore
                 .forEach(viewNamesCache::invalidate);
     }
 
+    private void invalidateTablePrivilegesCache(String databaseName, String tableName)
+    {
+        tablePrivilegesCache.asMap().keySet().stream()
+                .filter(userTableKey -> userTableKey.getKey().matches(databaseName, tableName))
+                .forEach(tablePrivilegesCache::invalidate);
+    }
     private void invalidateTableStatisticsCache(String databaseName, String tableName)
     {
         tableStatisticsCache.asMap().keySet().stream()
@@ -785,10 +798,10 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void createRole(String role, String grantor)
+    public void createRole(MetastoreContext metastoreContext, String role, String grantor)
     {
         try {
-            delegate.createRole(role, grantor);
+            delegate.createRole(metastoreContext, role, grantor);
         }
         finally {
             rolesCache.invalidateAll();
@@ -796,10 +809,10 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void dropRole(String role)
+    public void dropRole(MetastoreContext metastoreContext, String role)
     {
         try {
-            delegate.dropRole(role);
+            delegate.dropRole(metastoreContext, role);
         }
         finally {
             rolesCache.invalidateAll();
@@ -808,21 +821,21 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Set<String> listRoles()
+    public Set<String> listRoles(MetastoreContext metastoreContext)
     {
-        return get(rolesCache, "");
+        return get(rolesCache, getCachingKey(metastoreContext, ""));
     }
 
-    private Set<String> loadRoles()
+    private Set<String> loadAllRoles(KeyAndContext<String> rolesKey)
     {
-        return delegate.listRoles();
+        return delegate.listRoles(rolesKey.getMetastoreContext());
     }
 
     @Override
-    public void grantRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
+    public void grantRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
     {
         try {
-            delegate.grantRoles(roles, grantees, withAdminOption, grantor);
+            delegate.grantRoles(metastoreContext, roles, grantees, withAdminOption, grantor);
         }
         finally {
             roleGrantsCache.invalidateAll();
@@ -830,10 +843,10 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void revokeRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
+    public void revokeRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
     {
         try {
-            delegate.revokeRoles(roles, grantees, adminOptionFor, grantor);
+            delegate.revokeRoles(metastoreContext, roles, grantees, adminOptionFor, grantor);
         }
         finally {
             roleGrantsCache.invalidateAll();
@@ -841,14 +854,14 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Set<RoleGrant> listRoleGrants(PrestoPrincipal principal)
+    public Set<RoleGrant> listRoleGrants(MetastoreContext metastoreContext, PrestoPrincipal principal)
     {
-        return get(roleGrantsCache, principal);
+        return get(roleGrantsCache, getCachingKey(metastoreContext, principal));
     }
 
-    private Set<RoleGrant> loadRoleGrants(PrestoPrincipal principal)
+    private Set<RoleGrant> loadRoleGrants(KeyAndContext<PrestoPrincipal> principalKey)
     {
-        return delegate.listRoleGrants(principal);
+        return delegate.listRoleGrants(principalKey.getMetastoreContext(), principalKey.getKey());
     }
 
     private void invalidatePartitionCache(String databaseName, String tableName)
@@ -868,32 +881,40 @@ public class CachingHiveMetastore
                 .forEach(partitionStatisticsCache::invalidate);
     }
 
+    private void invalidateTablePrivilegesCache(PrestoPrincipal grantee, String databaseName, String tableName)
+    {
+        UserTableKey userTableKey = new UserTableKey(grantee, databaseName, tableName);
+        tablePrivilegesCache.asMap().keySet().stream()
+                .filter(tablePrivilegesCacheKey -> tablePrivilegesCacheKey.getKey().equals(userTableKey))
+                .forEach(tablePrivilegesCache::invalidate);
+    }
+
     @Override
-    public void grantTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void grantTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         try {
-            delegate.grantTablePrivileges(databaseName, tableName, grantee, privileges);
+            delegate.grantTablePrivileges(metastoreContext, databaseName, tableName, grantee, privileges);
         }
         finally {
-            tablePrivilegesCache.invalidate(new UserTableKey(grantee, databaseName, tableName));
+            invalidateTablePrivilegesCache(grantee, databaseName, tableName);
         }
     }
 
     @Override
-    public void revokeTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public void revokeTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         try {
-            delegate.revokeTablePrivileges(databaseName, tableName, grantee, privileges);
+            delegate.revokeTablePrivileges(metastoreContext, databaseName, tableName, grantee, privileges);
         }
         finally {
-            tablePrivilegesCache.invalidate(new UserTableKey(grantee, databaseName, tableName));
+            invalidateTablePrivilegesCache(grantee, databaseName, tableName);
         }
     }
 
     @Override
-    public Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal)
+    public Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal principal)
     {
-        return get(tablePrivilegesCache, new UserTableKey(principal, databaseName, tableName));
+        return get(tablePrivilegesCache, getCachingKey(metastoreContext, new UserTableKey(principal, databaseName, tableName)));
     }
 
     @Override
@@ -902,9 +923,10 @@ public class CachingHiveMetastore
         return delegate.isImpersonationEnabled();
     }
 
-    public Set<HivePrivilegeInfo> loadTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal)
+    private <T> KeyAndContext<T> getCachingKey(MetastoreContext context, T key)
     {
-        return delegate.listTablePrivileges(databaseName, tableName, principal);
+        MetastoreContext metastoreContext = metastoreImpersonationEnabled ? context : new MetastoreContext(NO_IMPERSONATION_USER);
+        return new KeyAndContext<>(metastoreContext, key);
     }
 
     private static CacheBuilder<Object, Object> newCacheBuilder(OptionalLong expiresAfterWriteMillis, OptionalLong refreshMillis, long maximumSize)
@@ -918,6 +940,11 @@ public class CachingHiveMetastore
         }
         cacheBuilder = cacheBuilder.maximumSize(maximumSize);
         return cacheBuilder;
+    }
+
+    public Set<HivePrivilegeInfo> loadTablePrivileges(KeyAndContext<UserTableKey> loadTablePrivilegesKey)
+    {
+        return delegate.listTablePrivileges(loadTablePrivilegesKey.getMetastoreContext(), loadTablePrivilegesKey.getKey().getDatabase(), loadTablePrivilegesKey.getKey().getTable(), loadTablePrivilegesKey.getKey().getPrincipal());
     }
 
     private static class KeyAndContext<T>

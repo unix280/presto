@@ -271,61 +271,61 @@ public class TestingSemiTransactionalHiveMetastore
     }
 
     @Override
-    public synchronized void createRole(String role, String grantor)
+    public synchronized void createRole(MetastoreContext metastoreContext, String role, String grantor)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void dropRole(String role)
+    public synchronized void dropRole(MetastoreContext metastoreContext, String role)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Set<String> listRoles()
+    public synchronized Set<String> listRoles(MetastoreContext metastoreContext)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void grantRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
+    public synchronized void grantRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean withAdminOption, PrestoPrincipal grantor)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void revokeRoles(Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
+    public synchronized void revokeRoles(MetastoreContext metastoreContext, Set<String> roles, Set<PrestoPrincipal> grantees, boolean adminOptionFor, PrestoPrincipal grantor)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Set<RoleGrant> listRoleGrants(PrestoPrincipal principal)
+    public synchronized Set<RoleGrant> listRoleGrants(MetastoreContext metastoreContext, PrestoPrincipal principal)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal)
+    public synchronized Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal principal)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void grantTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public synchronized void grantTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void revokeTablePrivileges(String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
+    public synchronized void revokeTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal grantee, Set<HivePrivilegeInfo> privileges)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void declareIntentionToWrite(HdfsContext hdfsContext, LocationHandle.WriteMode writeMode, Path stagingPathRoot, Optional<Path> tempPathRoot, String filePrefix, SchemaTableName schemaTableName, boolean temporaryTable)
+    public synchronized void declareIntentionToWrite(HdfsContext context, MetastoreContext metastoreContext, LocationHandle.WriteMode writeMode, Path stagingPathRoot, Optional<Path> tempPathRoot, String filePrefix, SchemaTableName schemaTableName, boolean temporaryTable)
     {
         throw new UnsupportedOperationException("method not implemented");
     }

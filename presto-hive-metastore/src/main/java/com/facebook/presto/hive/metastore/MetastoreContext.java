@@ -11,51 +11,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.hive.authentication;
+package com.facebook.presto.hive.metastore;
 
-import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 
 import java.util.Objects;
-import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
-public final class MetastoreContext
+public class MetastoreContext
 {
-    private static final MetastoreContext NONE_CONTEXT = new MetastoreContext();
-
-    private final Optional<String> username;
-
-    private MetastoreContext()
-    {
-        this.username = Optional.empty();
-    }
-
-    public MetastoreContext(String username)
-    {
-        this.username = requireNonNull(Optional.of(username), "username is null");
-    }
-
-    public MetastoreContext(ConnectorSession session)
-    {
-        this(requireNonNull(session, "session is null").getIdentity());
-    }
+    private final String username;
 
     public MetastoreContext(ConnectorIdentity identity)
     {
         requireNonNull(identity, "identity is null");
-        this.username = Optional.of(requireNonNull(identity.getUser(), "identity.getUser() is null"));
+        this.username = requireNonNull(identity.getUser(), "identity.getUser() is null");
     }
 
-    // this should be called only by CachingHiveMetastore
-    public static MetastoreContext none()
+    public MetastoreContext(String username)
     {
-        return NONE_CONTEXT;
+        this.username = requireNonNull(username, "username is null");
     }
 
-    public Optional<String> getUsername()
+    public String getUsername()
     {
         return username;
     }

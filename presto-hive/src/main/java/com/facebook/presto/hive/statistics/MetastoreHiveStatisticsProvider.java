@@ -28,6 +28,7 @@ import com.facebook.presto.hive.metastore.DecimalStatistics;
 import com.facebook.presto.hive.metastore.DoubleStatistics;
 import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.IntegerStatistics;
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
 import com.facebook.presto.spi.ColumnHandle;
@@ -116,6 +117,7 @@ public class MetastoreHiveStatisticsProvider
             return ImmutableMap.of();
         }
         boolean unpartitioned = hivePartitions.stream().anyMatch(partition -> partition.getPartitionId().equals(UNPARTITIONED_ID));
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity());
         if (unpartitioned) {
             checkArgument(hivePartitions.size() == 1, "expected only one hive partition");
             return ImmutableMap.of(UNPARTITIONED_ID, metastore.getTableStatistics(metastoreContext, table.getSchemaName(), table.getTableName()));
