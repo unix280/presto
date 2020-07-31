@@ -1192,6 +1192,7 @@
                     </exclusion>
                 </exclusions>
             </dependency>
+
             <dependency>
                 <groupId>com.google.cloud.bigdataoss</groupId>
                 <artifactId>gcsio</artifactId>
@@ -1207,6 +1208,7 @@
                     </exclusion>
                 </exclusions>
             </dependency>
+
             <dependency>
                 <groupId>com.google.cloud.bigdataoss</groupId>
                 <artifactId>util-hadoop</artifactId>
