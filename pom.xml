@@ -1148,6 +1148,22 @@
             </dependency>
 
             <dependency>
+                <groupId>com.amazonaws</groupId>
+                <artifactId>aws-java-sdk-sts</artifactId>
+                <version>${dep.aws-sdk.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>commons-logging</groupId>
+                        <artifactId>commons-logging</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>joda-time</groupId>
+                        <artifactId>joda-time</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
                 <groupId>com.google.cloud.bigdataoss</groupId>
                 <artifactId>util</artifactId>
                 <version>${dep.gcs.version}</version>

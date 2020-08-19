@@ -283,7 +283,8 @@ public class TestHiveLogicalPlanner
 
     private static PlanMatchPattern tableScanWithConstraint(String tableName, Map<String, Domain> expectedConstraint)
     {
-        return PlanMatchPattern.tableScan(tableName).with(new Matcher() {
+        return PlanMatchPattern.tableScan(tableName).with(new Matcher()
+        {
             @Override
             public boolean shapeMatches(PlanNode node)
             {
@@ -311,45 +312,45 @@ public class TestHiveLogicalPlanner
     public void testPushdownFilterOnSubfields()
     {
         assertUpdate("CREATE TABLE test_pushdown_filter_on_subfields(" +
-                         "id bigint, " +
-                         "a array(bigint), " +
-                         "b map(varchar, bigint), " +
-                         "c row(" +
-                             "a bigint, " +
-                             "b row(x bigint), " +
-                             "c array(bigint), " +
-                             "d map(bigint, bigint), " +
-                             "e map(varchar, bigint)))");
+                "id bigint, " +
+                "a array(bigint), " +
+                "b map(varchar, bigint), " +
+                "c row(" +
+                "a bigint, " +
+                "b row(x bigint), " +
+                "c array(bigint), " +
+                "d map(bigint, bigint), " +
+                "e map(varchar, bigint)))");
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE a[1] = 1",
-                        ImmutableMap.of(new Subfield("a[1]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("a[1]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields where a[1 + 1] = 1",
-                        ImmutableMap.of(new Subfield("a[2]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("a[2]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT *  FROM test_pushdown_filter_on_subfields WHERE b['foo'] = 1",
-                        ImmutableMap.of(new Subfield("b[\"foo\"]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("b[\"foo\"]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE b[concat('f','o', 'o')] = 1",
-                        ImmutableMap.of(new Subfield("b[\"foo\"]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("b[\"foo\"]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE c.a = 1",
-                        ImmutableMap.of(new Subfield("c.a"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("c.a"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE c.b.x = 1",
-                        ImmutableMap.of(new Subfield("c.b.x"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("c.b.x"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE c.c[5] = 1",
-                        ImmutableMap.of(new Subfield("c.c[5]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("c.c[5]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE c.d[5] = 1",
-                        ImmutableMap.of(new Subfield("c.d[5]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("c.d[5]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE c.e[concat('f', 'o', 'o')] = 1",
-                        ImmutableMap.of(new Subfield("c.e[\"foo\"]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("c.e[\"foo\"]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE c.e['foo'] = 1",
-                        ImmutableMap.of(new Subfield("c.e[\"foo\"]"), singleValue(BIGINT, 1L)));
+                ImmutableMap.of(new Subfield("c.e[\"foo\"]"), singleValue(BIGINT, 1L)));
 
         assertPushdownFilterOnSubfields("SELECT * FROM test_pushdown_filter_on_subfields WHERE c.a IS NOT NULL AND c.c IS NOT NULL",
                 ImmutableMap.of(new Subfield("c.a"), notNull(BIGINT), new Subfield("c.c"), notNull(new ArrayType(BIGINT))));
@@ -997,7 +998,7 @@ public class TestHiveLogicalPlanner
         return new ConstantExpression(value, BIGINT);
     }
 
-    private static Map<String, String> identityMap(String...values)
+    private static Map<String, String> identityMap(String... values)
     {
         return Arrays.stream(values).collect(toImmutableMap(Functions.identity(), Functions.identity()));
     }
@@ -1047,7 +1048,8 @@ public class TestHiveLogicalPlanner
 
     private static PlanMatchPattern tableScan(String tableName, TupleDomain<String> domainPredicate, RowExpression remainingPredicate, Set<String> predicateColumnNames)
     {
-        return PlanMatchPattern.tableScan(tableName).with(new Matcher() {
+        return PlanMatchPattern.tableScan(tableName).with(new Matcher()
+        {
             @Override
             public boolean shapeMatches(PlanNode node)
             {

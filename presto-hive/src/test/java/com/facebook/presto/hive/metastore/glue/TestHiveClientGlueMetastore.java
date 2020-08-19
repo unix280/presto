@@ -125,7 +125,8 @@ public class TestHiveClientGlueMetastore
     }
 
     @Test
-    public void testGetPartitions() throws Exception
+    public void testGetPartitions()
+            throws Exception
     {
         try {
             createDummyPartitionedTable(tablePartitionFormat, CREATE_TABLE_COLUMNS_PARTITIONED);

@@ -166,6 +166,11 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-sts</artifactId>
+        </dependency>
+
         <!-- for testing -->
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
