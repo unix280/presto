@@ -39,7 +39,7 @@ public class TestHiveS3Config
                 .setS3Endpoint(null)
                 .setS3SignerType(null)
                 .setS3PathStyleAccess(false)
-                .setS3UseInstanceCredentials(true)
+                .setS3UseInstanceCredentials(false)
                 .setS3SslEnabled(true)
                 .setS3IamRole(null)
                 .setS3SseEnabled(false)
