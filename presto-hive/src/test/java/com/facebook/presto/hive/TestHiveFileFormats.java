@@ -763,18 +763,18 @@ public class TestHiveFileFormats
         TestColumn writeColumn = new TestColumn("column_name",
                 getStandardMapObjectInspector(
                         javaStringObjectInspector,
-                        getStandardStructObjectInspector(
-                                ImmutableList.of("s_int", "s_double"),
-                                ImmutableList.of(javaIntObjectInspector, javaDoubleObjectInspector))),
+                            getStandardStructObjectInspector(
+                                    ImmutableList.of("s_int", "s_double"),
+                                    ImmutableList.of(javaIntObjectInspector, javaDoubleObjectInspector))),
                 ImmutableMap.of("test", Arrays.asList(1, 5.0)),
                 mapBlockOf(createUnboundedVarcharType(), RowType.anonymous(ImmutableList.of(INTEGER, DOUBLE)),
                         "test", rowBlockOf(ImmutableList.of(INTEGER, DOUBLE), 1L, 5.0)));
         TestColumn readColumn = new TestColumn("column_name",
                 getStandardMapObjectInspector(
                         javaStringObjectInspector,
-                        getStandardStructObjectInspector(
-                                ImmutableList.of("s_double", "s_int"),  //out of order
-                                ImmutableList.of(javaDoubleObjectInspector, javaIntObjectInspector))),
+                            getStandardStructObjectInspector(
+                                    ImmutableList.of("s_double", "s_int"),  //out of order
+                                    ImmutableList.of(javaDoubleObjectInspector, javaIntObjectInspector))),
                 ImmutableMap.of("test", Arrays.asList(5.0, 1)),
                 mapBlockOf(createUnboundedVarcharType(), RowType.anonymous(ImmutableList.of(DOUBLE, INTEGER)),
                         "test", rowBlockOf(ImmutableList.of(DOUBLE, INTEGER), 5.0, 1L)));
@@ -807,9 +807,9 @@ public class TestHiveFileFormats
         readColumn = new TestColumn("column_name",
                 getStandardMapObjectInspector(
                         javaStringObjectInspector,
-                        getStandardStructObjectInspector(
-                                ImmutableList.of("s_DOUBLE", "s_INT"),  //out of order
-                                ImmutableList.of(javaDoubleObjectInspector, javaIntObjectInspector))),
+                            getStandardStructObjectInspector(
+                                    ImmutableList.of("s_DOUBLE", "s_INT"),  //out of order
+                                    ImmutableList.of(javaDoubleObjectInspector, javaIntObjectInspector))),
                 ImmutableMap.of("test", Arrays.asList(5.0, 1)),
                 mapBlockOf(createUnboundedVarcharType(), RowType.anonymous(ImmutableList.of(DOUBLE, INTEGER)),
                         "test", rowBlockOf(ImmutableList.of(DOUBLE, INTEGER), 5.0, 1L)));
@@ -824,9 +824,9 @@ public class TestHiveFileFormats
         readColumn = new TestColumn("column_name",
                 getStandardMapObjectInspector(
                         javaStringObjectInspector,
-                        getStandardStructObjectInspector(
-                                ImmutableList.of("s_double", "s_int"),
-                                ImmutableList.of(javaIntObjectInspector, javaIntObjectInspector))), //re-type a sub-field
+                            getStandardStructObjectInspector(
+                                    ImmutableList.of("s_double", "s_int"),
+                                    ImmutableList.of(javaIntObjectInspector, javaIntObjectInspector))), //re-type a sub-field
                 ImmutableMap.of("test", Arrays.asList(5, 1)),
                 mapBlockOf(createUnboundedVarcharType(), RowType.anonymous(ImmutableList.of(INTEGER, INTEGER)),
                         "test", rowBlockOf(ImmutableList.of(INTEGER, INTEGER), 5L, 1L)));
