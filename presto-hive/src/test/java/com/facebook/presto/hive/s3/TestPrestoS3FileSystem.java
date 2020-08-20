@@ -150,19 +150,6 @@ public class TestPrestoS3FileSystem
     }
 
     @Test
-    public void testInstanceCredentialsEnabled()
-            throws Exception
-    {
-        Configuration config = new Configuration();
-        // instance credentials are enabled by default
-
-        try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
-            fs.initialize(new URI("s3n://test-bucket/"), config);
-            assertInstanceOf(getAwsCredentialsProvider(fs), InstanceProfileCredentialsProvider.class);
-        }
-    }
-
-    @Test
     public void testDefaultCredentials()
             throws Exception
     {
