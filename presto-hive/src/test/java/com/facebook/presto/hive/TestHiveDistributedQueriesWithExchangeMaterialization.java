@@ -169,13 +169,13 @@ public class TestHiveDistributedQueriesWithExchangeMaterialization
             assertQuery(
                     getSession(),
                     "SELECT lineitem.partkey, lineitem.suppkey, lineitem.comment lineitem_comment, partsupp.comment partsupp_comment\n" +
-                            "FROM test_constant_folding_lineitem_bucketed lineitem JOIN test_constant_folding_partsupp_unbucketed partsupp\n" +
-                            "ON\n" +
-                            "  lineitem.partkey = partsupp.partkey AND\n" +
-                            "  lineitem.partkey_mod_9 = partsupp.partkey_mod_9 AND\n" +
-                            "  lineitem.suppkey = partsupp.suppkey AND\n" +
-                            "  lineitem.suppkey_varchar = partsupp.suppkey_varchar\n" +
-                            "WHERE lineitem.partkey_mod_9 = 7 AND lineitem.suppkey = 42",
+                    "FROM test_constant_folding_lineitem_bucketed lineitem JOIN test_constant_folding_partsupp_unbucketed partsupp\n" +
+                    "ON\n" +
+                    "  lineitem.partkey = partsupp.partkey AND\n" +
+                    "  lineitem.partkey_mod_9 = partsupp.partkey_mod_9 AND\n" +
+                    "  lineitem.suppkey = partsupp.suppkey AND\n" +
+                    "  lineitem.suppkey_varchar = partsupp.suppkey_varchar\n" +
+                    "WHERE lineitem.partkey_mod_9 = 7 AND lineitem.suppkey = 42",
                     "SELECT lineitem.partkey, lineitem.suppkey, lineitem.comment lineitem_comment, partsupp.comment partsupp_comment\n" +
                             "FROM lineitem JOIN partsupp\n" +
                             "ON lineitem.partkey = partsupp.partkey AND\n" +
@@ -187,13 +187,13 @@ public class TestHiveDistributedQueriesWithExchangeMaterialization
             assertQuery(
                     getSession(),
                     "SELECT lineitem.partkey, lineitem.suppkey, lineitem.comment lineitem_comment, partsupp.comment partsupp_comment\n" +
-                            "FROM test_constant_folding_lineitem_bucketed lineitem JOIN test_constant_folding_partsupp_unbucketed partsupp\n" +
-                            "ON\n" +
-                            "  lineitem.partkey = partsupp.partkey AND\n" +
-                            "  lineitem.partkey_mod_9 = partsupp.partkey_mod_9 AND\n" +
-                            "  lineitem.suppkey = partsupp.suppkey AND\n" +
-                            "  lineitem.suppkey_varchar = partsupp.suppkey_varchar\n" +
-                            "WHERE lineitem.partkey_mod_9 = 7 AND lineitem.suppkey_varchar = '42'",
+                    "FROM test_constant_folding_lineitem_bucketed lineitem JOIN test_constant_folding_partsupp_unbucketed partsupp\n" +
+                    "ON\n" +
+                    "  lineitem.partkey = partsupp.partkey AND\n" +
+                    "  lineitem.partkey_mod_9 = partsupp.partkey_mod_9 AND\n" +
+                    "  lineitem.suppkey = partsupp.suppkey AND\n" +
+                    "  lineitem.suppkey_varchar = partsupp.suppkey_varchar\n" +
+                    "WHERE lineitem.partkey_mod_9 = 7 AND lineitem.suppkey_varchar = '42'",
                     "SELECT lineitem.partkey, lineitem.suppkey, lineitem.comment lineitem_comment, partsupp.comment partsupp_comment\n" +
                             "FROM lineitem JOIN partsupp\n" +
                             "ON lineitem.partkey = partsupp.partkey AND\n" +
