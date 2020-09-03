@@ -451,6 +451,7 @@
                     <!-- these tests take a very long time so only run them in the CI server -->
                     <excludes>
                         <exclude>**/TestLocalExecutionPlanner.java</exclude>
+                        <exclude>**/TestTimeZoneUtils.java</exclude>
                     </excludes>
                     <systemPropertyVariables>
                         <org.joda.time.DateTimeZone.Provider>io.airlift.jodabridge.JdkBasedZoneInfoProvider</org.joda.time.DateTimeZone.Provider>
