@@ -15,6 +15,7 @@ package com.facebook.presto.hive.metastore;
 
 import com.facebook.airlift.configuration.testing.ConfigAssertions;
 import com.facebook.presto.hive.MetastoreClientConfig;
+import com.facebook.presto.hive.metastore.CachingHiveMetastore.MetastoreCacheScope;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
 import io.airlift.units.Duration;
@@ -41,7 +42,9 @@ public class TestMetastoreClientConfig
                 .setRecordingPath(null)
                 .setDeleteFilesOnDrop(false)
                 .setRecordingDuration(new Duration(0, TimeUnit.MINUTES))
-                .setReplay(false));
+                .setReplay(false)
+                .setPartitionVersioningEnabled(false)
+                .setMetastoreCacheScope(MetastoreCacheScope.ALL));
     }
 
     @Test
@@ -60,6 +63,8 @@ public class TestMetastoreClientConfig
                 .put("hive.metastore-recording-path", "/foo/bar")
                 .put("hive.metastore-recoding-duration", "42s")
                 .put("hive.replay-metastore-recording", "true")
+                .put("hive.partition-versioning-enabled", "true")
+                .put("hive.metastore-cache-scope", "PARTITION")
                 .put("hive.metastore.thrift.delete-files-on-drop", "true")
                 .build();
 
@@ -76,7 +81,9 @@ public class TestMetastoreClientConfig
                 .setRecordingPath("/foo/bar")
                 .setRecordingDuration(new Duration(42, TimeUnit.SECONDS))
                 .setReplay(true)
-                .setDeleteFilesOnDrop(true);
+                .setDeleteFilesOnDrop(true)
+                .setPartitionVersioningEnabled(true)
+                .setMetastoreCacheScope(MetastoreCacheScope.PARTITION);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

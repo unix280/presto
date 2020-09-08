@@ -14,6 +14,7 @@
 package com.facebook.presto.hive;
 
 import com.facebook.airlift.configuration.Config;
+import com.facebook.presto.hive.metastore.CachingHiveMetastore.MetastoreCacheScope;
 import com.facebook.airlift.configuration.ConfigDescription;
 import com.google.common.net.HostAndPort;
 import io.airlift.units.Duration;
@@ -42,6 +43,8 @@ public class MetastoreClientConfig
     private String recordingPath;
     private boolean replay;
     private Duration recordingDuration = new Duration(0, MINUTES);
+    private boolean partitionVersioningEnabled;
+    private MetastoreCacheScope metastoreCacheScope = MetastoreCacheScope.ALL;
     private boolean deleteFilesOnDrop;
 
     public HostAndPort getMetastoreSocksProxy()
@@ -194,6 +197,31 @@ public class MetastoreClientConfig
     public MetastoreClientConfig setRequireHadoopNative(boolean requireHadoopNative)
     {
         this.requireHadoopNative = requireHadoopNative;
+        return this;
+    }
+
+    public boolean isPartitionVersioningEnabled()
+    {
+        return partitionVersioningEnabled;
+    }
+
+    @Config("hive.partition-versioning-enabled")
+    public MetastoreClientConfig setPartitionVersioningEnabled(boolean partitionVersioningEnabled)
+    {
+        this.partitionVersioningEnabled = partitionVersioningEnabled;
+        return this;
+    }
+
+    @NotNull
+    public MetastoreCacheScope getMetastoreCacheScope()
+    {
+        return metastoreCacheScope;
+    }
+
+    @Config("hive.metastore-cache-scope")
+    public MetastoreClientConfig setMetastoreCacheScope(MetastoreCacheScope metastoreCacheScope)
+    {
+        this.metastoreCacheScope = metastoreCacheScope;
         return this;
     }
 
