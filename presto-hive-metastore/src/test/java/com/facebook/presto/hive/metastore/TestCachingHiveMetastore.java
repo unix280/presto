@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.metastore;
 
 import com.facebook.presto.hive.PartitionVersionFetcher;
+import com.facebook.presto.hive.metastore.CachingHiveMetastore.MetastoreCacheScope;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.metastore.thrift.BridgingHiveMetastore;
 import com.facebook.presto.hive.metastore.thrift.HiveCluster;
@@ -69,7 +70,9 @@ public class TestCachingHiveMetastore
                 executor,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
-                1000);
+                1000,
+                false,
+                MetastoreCacheScope.ALL);
         stats = thriftHiveMetastore.getStats();
     }
 
