@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore;
 
+import com.facebook.presto.hive.PartitionVersionFetcher;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.metastore.thrift.BridgingHiveMetastore;
 import com.facebook.presto.hive.metastore.thrift.HiveCluster;
@@ -60,10 +61,11 @@ public class TestCachingHiveMetastore
         mockClient = new MockHiveMetastoreClient();
         MockHiveCluster mockHiveCluster = new MockHiveCluster(mockClient);
         ListeningExecutorService executor = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("test-%s")));
+        PartitionVersionFetcher hivePartitionVersionFetcher = new HivePartitionVersionFetcher();
         MetastoreClientConfig metastoreClientConfig = new MetastoreClientConfig();
         ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(mockHiveCluster, new MetastoreClientConfig(), null);
         metastore = new CachingHiveMetastore(
-                new BridgingHiveMetastore(thriftHiveMetastore),
+                new BridgingHiveMetastore(thriftHiveMetastore, hivePartitionVersionFetcher),
                 executor,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
