@@ -789,7 +789,7 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - develop
           requires:
             - finish_test_suite
 
