@@ -823,3 +823,22 @@ workflows:
       #         ignore: /.*/
       #     requires:
       #       - build_version
+      - release_to_production:
+          type: approval
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+          requires:
+            - deploy_prestodb_docker_image_staging
+      - deploy_prestodb_docker_image:
+          name: deploy_prestodb_docker_image_production
+          context: aws_ecr_production
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+          requires:
+            - release_to_production
