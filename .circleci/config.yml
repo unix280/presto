@@ -84,6 +84,7 @@ commands:
         default: centos:7
     steps:
       - setup_remote_docker:
+          version: 19.03.13
           docker_layer_caching: true
 
       - run:
@@ -231,7 +232,8 @@ jobs:
 
       - restore_package_cache
 
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -255,7 +257,8 @@ jobs:
 
       - restore_package_cache
 
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -279,7 +282,8 @@ jobs:
 
       - restore_package_cache
 
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -330,7 +334,8 @@ jobs:
 
       - restore_package_cache
 
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -378,7 +383,8 @@ jobs:
 
       - restore_package_cache
 
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -402,7 +408,8 @@ jobs:
 
       - restore_package_cache
 
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -429,7 +436,8 @@ jobs:
 
       - restore_package_cache
 
-      - setup_remote_docker
+      - setup_remote_docker:
+          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
