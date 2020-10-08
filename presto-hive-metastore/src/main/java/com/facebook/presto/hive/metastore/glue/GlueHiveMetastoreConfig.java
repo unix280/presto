@@ -31,6 +31,7 @@ public class GlueHiveMetastoreConfig
     private Optional<String> catalogId = Optional.empty();
     private int partitionSegments = 5;
     private int getPartitionThreads = 20;
+    private Optional<String> iamRole = Optional.empty();
 
     public Optional<String> getGlueRegion()
     {

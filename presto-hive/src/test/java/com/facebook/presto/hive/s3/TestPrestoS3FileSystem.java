@@ -19,6 +19,7 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+import com.amazonaws.auth.InstanceProfileCredentialsProvider;
 import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3EncryptionClient;
@@ -156,6 +157,19 @@ public class TestPrestoS3FileSystem
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             fs.initialize(new URI("s3n://test-bucket/"), config);
             assertInstanceOf(getAwsCredentialsProvider(fs), STSAssumeRoleSessionCredentialsProvider.class);
+        }
+    }
+
+    @Test
+    public void testInstanceCredentialsEnabled()
+            throws Exception
+    {
+        Configuration config = new Configuration();
+        // instance credentials are enabled by default
+
+        try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
+            fs.initialize(new URI("s3n://test-bucket/"), config);
+            assertInstanceOf(getAwsCredentialsProvider(fs), InstanceProfileCredentialsProvider.class);
         }
     }
 
@@ -431,8 +445,7 @@ public class TestPrestoS3FileSystem
     }
 
     @Test(expectedExceptions = UnrecoverableS3OperationException.class, expectedExceptionsMessageRegExp = ".*\\Q (Path: /tmp/test/path)\\E")
-    public void testUnrecoverableS3ExceptionMessage()
-            throws Exception
+    public void testUnrecoverableS3ExceptionMessage() throws Exception
     {
         throw new UnrecoverableS3OperationException(new Path("/tmp/test/path"), new IOException("test io exception"));
     }
@@ -649,8 +662,7 @@ public class TestPrestoS3FileSystem
     }
 
     @Test
-    public void testPrestoS3InputStreamEOS()
-            throws Exception
+    public void testPrestoS3InputStreamEOS() throws Exception
     {
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             AtomicInteger readableBytes = new AtomicInteger(1);
