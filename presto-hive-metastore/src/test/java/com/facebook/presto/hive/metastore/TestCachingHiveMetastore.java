@@ -13,10 +13,10 @@
  */
 package com.facebook.presto.hive.metastore;
 
+import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.MockHiveMetastore;
 import com.facebook.presto.hive.PartitionVersionFetcher;
 import com.facebook.presto.hive.metastore.CachingHiveMetastore.MetastoreCacheScope;
-import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.metastore.thrift.BridgingHiveMetastore;
 import com.facebook.presto.hive.metastore.thrift.HiveCluster;
 import com.facebook.presto.hive.metastore.thrift.HiveMetastoreClient;
