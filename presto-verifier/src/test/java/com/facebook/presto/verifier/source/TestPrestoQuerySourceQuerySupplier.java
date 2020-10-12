@@ -99,17 +99,17 @@ public class TestPrestoQuerySourceQuerySupplier
                             binder.bind(SqlParser.class).in(SINGLETON);
                         })
                         .build());
-        injector = app
-                .setRequiredConfigurationProperties(ImmutableMap.<String, String>builder()
-                        .put("test-id", "10000")
-                        .put("control.hosts", format("%s,%s", host, host))
-                        .put("control.jdbc-port", String.valueOf(port))
-                        .put("source-query.supplier", "presto-query")
-                        .put("source-query.query", SOURCE_FETCHING_QUERY)
-                        .put("source-query.catalog", CATALOG)
-                        .put("source-query.schema", SCHEMA)
-                        .put("source-query.username", "test_user")
-                        .build())
+
+        injector = app.setRequiredConfigurationProperties(ImmutableMap.<String, String>builder()
+                .put("test-id", "10000")
+                .put("control.hosts", format("%s,%s", host, host))
+                .put("control.jdbc-port", String.valueOf(port))
+                .put("source-query.supplier", "presto-query")
+                .put("source-query.query", SOURCE_FETCHING_QUERY)
+                .put("source-query.catalog", CATALOG)
+                .put("source-query.schema", SCHEMA)
+                .put("source-query.username", "test_user")
+                .build())
                 .initialize();
     }
 

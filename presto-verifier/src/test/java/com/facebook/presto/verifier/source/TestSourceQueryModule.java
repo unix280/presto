@@ -59,11 +59,12 @@ public class TestSourceQueryModule
                 ImmutableList.<Module>builder()
                         .add(new SourceQueryModule(ImmutableSet.of("test-supplier")))
                         .build());
-        app.setRequiredConfigurationProperties(
-                ImmutableMap.<String, String>builder()
-                        .putAll(DEFAULT_CONFIGURATION_PROPERTIES)
-                        .put("source-query.supplier", "test-supplier")
-                        .build()).initialize();
+
+        app.setRequiredConfigurationProperties(ImmutableMap.<String, String>builder()
+                .putAll(DEFAULT_CONFIGURATION_PROPERTIES)
+                .put("source-query.supplier", "test-supplier")
+                .build())
+                .initialize();
     }
 
     @Test(expectedExceptions = CreationException.class, expectedExceptionsMessageRegExp = "Unable to create injector.*")
@@ -74,10 +75,11 @@ public class TestSourceQueryModule
                 ImmutableList.<Module>builder()
                         .add(new SourceQueryModule(ImmutableSet.of("test-supplier")))
                         .build());
-        app.setRequiredConfigurationProperties(
-                ImmutableMap.<String, String>builder()
-                        .putAll(DEFAULT_CONFIGURATION_PROPERTIES)
-                        .put("source-query.supplier", "unknown-supplier")
-                        .build()).initialize();
+
+        app.setRequiredConfigurationProperties(ImmutableMap.<String, String>builder()
+                .putAll(DEFAULT_CONFIGURATION_PROPERTIES)
+                .put("source-query.supplier", "unknown-supplier")
+                .build())
+                .initialize();
     }
 }
