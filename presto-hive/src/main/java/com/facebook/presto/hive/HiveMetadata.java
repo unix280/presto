@@ -1701,6 +1701,7 @@ public class HiveMetadata
             int bucketCount = handle.getBucketProperty().get().getBucketCount();
             LocationHandle locationHandle = handle.getLocationHandle();
             List<String> fileNamesForMissingBuckets = computeFileNamesForMissingBuckets(
+                    session,
                     storageFormat,
                     handle.getCompressionCodec(),
                     handle.getFilePrefix(),
@@ -1724,6 +1725,7 @@ public class HiveMetadata
             int bucketCount = handle.getBucketProperty().get().getBucketCount();
 
             List<String> fileNamesForMissingBuckets = computeFileNamesForMissingBuckets(
+                    session,
                     storageFormat,
                     handle.getCompressionCodec(),
                     handle.getFilePrefix(),
@@ -1745,6 +1747,7 @@ public class HiveMetadata
     }
 
     private List<String> computeFileNamesForMissingBuckets(
+            ConnectorSession session,
             HiveStorageFormat storageFormat,
             HiveCompressionCodec compressionCodec,
             String filePrefix,
@@ -1758,7 +1761,7 @@ public class HiveMetadata
         String fileExtension = getFileExtension(fromHiveStorageFormat(storageFormat), compressionCodec);
         ImmutableList.Builder<String> missingFileNamesBuilder = ImmutableList.builder();
         for (int i = 0; i < bucketCount; i++) {
-            String targetFileName = HiveWriterFactory.computeBucketedFileName(filePrefix, i) + fileExtension;
+            String targetFileName = HiveSessionProperties.isFileRenamingEnabled(session) ? String.valueOf(i) : HiveWriterFactory.computeBucketedFileName(filePrefix, i) + fileExtension;
             if (!existingFileNames.contains(targetFileName)) {
                 missingFileNamesBuilder.add(targetFileName);
             }
