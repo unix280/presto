@@ -13,11 +13,15 @@
  */
 package com.facebook.presto.hive.metastore.thrift;
 
+import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.hive.HdfsContext;
+import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveBasicStatistics;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.HiveViewNotSupportedException;
+import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.PartitionNotFoundException;
 import com.facebook.presto.hive.RetryDriver;
 import com.facebook.presto.hive.SchemaAlreadyExistsException;
@@ -32,6 +36,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaNotFoundException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableNotFoundException;
+import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
@@ -39,6 +44,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -65,6 +71,7 @@ import org.weakref.jmx.Managed;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -95,6 +102,7 @@ import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.security.PrincipalType.USER;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
@@ -105,6 +113,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.hive.common.FileUtils.makePartName;
+import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 import static org.apache.hadoop.hive.metastore.api.HiveObjectType.TABLE;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category.PRIMITIVE;
@@ -113,21 +122,30 @@ import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Cate
 public class ThriftHiveMetastore
         implements HiveMetastore
 {
+    private static final Logger log = Logger.get(ThriftHiveMetastore.class);
+
     private final ThriftHiveMetastoreStats stats;
     private final HiveCluster clientProvider;
     private final Function<Exception, Exception> exceptionMapper;
+    private static final String DEFAULT_METASTORE_USER = "presto";
+    private final HdfsContext hdfsContext;
+    private final HdfsEnvironment hdfsEnvironment;
+    private final boolean deleteFilesOnDrop;
 
     @Inject
-    public ThriftHiveMetastore(HiveCluster hiveCluster)
+    public ThriftHiveMetastore(HiveCluster hiveCluster, MetastoreClientConfig metastoreClientConfig, HdfsEnvironment hdfsEnvironment)
     {
-        this(hiveCluster, new ThriftHiveMetastoreStats(), identity());
+        this(hiveCluster, metastoreClientConfig, new ThriftHiveMetastoreStats(), identity(), hdfsEnvironment);
     }
 
-    public ThriftHiveMetastore(HiveCluster hiveCluster, ThriftHiveMetastoreStats stats, Function<Exception, Exception> exceptionMapper)
+    public ThriftHiveMetastore(HiveCluster hiveCluster, MetastoreClientConfig metastoreClientConfig, ThriftHiveMetastoreStats stats, Function<Exception, Exception> exceptionMapper, HdfsEnvironment hdfsEnvironment)
     {
+        this.hdfsContext = new HdfsContext(new ConnectorIdentity(DEFAULT_METASTORE_USER, Optional.empty(), Optional.empty()));
+        this.deleteFilesOnDrop = metastoreClientConfig.isDeleteFilesOnDrop();
         this.clientProvider = requireNonNull(hiveCluster, "hiveCluster is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.exceptionMapper = requireNonNull(exceptionMapper, "exceptionMapper is null");
+        this.hdfsEnvironment = hdfsEnvironment;
     }
 
     @Managed
@@ -854,7 +872,12 @@ public class ThriftHiveMetastore
                     .stopOnIllegalExceptions()
                     .run("dropTable", stats.getDropTable().wrap(() -> {
                         try (HiveMetastoreClient client = clientProvider.createMetastoreClient()) {
+                            Table table = client.getTable(databaseName, tableName);
                             client.dropTable(databaseName, tableName, deleteData);
+                            String tableLocation = table.getSd().getLocation();
+                            if (deleteFilesOnDrop && deleteData && isManagedTable(table) && !isNullOrEmpty(tableLocation)) {
+                                deleteDirRecursive(hdfsContext, hdfsEnvironment, new Path(tableLocation));
+                            }
                         }
                         return null;
                     }));
@@ -867,6 +890,22 @@ public class ThriftHiveMetastore
         }
         catch (Exception e) {
             throw propagate(e);
+        }
+    }
+
+    private static boolean isManagedTable(Table table)
+    {
+        return table.getTableType().equals(MANAGED_TABLE.name());
+    }
+
+    private static void deleteDirRecursive(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)
+    {
+        try {
+            hdfsEnvironment.getFileSystem(context, path).delete(path, true);
+        }
+        catch (IOException | RuntimeException e) {
+            // don't fail if unable to delete path
+            log.warn(e, "Failed to delete path: " + path.toString());
         }
     }
 

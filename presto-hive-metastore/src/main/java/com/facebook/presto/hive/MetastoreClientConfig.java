@@ -14,6 +14,7 @@
 package com.facebook.presto.hive;
 
 import com.facebook.airlift.configuration.Config;
+import com.facebook.airlift.configuration.ConfigDescription;
 import com.google.common.net.HostAndPort;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
@@ -41,6 +42,7 @@ public class MetastoreClientConfig
     private String recordingPath;
     private boolean replay;
     private Duration recordingDuration = new Duration(0, MINUTES);
+    private boolean deleteFilesOnDrop;
 
     public HostAndPort getMetastoreSocksProxy()
     {
@@ -192,6 +194,19 @@ public class MetastoreClientConfig
     public MetastoreClientConfig setRequireHadoopNative(boolean requireHadoopNative)
     {
         this.requireHadoopNative = requireHadoopNative;
+        return this;
+    }
+
+    public boolean isDeleteFilesOnDrop()
+    {
+        return deleteFilesOnDrop;
+    }
+
+    @Config("hive.metastore.thrift.delete-files-on-drop")
+    @ConfigDescription("Delete files on drop in case the metastore doesn't do it")
+    public MetastoreClientConfig setDeleteFilesOnDrop(boolean deleteFilesOnDrop)
+    {
+        this.deleteFilesOnDrop = deleteFilesOnDrop;
         return this;
     }
 }

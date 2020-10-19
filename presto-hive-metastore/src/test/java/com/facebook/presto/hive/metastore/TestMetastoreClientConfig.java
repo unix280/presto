@@ -39,6 +39,7 @@ public class TestMetastoreClientConfig
                 .setPerTransactionMetastoreCacheMaximumSize(1000)
                 .setMaxMetastoreRefreshThreads(100)
                 .setRecordingPath(null)
+                .setDeleteFilesOnDrop(false)
                 .setRecordingDuration(new Duration(0, TimeUnit.MINUTES))
                 .setReplay(false));
     }
@@ -59,6 +60,7 @@ public class TestMetastoreClientConfig
                 .put("hive.metastore-recording-path", "/foo/bar")
                 .put("hive.metastore-recoding-duration", "42s")
                 .put("hive.replay-metastore-recording", "true")
+                .put("hive.metastore.thrift.delete-files-on-drop", "true")
                 .build();
 
         MetastoreClientConfig expected = new MetastoreClientConfig()
@@ -73,7 +75,8 @@ public class TestMetastoreClientConfig
                 .setMaxMetastoreRefreshThreads(2500)
                 .setRecordingPath("/foo/bar")
                 .setRecordingDuration(new Duration(42, TimeUnit.SECONDS))
-                .setReplay(true);
+                .setReplay(true)
+                .setDeleteFilesOnDrop(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

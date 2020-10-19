@@ -896,7 +896,7 @@ public abstract class AbstractTestHiveClient
 
         HiveCluster hiveCluster = new TestingHiveCluster(metastoreClientConfig, host, port);
         ExtendedHiveMetastore metastore = new CachingHiveMetastore(
-                new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster)),
+                new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster, new MetastoreClientConfig(), hdfsEnvironment)),
                 executor,
                 Duration.valueOf("1m"),
                 Duration.valueOf("15s"),
