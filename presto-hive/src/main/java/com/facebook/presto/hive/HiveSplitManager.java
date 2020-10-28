@@ -48,9 +48,12 @@ import org.weakref.jmx.Nested;
 
 import javax.inject.Inject;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -386,27 +389,33 @@ public class HiveSplitManager
                     partitions);
 
             ImmutableList.Builder<HivePartitionMetadata> results = ImmutableList.builder();
+            Map<String, Set<String>> partitionsNotReadable = new HashMap<>();
+            int unreadablePartitionsSkipped = 0;
             for (HivePartition hivePartition : partitionBatch) {
                 Partition partition = partitions.get(hivePartition.getPartitionId());
                 if (partition == null) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, "Partition not loaded: " + hivePartition);
                 }
-                String partName = makePartName(table.getPartitionColumns(), partition.getValues());
+                String partitionName = makePartName(table.getPartitionColumns(), partition.getValues());
                 Optional<EncryptionInformation> encryptionInformation = encryptionInformationForPartitions.map(metadata -> metadata.get(hivePartition.getPartitionId()));
 
                 if (!isOfflineDataDebugModeEnabled(session)) {
                     // verify partition is online
-                    verifyOnline(tableName, Optional.of(partName), getProtectMode(partition), partition.getParameters());
+                    verifyOnline(tableName, Optional.of(partitionName), getProtectMode(partition), partition.getParameters());
 
                     // verify partition is not marked as non-readable
-                    String partitionNotReadable = partition.getParameters().get(OBJECT_NOT_READABLE);
-                    if (!isNullOrEmpty(partitionNotReadable)) {
+                    String reason = partition.getParameters().get(OBJECT_NOT_READABLE);
+                    if (!isNullOrEmpty(reason)) {
                         if (!shouldIgnoreUnreadablePartition(session) || !partition.isEligibleToIgnore()) {
-                            throw new HiveNotReadableException(tableName, Optional.of(partName), partitionNotReadable);
+                            throw new HiveNotReadableException(tableName, Optional.of(partitionName), reason);
                         }
-                        warningCollector.add(new PrestoWarning(
-                                PARTITION_NOT_READABLE,
-                                format("Table '%s' partition '%s' is not readable: %s", tableName, partName, partitionNotReadable)));
+                        unreadablePartitionsSkipped++;
+                        if (partitionsNotReadable.size() <= 3) {
+                            partitionsNotReadable.putIfAbsent(reason, new HashSet<>(ImmutableSet.of(partitionName)));
+                            if (partitionsNotReadable.get(reason).size() <= 3) {
+                                partitionsNotReadable.get(reason).add(partitionName);
+                            }
+                        }
                         continue;
                     }
                 }
@@ -419,9 +428,9 @@ public class HiveSplitManager
                 List<Column> tableColumns = table.getDataColumns();
                 List<Column> partitionColumns = partition.getColumns();
                 if ((tableColumns == null) || (partitionColumns == null)) {
-                    throw new PrestoException(HIVE_INVALID_METADATA, format("Table '%s' or partition '%s' has null columns", tableName, partName));
+                    throw new PrestoException(HIVE_INVALID_METADATA, format("Table '%s' or partition '%s' has null columns", tableName, partitionName));
                 }
-                TableToPartitionMapping tableToPartitionMapping = getTableToPartitionMapping(session, storageFormat, tableName, partName, tableColumns, partitionColumns);
+                TableToPartitionMapping tableToPartitionMapping = getTableToPartitionMapping(session, storageFormat, tableName, partitionName, tableColumns, partitionColumns);
 
                 if (hiveBucketHandle.isPresent() && !hiveBucketHandle.get().isVirtuallyBucketed()) {
                     Optional<HiveBucketProperty> partitionBucketProperty = partition.getStorage().getBucketProperty();
@@ -451,7 +460,13 @@ public class HiveSplitManager
 
                 results.add(new HivePartitionMetadata(hivePartition, Optional.of(partition), tableToPartitionMapping, encryptionInformation));
             }
-
+            if (unreadablePartitionsSkipped > 0) {
+                StringBuilder warningMessage = new StringBuilder(format("Table '%s' has %s out of %s partitions unreadable: ", tableName, unreadablePartitionsSkipped, partitionBatch.size()));
+                for (Entry<String, Set<String>> entry : partitionsNotReadable.entrySet()) {
+                    warningMessage.append(String.join(", ", entry.getValue())).append("... are due to ").append(entry.getKey()).append(". ");
+                }
+                warningCollector.add(new PrestoWarning(PARTITION_NOT_READABLE, warningMessage.toString()));
+            }
             return results.build();
         });
         return concat(partitionBatches);
