@@ -33,7 +33,7 @@ public abstract class AbstractTestSessionPropertyManager
             Optional.of("source"),
             ImmutableSet.of("tag1", "tag2"),
             Optional.of(QueryType.DATA_DEFINITION.toString()),
-            new ResourceGroupId(ImmutableList.of("global", "pipeline", "user_foo", "bar")));
+            Optional.of(new ResourceGroupId(ImmutableList.of("global", "pipeline", "user_foo", "bar"))));
 
     protected abstract void assertProperties(Map<String, String> properties, SessionMatchSpec... spec)
             throws Exception;
