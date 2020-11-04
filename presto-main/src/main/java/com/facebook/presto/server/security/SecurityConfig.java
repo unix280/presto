@@ -32,7 +32,7 @@ public class SecurityConfig
     private static final Splitter SPLITTER = Splitter.on(',').trimResults().omitEmptyStrings();
 
     private List<AuthenticationType> authenticationTypes = ImmutableList.of();
-    private boolean enableForwardingHttps;
+    private boolean enableForwardingHttps = true;
 
     public enum AuthenticationType
     {

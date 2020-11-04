@@ -14,6 +14,7 @@
 package com.facebook.presto.spark;
 
 import com.facebook.airlift.configuration.AbstractConfigurationAwareModule;
+import com.facebook.airlift.http.server.Authenticator;
 import com.facebook.airlift.node.NodeConfig;
 import com.facebook.airlift.node.NodeInfo;
 import com.facebook.presto.GroupByHashPageIndexerFactory;
@@ -156,6 +157,7 @@ import com.facebook.presto.transaction.TransactionManagerConfig;
 import com.facebook.presto.type.TypeDeserializer;
 import com.facebook.presto.type.TypeRegistry;
 import com.facebook.presto.version.EmbedVersion;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Binder;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
@@ -167,7 +169,9 @@ import org.weakref.jmx.testing.TestingMBeanServer;
 import javax.inject.Singleton;
 import javax.management.MBeanServer;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -455,5 +459,12 @@ public class PrestoSparkModule
                     newFixedThreadPool(1, daemonThreadsNamed("fragment-result-cache-remover-%s")));
         }
         return new NoOpFragmentResultCacheManager();
+    }
+
+    @Provides
+    @Singleton
+    List<Authenticator> getAuthenticatorList(Set<Authenticator> authenticators)
+    {
+        return ImmutableList.copyOf(authenticators);
     }
 }

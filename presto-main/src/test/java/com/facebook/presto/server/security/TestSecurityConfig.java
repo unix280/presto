@@ -29,7 +29,7 @@ public class TestSecurityConfig
     public void testDefaults()
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(SecurityConfig.class)
-                .setEnableForwardingHttps(false)
+                .setEnableForwardingHttps(true)
                 .setAuthenticationTypes(""));
     }
 
@@ -38,11 +38,11 @@ public class TestSecurityConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("http-server.authentication.type", "KERBEROS,PASSWORD")
-                .put("http-server.authentication.allow-forwarded-https", "true")
+                .put("http-server.authentication.allow-forwarded-https", "false")
                 .build();
 
         SecurityConfig expected = new SecurityConfig()
-                .setEnableForwardingHttps(true)
+                .setEnableForwardingHttps(false)
                 .setAuthenticationTypes(ImmutableList.of(KERBEROS, PASSWORD));
 
         ConfigAssertions.assertFullMapping(properties, expected);
