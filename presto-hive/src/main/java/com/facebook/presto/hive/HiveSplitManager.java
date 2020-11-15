@@ -61,7 +61,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.stream.Stream;
 
-import static com.facebook.presto.hive.BackgroundHiveSplitLoader.BucketSplitInfo.createBucketSplitInfo;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static com.facebook.presto.hive.HiveColumnHandle.isPathColumnHandle;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
@@ -75,6 +74,7 @@ import static com.facebook.presto.hive.HiveSessionProperties.shouldIgnoreUnreada
 import static com.facebook.presto.hive.HiveStorageFormat.PARQUET;
 import static com.facebook.presto.hive.HiveStorageFormat.getHiveStorageFormat;
 import static com.facebook.presto.hive.HiveWarningCode.PARTITION_NOT_READABLE;
+import static com.facebook.presto.hive.StoragePartitionLoader.BucketSplitInfo.createBucketSplitInfo;
 import static com.facebook.presto.hive.TableToPartitionMapping.mapColumnsByIndex;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getProtectMode;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.makePartName;
