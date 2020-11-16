@@ -106,7 +106,6 @@ public final class InternalHiveConnectorFactory
                     });
 
             Injector injector = app
-                    .strictConfig()
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(config)
                     .initialize();

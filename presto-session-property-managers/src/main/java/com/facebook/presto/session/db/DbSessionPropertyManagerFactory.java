@@ -39,7 +39,6 @@ public class DbSessionPropertyManagerFactory
         try {
             Bootstrap app = new Bootstrap(new JsonModule(), new JsonModule(), new DbSessionPropertyManagerModule());
             Injector injector = app
-                    .strictConfig()
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(config)
                     .initialize();
