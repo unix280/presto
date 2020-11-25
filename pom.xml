@@ -107,6 +107,7 @@
         <module>presto-teradata-functions</module>
         <module>presto-example-http</module>
         <module>presto-juicyray</module>
+        <module>presto-event-listener</module>
         <module>presto-local-file</module>
         <module>presto-tpch</module>
         <module>presto-tpcds</module>
@@ -290,6 +291,13 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-juicyray</artifactId>
+                <version>${project.version}</version>
+                <type>zip</type>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-event-listener</artifactId>
                 <version>${project.version}</version>
                 <type>zip</type>
             </dependency>

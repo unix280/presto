@@ -89,6 +89,10 @@
             <outputDirectory>plugin/juicyray</outputDirectory>
         </fileSet>
         <fileSet>
+            <directory>${project.build.directory}/dependency/presto-event-listener-${project.version}</directory>
+            <outputDirectory>plugin/event-listener</outputDirectory>
+        </fileSet>
+        <fileSet>
             <directory>${project.build.directory}/dependency/presto-hive-hadoop2-${project.version}</directory>
             <outputDirectory>plugin/hive-hadoop2</outputDirectory>
         </fileSet>
