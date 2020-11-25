@@ -559,6 +559,7 @@ jobs:
           command: |
             mkdir build-artifacts
             cp ~/build-artifacts/presto-server-$PRESTO_VERSION.tar.gz ./build-artifacts
+            cp ~/build-artifacts/presto-cli-$PRESTO_VERSION-executable.jar ./build-artifacts
 
       - build_tag_push_docker_image:
           repo_name: prestodb
