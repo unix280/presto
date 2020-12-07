@@ -22,6 +22,7 @@ import com.google.inject.Scopes;
 import java.util.Map;
 
 import static com.facebook.airlift.configuration.ConfigBinder.configBinder;
+import static com.google.common.base.Throwables.throwIfUnchecked;
 
 public class FileAuthenticatorFactory
         implements PasswordAuthenticatorFactory
@@ -35,17 +36,23 @@ public class FileAuthenticatorFactory
     @Override
     public PasswordAuthenticator create(Map<String, String> config)
     {
-        Bootstrap app = new Bootstrap(
-                binder -> {
-                    configBinder(binder).bindConfig(FileConfig.class);
-                    binder.bind(FileAuthenticator.class).in(Scopes.SINGLETON);
-                });
+        try {
+            Bootstrap app = new Bootstrap(
+                    binder -> {
+                        configBinder(binder).bindConfig(FileConfig.class);
+                        binder.bind(FileAuthenticator.class).in(Scopes.SINGLETON);
+                    });
 
-        Injector injector = app
-                .doNotInitializeLogging()
-                .setRequiredConfigurationProperties(config)
-                .initialize();
+            Injector injector = app
+                    .doNotInitializeLogging()
+                    .setRequiredConfigurationProperties(config)
+                    .initialize();
 
-        return injector.getInstance(FileAuthenticator.class);
+            return injector.getInstance(FileAuthenticator.class);
+        }
+        catch (Exception e) {
+            throwIfUnchecked(e);
+            throw new RuntimeException(e);
+        }
     }
 }

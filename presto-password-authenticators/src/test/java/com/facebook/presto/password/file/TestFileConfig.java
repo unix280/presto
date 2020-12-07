@@ -18,9 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.units.Duration;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.File;
 import java.util.Map;
 
 import static com.facebook.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
@@ -41,18 +39,15 @@ public class TestFileConfig
 
     @Test
     public void testExplicitConfig()
-            throws IOException
     {
-        Path passwordFile = Files.createTempFile(null, null);
-
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("file.password-file", passwordFile.toString())
+                .put("file.password-file", "/test/password")
                 .put("file.refresh-period", "42s")
                 .put("file.auth-token-cache.max-size", "1234")
                 .build();
 
         FileConfig expected = new FileConfig()
-                .setPasswordFile(passwordFile.toFile())
+                .setPasswordFile(new File("/test/password"))
                 .setRefreshPeriod(new Duration(42, SECONDS))
                 .setAuthTokenCacheMaxSize(1234);
 

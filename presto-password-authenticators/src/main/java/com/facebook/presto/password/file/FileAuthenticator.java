@@ -14,12 +14,14 @@
 package com.facebook.presto.password.file;
 
 import com.facebook.airlift.http.server.BasicPrincipal;
+import com.facebook.airlift.log.Logger;
 import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.PasswordAuthenticator;
 
 import javax.inject.Inject;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.security.Principal;
 import java.util.function.Supplier;
 
@@ -29,12 +31,17 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class FileAuthenticator
         implements PasswordAuthenticator
 {
+    private static final Logger log = Logger.get(FileAuthenticator.class);
     private final Supplier<PasswordStore> passwordStoreSupplier;
 
     @Inject
-    public FileAuthenticator(FileConfig config)
+    public FileAuthenticator(FileConfig config) throws FileNotFoundException
     {
         File file = config.getPasswordFile();
+        if (!file.exists()) {
+            log.error("File %s does not exist", file.getAbsolutePath());
+            throw new FileNotFoundException("File " + file.getAbsolutePath() + " does not exist");
+        }
         int cacheMaxSize = config.getAuthTokenCacheMaxSize();
 
         passwordStoreSupplier = memoizeWithExpiration(

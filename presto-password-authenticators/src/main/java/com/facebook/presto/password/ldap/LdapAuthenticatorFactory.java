@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.password;
+package com.facebook.presto.password.ldap;
 
 import com.facebook.airlift.bootstrap.Bootstrap;
 import com.facebook.presto.spi.security.PasswordAuthenticator;

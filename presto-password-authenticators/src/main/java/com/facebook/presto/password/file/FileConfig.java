@@ -18,11 +18,11 @@ import com.facebook.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 
+import javax.validation.constraints.NotNull;
+
 import java.io.File;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-
-//import com.facebook.airlift.configuration.validation.FileExists;
 
 public class FileConfig
 {
@@ -30,8 +30,7 @@ public class FileConfig
     private Duration refreshPeriod = new Duration(5, SECONDS);
     private int authTokenCacheMaxSize = 1000;
 
-//    @FileExists
-    //Add support for FileExists validation
+    @NotNull
     public File getPasswordFile()
     {
         return passwordFile;

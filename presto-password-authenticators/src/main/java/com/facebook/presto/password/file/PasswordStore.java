@@ -29,6 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.facebook.presto.password.file.EncryptionUtil.doesBCryptPasswordMatch;
+import static com.facebook.presto.password.file.EncryptionUtil.doesPBKDF2PasswordMatch;
+import static com.facebook.presto.password.file.EncryptionUtil.getHashingAlgorithm;
 import static com.facebook.presto.spi.StandardErrorCode.CONFIGURATION_INVALID;
 import static com.facebook.presto.spi.StandardErrorCode.CONFIGURATION_UNAVAILABLE;
 import static java.lang.String.format;
@@ -110,11 +113,11 @@ public class PasswordStore
 
     private static HashedPassword getHashedPassword(String hashedPassword)
     {
-        switch (EncryptionUtil.getHashingAlgorithm(hashedPassword)) {
+        switch (getHashingAlgorithm(hashedPassword)) {
             case BCRYPT:
-                return password -> EncryptionUtil.doesBCryptPasswordMatch(password, hashedPassword);
+                return password -> doesBCryptPasswordMatch(password, hashedPassword);
             case PBKDF2:
-                return password -> EncryptionUtil.doesPBKDF2PasswordMatch(password, hashedPassword);
+                return password -> doesPBKDF2PasswordMatch(password, hashedPassword);
         }
         throw new HashedPasswordException("Hashing algorithm of password cannot be determined");
     }
