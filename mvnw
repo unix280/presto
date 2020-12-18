@@ -228,9 +228,20 @@ export MAVEN_CMD_LINE_ARGS
 
 WRAPPER_LAUNCHER=org.apache.maven.wrapper.MavenWrapperMain
 
+MAVEN_HOME=`exec "$JAVACMD" \
+  	        $MAVEN_OPTS \
+                -classpath "$MAVEN_PROJECTBASEDIR/.mvn/wrapper/maven-wrapper.jar" \
+                "-Dmaven.home=${M2_HOME}" "-Dmaven.multiModuleProjectDirectory=${MAVEN_PROJECTBASEDIR}" \
+                ${WRAPPER_LAUNCHER} $MAVEN_CONFIG -v | sed -n 2p | awk -F" " '{print $3}'`
+
+#Copy s3 maven repository dependencies to Maven home lib
+if [[ ! -f "$MAVEN_HOME/lib/s3-storage-wagon-2.3.jar" ]]; then
+  cp $MAVEN_PROJECTBASEDIR/src/lib/* $MAVEN_HOME/lib/
+fi
+
 # avoid using MAVEN_CMD_LINE_ARGS below since that would loose parameter escaping in $@
 exec "$JAVACMD" \
   $MAVEN_OPTS \
   -classpath "$MAVEN_PROJECTBASEDIR/.mvn/wrapper/maven-wrapper.jar" \
   "-Dmaven.home=${M2_HOME}" "-Dmaven.multiModuleProjectDirectory=${MAVEN_PROJECTBASEDIR}" \
-  ${WRAPPER_LAUNCHER} $MAVEN_CONFIG "$@"
+  ${WRAPPER_LAUNCHER} $MAVEN_CONFIG -s $MAVEN_PROJECTBASEDIR/settings.xml "$@"

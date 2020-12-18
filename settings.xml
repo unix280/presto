@@ -1,0 +1,27 @@
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+    <servers>
+        <server>
+            <id>ahana-s3-maven-repo-snapshots</id>
+            <username>AKIA3P3XAX7FHR6WZQ4P</username>
+            <password>dvGiS/2J2Sy53/lJXhnl8G2FWwbce0LlTqcigDAI</password>
+            <configuration>
+                <region>us-east-2</region>
+                <publicRepository>false</publicRepository>
+            </configuration>
+        </server>
+
+        <server>
+            <id>ahana-s3-maven-repo-releases</id>
+            <username>AKIA3P3XAX7FHR6WZQ4P</username>
+            <password>dvGiS/2J2Sy53/lJXhnl8G2FWwbce0LlTqcigDAI</password>
+            <configuration>
+                <region>us-east-2</region>
+                <publicRepository>false</publicRepository>
+            </configuration>
+        </server>
+    </servers>
+</settings>

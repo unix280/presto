@@ -14,9 +14,11 @@
 package com.facebook.presto.hive;
 
 import com.facebook.presto.hive.gcs.GcsConfigurationInitializer;
+import com.facebook.presto.hive.rubix.RubixCacheConfigurationInitializer;
 import com.facebook.presto.hive.s3.S3ConfigurationUpdater;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
 import io.airlift.units.Duration;
 import org.apache.hadoop.conf.Configuration;
@@ -29,6 +31,7 @@ import javax.inject.Inject;
 import javax.net.SocketFactory;
 
 import java.util.List;
+import java.util.Set;
 
 import static com.facebook.presto.hive.util.ConfigurationUtils.copy;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -57,17 +60,18 @@ public class HdfsConfigurationInitializer
     private final int fileSystemMaxCacheSize;
     private final S3ConfigurationUpdater s3ConfigurationUpdater;
     private final GcsConfigurationInitializer gcsConfigurationInitialize;
+    private final Set<RubixCacheConfigurationInitializer> rubixCacheConfigurationInitializer;
     private final boolean isHdfsWireEncryptionEnabled;
     private int textMaxLineLength;
 
     @VisibleForTesting
     public HdfsConfigurationInitializer(HiveClientConfig config, MetastoreClientConfig metastoreConfig)
     {
-        this(config, metastoreConfig, ignored -> {}, ignored -> {});
+        this(config, metastoreConfig, ignored -> {}, ignored -> {}, ImmutableSet.of());
     }
 
     @Inject
-    public HdfsConfigurationInitializer(HiveClientConfig config, MetastoreClientConfig metastoreConfig, S3ConfigurationUpdater s3ConfigurationUpdater, GcsConfigurationInitializer gcsConfigurationInitialize)
+    public HdfsConfigurationInitializer(HiveClientConfig config, MetastoreClientConfig metastoreConfig, S3ConfigurationUpdater s3ConfigurationUpdater, GcsConfigurationInitializer gcsConfigurationInitialize, Set<RubixCacheConfigurationInitializer> rubixCacheConfigurationInitializer)
     {
         requireNonNull(config, "config is null");
         checkArgument(config.getDfsTimeout().toMillis() >= 1, "dfsTimeout must be at least 1 ms");
@@ -86,6 +90,7 @@ public class HdfsConfigurationInitializer
 
         this.s3ConfigurationUpdater = requireNonNull(s3ConfigurationUpdater, "s3ConfigurationUpdater is null");
         this.gcsConfigurationInitialize = requireNonNull(gcsConfigurationInitialize, "gcsConfigurationInitialize is null");
+        this.rubixCacheConfigurationInitializer = requireNonNull(rubixCacheConfigurationInitializer, "rubixCacheConfigurationInitializer is null");
     }
 
     private static Configuration readConfiguration(List<String> resourcePaths)
@@ -138,6 +143,7 @@ public class HdfsConfigurationInitializer
 
         s3ConfigurationUpdater.updateConfiguration(config);
         gcsConfigurationInitialize.updateConfiguration(config);
+        rubixCacheConfigurationInitializer.forEach(configurationInitializer -> configurationInitializer.initializeConfiguration(config));
     }
 
     public static class NoOpDNSToSwitchMapping

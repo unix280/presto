@@ -81,6 +81,7 @@
         <air.test.jvmsize>4g</air.test.jvmsize>
 
         <air.javadoc.lint>-missing</air.javadoc.lint>
+        <rubix.version>0.3.11.1</rubix.version>
     </properties>
 
     <modules>
@@ -1794,6 +1795,12 @@
                 <version>2.0.2-6</version>
                 <scope>provided</scope>
             </dependency>
+
+            <dependency>
+                <groupId>com.qubole.rubix</groupId>
+                <artifactId>rubix-presto-shaded</artifactId>
+                <version>${rubix.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -1961,6 +1968,22 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>ci-build</id>
+            <repositories>
+                <repository>
+                    <id>ahana-s3-maven-repo-snapshots</id>
+                    <url>s3://ahana-maven-repo/snapshot</url>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                </repository>
+                <repository>
+                    <id>ahana-s3-maven-repo-releases</id>
+                    <url>s3://ahana-maven-repo/release</url>
+                </repository>
+            </repositories>
+        </profile>
         <profile>
             <id>tests-with-dependencies</id>
             <!--

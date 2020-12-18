@@ -24,6 +24,9 @@ import com.facebook.presto.hive.authentication.HiveAuthenticationModule;
 import com.facebook.presto.hive.gcs.HiveGcsModule;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.HiveMetastoreModule;
+import com.facebook.presto.hive.rubix.RubixConfig;
+import com.facebook.presto.hive.rubix.RubixInitializer;
+import com.facebook.presto.hive.rubix.RubixModule;
 import com.facebook.presto.hive.s3.HiveS3Module;
 import com.facebook.presto.hive.security.HiveSecurityModule;
 import com.facebook.presto.hive.security.SystemTableAwareAccessControl;
@@ -109,6 +112,7 @@ public class HiveConnectorFactory
                     new HiveClientModule(catalogName),
                     new HiveS3Module(catalogName),
                     new HiveGcsModule(),
+                    new RubixModule(),
                     new HiveMetastoreModule(catalogName, metastore),
                     new HiveSecurityModule(),
                     new HiveAuthenticationModule(),
@@ -135,6 +139,12 @@ public class HiveConnectorFactory
                     .setRequiredConfigurationProperties(config)
                     .quiet()
                     .initialize();
+
+            if (injector.getInstance(RubixConfig.class).isCacheEnabled()) {
+                // RubixInitializer needs ConfigurationInitializers, hence kept outside RubixModule
+                RubixInitializer rubixInitializer = injector.getInstance(RubixInitializer.class);
+                rubixInitializer.initializeRubix(context.getNodeManager(), catalogName);
+            }
 
             LifeCycleManager lifeCycleManager = injector.getInstance(LifeCycleManager.class);
             HiveMetadataFactory metadataFactory = injector.getInstance(HiveMetadataFactory.class);

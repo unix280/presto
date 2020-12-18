@@ -43,6 +43,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
+import com.qubole.rubix.presto.CachingPrestoS3FileSystem;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.HadoopExtendedFileSystem;
@@ -376,7 +377,8 @@ public final class HiveWriteUtils
     public static boolean isS3FileSystem(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)
     {
         try {
-            return getRawFileSystem(hdfsEnvironment.getFileSystem(context, path)) instanceof PrestoS3FileSystem;
+            FileSystem fileSystem = getRawFileSystem(hdfsEnvironment.getFileSystem(context, path));
+            return fileSystem instanceof PrestoS3FileSystem || fileSystem instanceof CachingPrestoS3FileSystem;
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed checking path: " + path, e);
