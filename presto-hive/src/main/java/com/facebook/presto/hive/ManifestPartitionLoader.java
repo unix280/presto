@@ -176,7 +176,8 @@ public class ManifestPartitionLoader
                         partitionName,
                         partitionDataColumnCount,
                         partition.getTableToPartitionMapping(),
-                        Optional.empty()),
+                        Optional.empty(),
+                        partition.getRedundantColumnDomains()),
                 schedulerUsesHostAddresses,
                 partition.getEncryptionInformation());
     }
