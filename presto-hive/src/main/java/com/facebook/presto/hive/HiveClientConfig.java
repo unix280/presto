@@ -214,6 +214,8 @@ public class HiveClientConfig
 
     private boolean userDefinedTypeEncodingEnabled;
 
+    private boolean columnIndexFilterEnabled;
+
     @Min(0)
     public int getMaxInitialSplits()
     {
@@ -1748,6 +1750,19 @@ public class HiveClientConfig
     public int getMaterializedViewMissingPartitionsThreshold()
     {
         return this.materializedViewMissingPartitionsThreshold;
+    }
+
+    @Config("hive.parquet-column-index-filter-enabled")
+    @ConfigDescription("enable using parquet column index filter")
+    public HiveClientConfig setReadColumnIndexFilter(boolean columnIndexFilterEnabled)
+    {
+        this.columnIndexFilterEnabled = columnIndexFilterEnabled;
+        return this;
+    }
+
+    public boolean getReadColumnIndexFilter()
+    {
+        return this.columnIndexFilterEnabled;
     }
 
     @Config("hive.size-based-split-weights-enabled")
