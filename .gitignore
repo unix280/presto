@@ -31,3 +31,4 @@ build-artifacts/
 presto-dist/
 # Ignore direnv envrc
 .envrc
+presto-docs-venv/
