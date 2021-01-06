@@ -1692,6 +1692,8 @@ public class HiveMetadata
                     session,
                     handle.getSchemaName(),
                     handle.getTableName(),
+                    table.getStorage().getLocation(),
+                    true,
                     partitionObjectBuilder.buildPartitionObject(session, table, update, prestoVersion, partitionParameters),
                     update.getWritePath(),
                     partitionStatistics);
@@ -2034,7 +2036,15 @@ public class HiveMetadata
                         partitionUpdate.getStatistics(),
                         columnTypes,
                         getColumnStatistics(partitionComputedStatistics, partition.getValues()));
-                metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics);
+                metastore.addPartition(
+                        session,
+                        handle.getSchemaName(),
+                        handle.getTableName(),
+                        table.get().getStorage().getLocation(),
+                        false,
+                        partition,
+                        partitionUpdate.getWritePath(),
+                        partitionStatistics);
             }
             else {
                 throw new IllegalArgumentException(format("Unsupported update mode: %s", partitionUpdate.getUpdateMode()));
