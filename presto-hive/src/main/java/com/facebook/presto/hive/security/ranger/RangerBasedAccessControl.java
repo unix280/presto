@@ -101,6 +101,9 @@ public class RangerBasedAccessControl
             servicePolicies = getHiveServicePolicies(client, hiveServicePolicyUrl);
             users = getUsers(client, getUsersUrl);
             rangerAuthorizer = new RangerAuthorizer(servicePolicies);
+
+            log.info("Retrieved policies count " + servicePolicies.getPolicies().size());
+            log.info("Retrieved users count " + users.getvXUsers().size());
         }
         catch (Exception e) {
             log.error("Exception while querying ranger service " + e);
