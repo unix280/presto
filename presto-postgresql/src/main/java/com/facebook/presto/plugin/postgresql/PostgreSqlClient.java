@@ -18,6 +18,7 @@ import com.facebook.presto.common.type.StandardTypes;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeManager;
 import com.facebook.presto.common.type.TypeSignature;
+import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.plugin.jdbc.BaseJdbcClient;
 import com.facebook.presto.plugin.jdbc.BaseJdbcConfig;
 import com.facebook.presto.plugin.jdbc.DriverConnectionFactory;
@@ -51,7 +52,10 @@ import java.sql.SQLException;
 import java.util.Optional;
 
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
+import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
+import static com.facebook.presto.common.type.VarcharType.createVarcharType;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
+import static com.facebook.presto.plugin.jdbc.StandardReadMappings.varcharReadMapping;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.fasterxml.jackson.core.JsonFactory.Feature.CANONICALIZE_FIELD_NAMES;
@@ -112,8 +116,18 @@ public class PostgreSqlClient
     @Override
     public Optional<ReadMapping> toPrestoType(ConnectorSession session, JdbcTypeHandle typeHandle)
     {
-        if (typeHandle.getJdbcTypeName().equals("jsonb") || typeHandle.getJdbcTypeName().equals("json")) {
-            return Optional.of(jsonColumnMapping());
+        String typeName = typeHandle.getJdbcTypeName();
+        int columnSize = typeHandle.getColumnSize();
+
+        switch (typeName) {
+            case "uuid":
+                if (columnSize > VarcharType.MAX_LENGTH) {
+                    return Optional.of(varcharReadMapping(createUnboundedVarcharType()));
+                }
+                return Optional.of(varcharReadMapping(createVarcharType(columnSize)));
+            case "jsonb":
+            case "json":
+                return Optional.of(jsonColumnMapping());
         }
         return super.toPrestoType(session, typeHandle);
     }
