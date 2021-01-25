@@ -39,6 +39,7 @@ public interface SessionPropertiesDao
             "source_regex VARCHAR(512),\n" +
             "query_type VARCHAR(512),\n" +
             "group_regex VARCHAR(512),\n" +
+            "client_info_regex VARCHAR(512),\n" +
             "priority INT NOT NULL,\n" +
             "PRIMARY KEY (spec_id)\n" +
             ")")
@@ -76,34 +77,36 @@ public interface SessionPropertiesDao
             "S.source_regex,\n" +
             "S.query_type,\n" +
             "S.group_regex,\n" +
+            "S.client_info_regex,\n" +
             "S.client_tags,\n" +
             "GROUP_CONCAT(P.session_property_name ORDER BY P.session_property_name) session_property_names,\n" +
             "GROUP_CONCAT(P.session_property_value ORDER BY P.session_property_name) session_property_values\n" +
             "FROM\n" +
             "(SELECT\n" +
-            "A.spec_id, A.user_regex, A.source_regex, A.query_type, A.group_regex, A.priority,\n" +
+            "A.spec_id, A.user_regex, A.source_regex, A.query_type, A.group_regex, A.client_info_regex, A.priority,\n" +
             "GROUP_CONCAT(DISTINCT B.client_tag) client_tags\n" +
             "FROM " + SESSION_SPECS_TABLE + " A\n" +
             "LEFT JOIN " + CLIENT_TAGS_TABLE + " B\n" +
             "ON A.spec_id = B.tag_spec_id\n" +
-            "GROUP BY A.spec_id, A.user_regex, A.source_regex, A.query_type, A.group_regex, A.priority)\n" +
+            "GROUP BY A.spec_id, A.user_regex, A.source_regex, A.query_type, A.group_regex, A.client_info_regex, A.priority)\n" +
             " S JOIN\n" +
             PROPERTIES_TABLE + " P\n" +
             "ON S.spec_id = P.property_spec_id\n" +
-            "GROUP BY S.spec_id, S.user_regex, S.source_regex, S.query_type, S.group_regex, S.priority, S.client_tags\n" +
+            "GROUP BY S.spec_id, S.user_regex, S.source_regex, S.query_type, S.group_regex, S.client_info_regex, S.priority, S.client_tags\n" +
             "ORDER BY S.priority asc")
     @UseRowMapper(SessionMatchSpec.Mapper.class)
     List<SessionMatchSpec> getSessionMatchSpecs();
 
     @VisibleForTesting
-    @SqlUpdate("INSERT INTO " + SESSION_SPECS_TABLE + " (spec_id, user_regex, source_regex, query_type, group_regex, priority)\n" +
-            "VALUES (:spec_id, :user_regex, :source_regex, :query_type, :group_regex, :priority)")
+    @SqlUpdate("INSERT INTO " + SESSION_SPECS_TABLE + " (spec_id, user_regex, source_regex, query_type, group_regex, client_info_regex, priority)\n" +
+            "VALUES (:spec_id, :user_regex, :source_regex, :query_type, :group_regex, :client_info_regex, :priority)")
     void insertSpecRow(
             @Bind("spec_id") long specId,
             @Bind("user_regex") String userRegex,
             @Bind("source_regex") String sourceRegex,
             @Bind("query_type") String queryType,
             @Bind("group_regex") String groupRegex,
+            @Bind("client_info_regex") String clientInfoRegex,
             @Bind("priority") int priority);
 
     @VisibleForTesting
