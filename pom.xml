@@ -10,7 +10,7 @@
 
     <groupId>com.facebook.presto</groupId>
     <artifactId>presto-root</artifactId>
-    <version>0.246-SNAPSHOT</version>
+    <version>0.246</version>
     <packaging>pom</packaging>
 
     <name>presto-root</name>
@@ -30,7 +30,7 @@
     <scm>
         <connection>scm:git:git://github.com/prestodb/presto.git</connection>
         <url>https://github.com/prestodb/presto</url>
-        <tag>HEAD</tag>
+        <tag>0.246</tag>
     </scm>
 
     <properties>
@@ -230,7 +230,7 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-session-property-managers</artifactId>
-                <version>0.242</version>
+                <version>${project.version}</version>
                 <type>test-jar</type>
             </dependency>
 
