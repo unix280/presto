@@ -4,6 +4,15 @@ orbs:
   aws-cli: circleci/aws-cli@1.2.1
 
 executors:
+  openjdk-test:
+    machine:
+      image: ubuntu-1604:202004-01
+    working_directory: ~/prestodb
+    environment:
+      MAVEN_OPTS: "-Xmx2G -Xms1G -XX:+ExitOnOutOfMemoryError"
+      MAVEN_SKIP_CHECKS_AND_DOCS: "-Dair.check.skip-all=true -Dmaven.javadoc.skip=true"
+      MAVEN_FAST_INSTALL: "-DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -B -q -T C1"
+
   openjdk:
     docker:
       - image: circleci/openjdk:8-jdk-stretch-node
@@ -47,7 +56,7 @@ commands:
       - run:
           name: Copy maven cache
           command: |
-            mkdir ~/.m2
+            mkdir -p ~/.m2
             if [ "$(ls -A ~/mvn_cache)" ]; then cp -R ~/mvn_cache/* ~/.m2/; fi
 
   persist_test_results:
@@ -128,7 +137,7 @@ jobs:
 
       - run:
           name: Run Maven Build
-          command: ./mvnw install -DskipTests -B -T C1 -P ci-build
+          command: ./mvnw install -DskipTests -B -T C1 -P ci
 
       - save_package_cache
 
@@ -253,15 +262,12 @@ jobs:
       - persist_test_results
 
   product_test_basic_environment:
-    executor: openjdk
+    executor: openjdk-test
     resource_class: large
     steps:
       - checkout
 
       - restore_package_cache
-
-      - setup_remote_docker:
-          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -379,15 +385,12 @@ jobs:
       - persist_test_results
 
   hive_tests:
-    executor: openjdk
+    executor: openjdk-test
     resource_class: large
     steps:
       - checkout
 
       - restore_package_cache
-
-      - setup_remote_docker:
-          version: 19.03.13
 
       - run:
           name: Install Maven Wrapper
@@ -820,11 +823,11 @@ workflows:
 #            - docker_hub
 #          requires:
 #            - start_test_suite
-#      - product_test_basic_environment:
-#          context:
-#            - docker_hub
-#          requires:
-#            - start_test_suite
+      - product_test_basic_environment:
+          context:
+            - docker_hub
+          requires:
+            - start_test_suite
 #      - product_test_specific_environment:
 #          context:
 #            - docker_hub
@@ -835,11 +838,11 @@ workflows:
 #            - docker_hub
 #          requires:
 #            - start_test_suite
-#      - hive_tests:
-#          context:
-#            - docker_hub
-#          requires:
-#            - start_test_suite
+      - hive_tests:
+          context:
+            - docker_hub
+          requires:
+            - start_test_suite
 #      - kudu_tests:
 #          context:
 #            - docker_hub
@@ -880,10 +883,10 @@ workflows:
             - test_specific_module_presto_thrift_connector
             - test_specific_module_presto_spark_base
             # - test_other_modules
-            # - product_test_basic_environment
+            - product_test_basic_environment
             # - product_test_specific_environment
             # - product_test_specific_environment_2
-            # - hive_tests
+            - hive_tests
             # - kudu_tests
             # - spark_integration_tests
       - tag_version:

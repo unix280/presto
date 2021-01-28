@@ -18,13 +18,6 @@
 
     <repositories>
         <repository>
-            <id>ahana-s3-maven-repo-snapshots</id>
-            <url>s3://ahana-maven-repo/snapshot</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-        <repository>
             <id>ahana-s3-maven-repo-releases</id>
             <url>s3://ahana-maven-repo/release</url>
         </repository>
