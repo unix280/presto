@@ -98,6 +98,7 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.common.type.BigintType.BIGINT;
+import static com.facebook.presto.common.type.UnknownType.UNKNOWN;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.metadata.FunctionAndTypeManager.qualifyObjectName;
 import static com.facebook.presto.spi.plan.LimitNode.Step.FINAL;
@@ -111,7 +112,6 @@ import static com.facebook.presto.sql.relational.Expressions.call;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 import static com.facebook.presto.sql.relational.Expressions.constantNull;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
-import static com.facebook.presto.type.UnknownType.UNKNOWN;
 import static com.facebook.presto.util.MoreLists.nElements;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
