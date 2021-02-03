@@ -160,6 +160,9 @@ public class TestFeaturesConfig
                 .setAllowWindowOrderByLiterals(true)
                 .setEnforceFixedDistributionForOutputOperator(false)
                 .setEmptyJoinOptimization(false)
+                .setSpoolingOutputBufferThreshold(new DataSize(8, MEGABYTE))
+                .setSpoolingOutputBufferTempStorage("local")
+                .setEmptyJoinOptimization(false)
                 .setEnforceFixedDistributionForOutputOperator(false)
                 .setHideUnauthorizedColumns(false));
     }
@@ -273,6 +276,8 @@ public class TestFeaturesConfig
                 .put("is-allow-window-order-by-literals", "false")
                 .put("enforce-fixed-distribution-for-output-operator", "true")
                 .put("optimizer.optimize-joins-with-empty-sources", "true")
+                .put("spooling-output-buffer-threshold", "16MB")
+                .put("spooling-output-buffer-tempstorage", "tempfs")
                 .put("hide-unauthorized-columns", "true")
                 .build();
 
@@ -382,6 +387,9 @@ public class TestFeaturesConfig
                 .setSkipRedundantSort(false)
                 .setAllowWindowOrderByLiterals(false)
                 .setEnforceFixedDistributionForOutputOperator(true)
+                .setEmptyJoinOptimization(true)
+                .setSpoolingOutputBufferThreshold(new DataSize(16, MEGABYTE))
+                .setSpoolingOutputBufferTempStorage("tempfs")
                 .setEmptyJoinOptimization(true)
                 .setEnforceFixedDistributionForOutputOperator(true)
                 .setHideUnauthorizedColumns(true);
