@@ -2406,11 +2406,16 @@ public class HiveMetadata
         }
 
         TupleDomain<Subfield> domainPredicate = hivePartitionResult.getEffectivePredicate().transform(HiveMetadata::toSubfield);
+        Table table = metastore.getTable(
+                handle.getSchemaTableName().getSchemaName(),
+                handle.getSchemaTableName().getTableName())
+                .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
         return ImmutableList.of(new ConnectorTableLayoutResult(
                 getTableLayout(
                         session,
                         new HiveTableLayoutHandle(
                                 handle.getSchemaTableName(),
+                                table.getStorage().getLocation(),
                                 hivePartitionResult.getPartitionColumns(),
                                 // remove comments to optimize serialization costs
                                 pruneColumnComments(hivePartitionResult.getDataColumns()),
@@ -2649,6 +2654,7 @@ public class HiveMetadata
 
         return new HiveTableLayoutHandle(
                 hiveLayoutHandle.getSchemaTableName(),
+                hiveLayoutHandle.getTablePath(),
                 hiveLayoutHandle.getPartitionColumns(),
                 hiveLayoutHandle.getDataColumns(),
                 hiveLayoutHandle.getTableParameters(),
