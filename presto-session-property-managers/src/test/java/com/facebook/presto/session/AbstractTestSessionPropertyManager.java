@@ -38,6 +38,8 @@ public abstract class AbstractTestSessionPropertyManager
 
     protected abstract void assertProperties(Map<String, String> properties, SessionMatchSpec... spec)
             throws Exception;
+    protected abstract void assertProperties(Map<String, String> defaultProperties, Map<String, String> overrideProperties, SessionMatchSpec... spec)
+            throws Exception;
 
     @Test
     public void testResourceGroupMatch()
@@ -50,6 +52,7 @@ public abstract class AbstractTestSessionPropertyManager
                 Optional.empty(),
                 Optional.empty(),
                 Optional.of(Pattern.compile("global.pipeline.user_.*")),
+                Optional.empty(),
                 Optional.empty(),
                 properties);
 
@@ -65,6 +68,7 @@ public abstract class AbstractTestSessionPropertyManager
                 Optional.empty(),
                 Optional.empty(),
                 Optional.of(ImmutableList.of("tag2")),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -84,11 +88,13 @@ public abstract class AbstractTestSessionPropertyManager
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 ImmutableMap.of("PROPERTY1", "VALUE1", "PROPERTY3", "VALUE3"));
         SessionMatchSpec spec2 = new SessionMatchSpec(
                 Optional.empty(),
                 Optional.empty(),
                 Optional.of(ImmutableList.of("tag1", "tag2")),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -108,6 +114,7 @@ public abstract class AbstractTestSessionPropertyManager
                 Optional.empty(),
                 Optional.of(Pattern.compile("global.interactive.user_.*")),
                 Optional.empty(),
+                Optional.empty(),
                 ImmutableMap.of("PROPERTY", "VALUE"));
 
         assertProperties(ImmutableMap.of(), spec);
@@ -125,8 +132,42 @@ public abstract class AbstractTestSessionPropertyManager
                 Optional.empty(),
                 Optional.empty(),
                 Optional.of(Pattern.compile("bar")),
+                Optional.empty(),
                 properties);
 
         assertProperties(properties, spec);
+    }
+
+    @Test
+    public void testOverride()
+             throws Exception
+    {
+        ImmutableMap<String, String> overrideProperties = ImmutableMap.of("PROPERTY1", "VALUE1");
+        ImmutableMap<String, String> defaultProperties = ImmutableMap.of("PROPERTY1", "VALUE2", "PROPERTY2", "VALUE");
+
+        SessionMatchSpec specOverride = new SessionMatchSpec(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(Pattern.compile("bar")),
+                Optional.of(true),
+                overrideProperties);
+
+        SessionMatchSpec specDefault = new SessionMatchSpec(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(Pattern.compile("bar")),
+                Optional.empty(),
+                defaultProperties);
+
+        // PROPERTY1 should be an override property with the value from the default (non-override, higher precendence)
+        // spec.
+        // PROPERTY2 should be a default property
+        assertProperties(defaultProperties, ImmutableMap.of("PROPERTY1", "VALUE2"), specOverride, specDefault);
     }
 }

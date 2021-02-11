@@ -15,11 +15,14 @@ package com.facebook.presto.session;
 
 import com.facebook.presto.spi.session.SessionConfigurationContext;
 import com.facebook.presto.spi.session.SessionPropertyConfigurationManager;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Table;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableTable.toImmutableTable;
@@ -27,20 +30,28 @@ import static com.google.common.collect.ImmutableTable.toImmutableTable;
 public abstract class AbstractSessionPropertyManager
         implements SessionPropertyConfigurationManager
 {
+    public static final String DEFAULT_PROPERTIES = "defaultProperties";
+    public static final String OVERRIDE_PROPERTIES = "overrideProperties";
+
     @Override
-    public final Map<String, String> getSystemSessionProperties(SessionConfigurationContext context)
+    public final SystemSessionPropertyConfiguration getSystemSessionProperties(SessionConfigurationContext context)
     {
-        Map<String, String> sessionProperties = getSessionProperties(context);
-        return sessionProperties.entrySet().stream()
+        Map<String, Map<String, String>> sessionProperties = getSessionProperties(context);
+        Map<String, String> defaultProperties = sessionProperties.get(DEFAULT_PROPERTIES);
+        Map<String, String> overrideProperties = sessionProperties.get(OVERRIDE_PROPERTIES);
+
+        return new SystemSessionPropertyConfiguration(ImmutableMap.copyOf(defaultProperties.entrySet().stream()
                 .filter(property -> !isCatalogSessionProperty(property))
-                .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+                .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue))), ImmutableMap.copyOf(overrideProperties.entrySet().stream()
+                .filter(property -> !isCatalogSessionProperty(property))
+                .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue))));
     }
 
     @Override
     public final Map<String, Map<String, String>> getCatalogSessionProperties(SessionConfigurationContext context)
     {
-        Map<String, String> sessionProperties = getSessionProperties(context);
-        Table<String, String, String> catalogsSessionProperties = sessionProperties.entrySet().stream()
+        Map<String, Map<String, String>> sessionProperties = getSessionProperties(context);
+        Table<String, String, String> catalogsSessionProperties = sessionProperties.get(DEFAULT_PROPERTIES).entrySet().stream()
                 .filter(AbstractSessionPropertyManager::isCatalogSessionProperty)
                 .collect(toImmutableTable(
                         catalogProperty -> catalogProperty.getKey().split("\\.", 2)[0],
@@ -51,14 +62,30 @@ public abstract class AbstractSessionPropertyManager
 
     protected abstract List<SessionMatchSpec> getSessionMatchSpecs();
 
-    private Map<String, String> getSessionProperties(SessionConfigurationContext context)
+    private Map<String, Map<String, String>> getSessionProperties(SessionConfigurationContext context)
     {
         // later properties override earlier properties
-        Map<String, String> combinedProperties = new HashMap<>();
+        Map<String, String> defaultProperties = new HashMap<>();
+        Set<String> overridePropertyNames = new HashSet<String>();
         for (SessionMatchSpec sessionMatchSpec : getSessionMatchSpecs()) {
-            combinedProperties.putAll(sessionMatchSpec.match(context));
+            Map<String, String> newProperties = sessionMatchSpec.match(context);
+            defaultProperties.putAll(newProperties);
+            if (sessionMatchSpec.getOverrideSessionProperties().orElse(false)) {
+                overridePropertyNames.addAll(newProperties.keySet());
+            }
         }
-        return combinedProperties;
+
+        // Once a property has been overridden it stays that way and the value is updated by any rule
+        Map<String, String> overrideProperties = new HashMap<>();
+        for (String propertyName : overridePropertyNames) {
+            overrideProperties.put(propertyName, defaultProperties.get(propertyName));
+        }
+
+        Map<String, Map<String, String>> sessionProperties = new HashMap<>();
+        sessionProperties.put(DEFAULT_PROPERTIES, defaultProperties);
+        sessionProperties.put(OVERRIDE_PROPERTIES, overrideProperties);
+
+        return sessionProperties;
     }
 
     private static boolean isCatalogSessionProperty(Map.Entry<String, String> property)

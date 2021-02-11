@@ -44,6 +44,7 @@ public class SessionMatchSpec
     private final Optional<String> queryType;
     private final Optional<Pattern> clientInfoRegex;
     private final Optional<Pattern> resourceGroupRegex;
+    private final Optional<Boolean> overrideSessionProperties;
     private final Map<String, String> sessionProperties;
 
     @JsonCreator
@@ -54,6 +55,7 @@ public class SessionMatchSpec
             @JsonProperty("queryType") Optional<String> queryType,
             @JsonProperty("group") Optional<Pattern> resourceGroupRegex,
             @JsonProperty("clientInfo") Optional<Pattern> clientInfoRegex,
+            @JsonProperty("overrideSessionProperties") Optional<Boolean> overrideSessionProperties,
             @JsonProperty("sessionProperties") Map<String, String> sessionProperties)
     {
         this.userRegex = requireNonNull(userRegex, "userRegex is null");
@@ -63,6 +65,7 @@ public class SessionMatchSpec
         this.queryType = requireNonNull(queryType, "queryType is null");
         this.resourceGroupRegex = requireNonNull(resourceGroupRegex, "resourceGroupRegex is null");
         this.clientInfoRegex = requireNonNull(clientInfoRegex, "clientInfoRegex is null");
+        this.overrideSessionProperties = requireNonNull(overrideSessionProperties, "overrideSessionProperties is null");
         requireNonNull(sessionProperties, "sessionProperties is null");
         this.sessionProperties = ImmutableMap.copyOf(sessionProperties);
     }
@@ -143,6 +146,12 @@ public class SessionMatchSpec
     }
 
     @JsonProperty
+    public Optional<Boolean> getOverrideSessionProperties()
+    {
+        return overrideSessionProperties;
+    }
+
+    @JsonProperty
     public Map<String, String> getSessionProperties()
     {
         return sessionProperties;
@@ -166,6 +175,7 @@ public class SessionMatchSpec
                     Optional.ofNullable(resultSet.getString("query_type")),
                     Optional.ofNullable(resultSet.getString("group_regex")).map(Pattern::compile),
                     Optional.ofNullable(resultSet.getString("client_info_regex")).map(Pattern::compile),
+                    Optional.of(resultSet.getBoolean("override_session_properties")),
                     sessionProperties);
         }
 

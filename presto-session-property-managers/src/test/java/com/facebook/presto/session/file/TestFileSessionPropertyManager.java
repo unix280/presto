@@ -18,6 +18,7 @@ import com.facebook.airlift.testing.TempFile;
 import com.facebook.presto.session.AbstractTestSessionPropertyManager;
 import com.facebook.presto.session.SessionMatchSpec;
 import com.facebook.presto.spi.session.SessionPropertyConfigurationManager;
+import com.google.common.collect.ImmutableMap;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,14 +33,22 @@ public class TestFileSessionPropertyManager
         extends AbstractTestSessionPropertyManager
 {
     @Override
-    protected void assertProperties(Map<String, String> properties, SessionMatchSpec... spec)
+    protected void assertProperties(Map<String, String> defaultProperties, SessionMatchSpec... spec)
+            throws IOException
+    {
+        assertProperties(defaultProperties, ImmutableMap.of(), spec);
+    }
+
+    protected void assertProperties(Map<String, String> defaultProperties, Map<String, String> overrideProperties, SessionMatchSpec... spec)
             throws IOException
     {
         try (TempFile tempFile = new TempFile()) {
             Path configurationFile = tempFile.path();
             Files.write(configurationFile, CODEC.toJsonBytes(Arrays.asList(spec)));
             SessionPropertyConfigurationManager manager = new FileSessionPropertyManager(new FileSessionPropertyManagerConfig().setConfigFile(configurationFile.toFile()));
-            assertEquals(manager.getSystemSessionProperties(CONTEXT), properties);
+            SessionPropertyConfigurationManager.SystemSessionPropertyConfiguration propertyConfiguration = manager.getSystemSessionProperties(CONTEXT);
+            assertEquals(propertyConfiguration.systemPropertyDefaults, defaultProperties);
+            assertEquals(propertyConfiguration.systemPropertyOverrides, overrideProperties);
         }
     }
 }
