@@ -1965,7 +1965,7 @@
                             <!-- This is actually the time when the build was done -->
                             <Build-Time>${git.build.time}</Build-Time>
                             <Git-Commit-Id>${git.commit.id}</Git-Commit-Id>
-                            <Implementation-Version>${project.version}-${git.commit.id.abbrev}</Implementation-Version>
+                            <Implementation-Version>${project.version}</Implementation-Version>
                         </manifestEntries>
                     </archive>
                 </configuration>

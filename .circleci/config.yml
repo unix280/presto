@@ -487,16 +487,19 @@ jobs:
           command: git checkout -b temp
 
       - run:
-          name: Create version tag
-          command: |
-            echo 'export TAG_VERSION=$(date -u +%Y.%-m.%-d)-$(git rev-parse --short HEAD)' >> $BASH_ENV
-            source $BASH_ENV
-
-      - run:
           name: Create maven version
           command: |
             mvn_version=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
             latest_prestodb_version=$(echo "$mvn_version" | grep -Eo '^([0-9]+\.[0-9]+(\.[0-9]+)?)')
+            old_ahana_version=$(git describe --match "v[0-9]*.[0-9]*-AHN-[0-9]*.[0-9]*" --tags $(git rev-list --tags --max-count=1) | sed 's|.*-||')
+            new_ahana_version=$(echo $old_ahana_version 0.1 | awk '{print $1 + $2}')
+            old_prestodb_version=$(git describe --match "v[0-9]*.[0-9]*-AHN-[0-9]*.[0-9]*" --tags $(git rev-list --tags --max-count=1) | awk -F- '{print $1}' | grep -Eo '[0-9]+\.[0-9]+')
+            if [[ "$old_prestodb_version" == "$latest_prestodb_version" ]]
+            then
+              TAG_VERSION=AHN-${new_ahana_version}
+            else
+              TAG_VERSION=AHN-0.1
+            fi
             echo "export MVN_VERSION=$latest_prestodb_version-$TAG_VERSION" >> $BASH_ENV
             source $BASH_ENV
 
@@ -523,9 +526,14 @@ jobs:
       - checkout
 
       - run:
-          name: Create dated production tag
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Create production tag
           command: |
-            echo 'export TAG_PRODUCTION_VERSION=$(date -u +%Y.%-m.%-d)-$CIRCLE_BUILD_NUM' >> $BASH_ENV
+            mvn_version=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+            echo "export TAG_PRODUCTION_VERSION=$mvn_version" >> $BASH_ENV
             source $BASH_ENV
 
       - run:
