@@ -91,6 +91,11 @@ commands:
     parameters:
       repo_name:
         type: string
+      aws_region:
+        type: string
+        default: us-east-1
+      aws_ecr_account_url:
+        type: string
       base_os:
         type: string
         default: centos:7
@@ -105,19 +110,19 @@ commands:
 
       - run:
           name: Login to Docker
-          command: aws ecr get-login-password --region $AWS_REGION --profile default | docker login --username AWS --password-stdin $AWS_ECR_ACCOUNT_URL
+          command: aws ecr get-login-password --region << parameters.aws_region >> --profile default | docker login --username AWS --password-stdin << parameters.aws_ecr_account_url >>
 
       - run:
           name: Tag with version and 'latest'
           command: |
-            docker tag ahanaio/<< parameters.repo_name >>:latest $AWS_ECR_ACCOUNT_URL/ahanaio/<< parameters.repo_name >>:latest
-            docker tag ahanaio/<< parameters.repo_name >>:latest $AWS_ECR_ACCOUNT_URL/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
+            docker tag ahanaio/<< parameters.repo_name >>:latest << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest
+            docker tag ahanaio/<< parameters.repo_name >>:latest << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
 
       - run:
           name: Push latest and version tag
           command: |
-            docker push $AWS_ECR_ACCOUNT_URL/ahanaio/<< parameters.repo_name >>:latest
-            docker push $AWS_ECR_ACCOUNT_URL/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
+            docker push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest
+            docker push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
 
 jobs:
   build:
@@ -545,6 +550,9 @@ jobs:
             git push origin p$TAG_PRODUCTION_VERSION
 
   deploy_prestodb_docker_image:
+    parameters:
+      aws_ecr_account_url:
+        type: string
     executor: openjdk
     steps:
       - aws-cli/setup
@@ -574,8 +582,12 @@ jobs:
 
       - build_tag_push_docker_image:
           repo_name: prestodb
+          aws_ecr_account_url: << parameters.aws_ecr_account_url >>
 
   deploy_prestodb_cli_docker_image:
+    parameters:
+      aws_ecr_account_url:
+        type: string
     executor: openjdk
     steps:
       - aws-cli/setup
@@ -604,6 +616,7 @@ jobs:
 
       - build_tag_push_docker_image:
           repo_name: prestodb-cli
+          aws_ecr_account_url: << parameters.aws_ecr_account_url >>
 
 workflows:
   build_and_test:
@@ -921,8 +934,9 @@ workflows:
               ignore: /.*/
       - deploy_prestodb_docker_image:
           name: deploy_prestodb_docker_image_staging
+          aws_ecr_account_url: 375567808433.dkr.ecr.us-east-1.amazonaws.com
           context:
-            - aws_ecr_staging
+            - prestodb_staging
             - docker_hub
           filters:
             tags:
@@ -933,8 +947,9 @@ workflows:
             - build_version
       # - deploy_prestodb_cli_docker_image:
       #     name: deploy_prestodb_cli_docker_image_staging
+      #     aws_ecr_account_url: 375567808433.dkr.ecr.us-east-1.amazonaws.com
       #     context:
-      #        - aws_ecr_staging
+      #        - prestodb_staging
       #        - docker_hub
       #     filters:
       #       tags:
@@ -954,8 +969,9 @@ workflows:
             - deploy_prestodb_docker_image_staging
       - deploy_prestodb_docker_image:
           name: deploy_prestodb_docker_image_production
+          aws_ecr_account_url: 119343124599.dkr.ecr.us-east-1.amazonaws.com
           context:
-            - aws_ecr_production
+            - prestodb_production
             - docker_hub
           filters:
             tags:
