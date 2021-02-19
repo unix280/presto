@@ -618,6 +618,30 @@ jobs:
           repo_name: prestodb-cli
           aws_ecr_account_url: << parameters.aws_ecr_account_url >>
 
+  rotate_iam_credentials:
+    executor: aws-cli/default
+    parameters:
+      ahana_circleci_owner_id:
+        type: string
+        default: 98dcdd92-e223-4759-96d9-d2b8d50effb5
+      project_name:
+        type: string
+      environment:
+        type: string
+      iam_user_name:
+        type: string
+    steps:
+      - checkout
+
+      - aws-cli/setup
+
+      - jq/install
+
+      - run:
+          name: Rotate keys
+          command: |
+            bash ./.circleci/rotate_iam_keys.sh << parameters.ahana_circleci_owner_id >> << parameters.project_name >> << parameters.environment >> << parameters.iam_user_name >>
+
 workflows:
   build_and_test:
     jobs:
@@ -990,3 +1014,28 @@ workflows:
             - deploy_prestodb_docker_image_production
           context:
             - docker_hub
+
+  rotate_credentials_monthly:
+    triggers:
+      - schedule:
+          cron: '30 5 1 * *'
+          filters:
+            branches:
+              only: master
+    jobs:
+      - rotate_iam_credentials:
+          name: rotate_prestodb_staging_credentials
+          project_name: prestodb
+          environment: staging
+          iam_user_name: AhanaPrestoDbProvisioningUser
+          context:
+            - devopsray_provisioning_setup_staging
+            - circleci_api_key
+      - rotate_iam_credentials:
+          name: rotate_prestodb_production_credentials
+          project_name: prestodb
+          environment: production
+          iam_user_name: AhanaPrestoDbProvisioningUser
+          context:
+            - devopsray_provisioning_setup_production
+            - circleci_api_key
