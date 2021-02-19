@@ -36,7 +36,7 @@ echo Found CircleCi context ${projectName}_${environment} $contextId
 
 # Update the access key and secret access key CircleCI environment variables using cURL
 curl --request PUT \
---url https://circleci.com/api/v2/context/${contextId}/environment-variable/AWS_ACCESS_KEY_ID_TEST \
+--url https://circleci.com/api/v2/context/${contextId}/environment-variable/AWS_ACCESS_KEY_ID \
 --header "Circle-Token: ${CIRCLECI_API_KEY}" \
 --header 'Accept: application/json'    \
 --header 'Content-Type: application/json' \
@@ -46,7 +46,7 @@ echo
 echo Updated ${projectName}_${environment} AWS_ACCESS_KEY_ID to $newAccessKeyId
 
 curl --request PUT \
---url https://circleci.com/api/v2/context/${contextId}/environment-variable/AWS_SECRET_ACCESS_KEY_TEST \
+--url https://circleci.com/api/v2/context/${contextId}/environment-variable/AWS_SECRET_ACCESS_KEY \
 --header "Circle-Token: ${CIRCLECI_API_KEY}" \
 --header 'Accept: application/json'    \
 --header 'Content-Type: application/json' \
