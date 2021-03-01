@@ -1022,7 +1022,7 @@ workflows:
           cron: '30 5 1 * *'
           filters:
             branches:
-              only: master
+              only: develop
     jobs:
       - rotate_iam_credentials:
           name: rotate_prestodb_staging_credentials
