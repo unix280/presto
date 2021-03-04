@@ -84,8 +84,8 @@ public class MySqlConnectionModule
                 .setTableName(config.getFunctionNamespacesTableName());
         jdbi.getConfig(SqlFunctionsTableCustomizerFactory.Config.class)
                 .setTableName(config.getFunctionsTableName());
-        jdbi.getConfig(EnumTypesTableCustomizerFactory.Config.class)
-                .setTableName(config.getEnumTypesTableName());
+        jdbi.getConfig(UserDefinedTypesTableCustomizerFactory.Config.class)
+                .setTableName(config.getUserDefinedTypesTableName());
         return jdbi;
     }
 }
