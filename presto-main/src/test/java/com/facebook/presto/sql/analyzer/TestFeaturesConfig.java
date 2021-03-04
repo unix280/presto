@@ -159,6 +159,8 @@ public class TestFeaturesConfig
                 .setCheckAccessControlOnUtilizedColumnsOnly(false)
                 .setAllowWindowOrderByLiterals(true)
                 .setEnforceFixedDistributionForOutputOperator(false)
+                .setEmptyJoinOptimization(false)
+                .setEnforceFixedDistributionForOutputOperator(false)
                 .setHideUnauthorizedColumns(false));
     }
 
@@ -270,6 +272,7 @@ public class TestFeaturesConfig
                 .put("optimizer.skip-redundant-sort", "false")
                 .put("is-allow-window-order-by-literals", "false")
                 .put("enforce-fixed-distribution-for-output-operator", "true")
+                .put("optimizer.optimize-joins-with-empty-sources", "true")
                 .put("hide-unauthorized-columns", "true")
                 .build();
 
@@ -378,6 +381,8 @@ public class TestFeaturesConfig
                 .setCheckAccessControlOnUtilizedColumnsOnly(true)
                 .setSkipRedundantSort(false)
                 .setAllowWindowOrderByLiterals(false)
+                .setEnforceFixedDistributionForOutputOperator(true)
+                .setEmptyJoinOptimization(true)
                 .setEnforceFixedDistributionForOutputOperator(true)
                 .setHideUnauthorizedColumns(true);
         assertFullMapping(properties, expected);
