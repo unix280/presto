@@ -238,7 +238,8 @@ public class PrestoSparkQueryRunner
         testingAccessControlManager = injector.getInstance(TestingAccessControlManager.class);
 
         // Install tpch Plugin
-        pluginManager.installPlugin(new TpchPlugin());
+        Plugin tpchplugin = new TpchPlugin();
+        pluginManager.installPlugin(tpchplugin, tpchplugin.getClass()::getClassLoader);
         connectorManager.createConnection("tpch", "tpch", ImmutableMap.of());
 
         // Install Hive Plugin
@@ -257,7 +258,8 @@ public class PrestoSparkQueryRunner
 
         this.metastore = new FileHiveMetastore(hdfsEnvironment, baseDir.toURI().toString(), "test");
         metastore.createDatabase(createDatabaseMetastoreObject("hive_test"));
-        pluginManager.installPlugin(new HivePlugin("hive", Optional.of(metastore)));
+        Plugin hiveplugin = new HivePlugin("hive", Optional.of(metastore));
+        pluginManager.installPlugin(new HivePlugin("hive", Optional.of(metastore)), hiveplugin.getClass()::getClassLoader);
 
         connectorManager.createConnection("hive", "hive", ImmutableMap.of());
 
@@ -434,7 +436,7 @@ public class PrestoSparkQueryRunner
     @Override
     public void installPlugin(Plugin plugin)
     {
-        pluginManager.installPlugin(plugin);
+        pluginManager.installPlugin(plugin, plugin.getClass()::getClassLoader);
     }
 
     @Override

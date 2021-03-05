@@ -53,7 +53,7 @@ import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
 import com.facebook.presto.sql.relational.RowExpressionOptimizer;
 import com.facebook.presto.type.TypeRegistry;
 
-public class TestingConnectorContext
+public final class TestingConnectorContext
         implements ConnectorContext
 {
     private final NodeManager nodeManager = new ConnectorAwareNodeManager(new InMemoryNodeManager(), "testenv", new ConnectorId("test"));
@@ -152,5 +152,11 @@ public class TestingConnectorContext
     public BlockEncodingSerde getBlockEncodingSerde()
     {
         return blockEncodingSerde;
+    }
+
+    @Override
+    public ClassLoader duplicatePluginClassLoader()
+    {
+        return getClass().getClassLoader();
     }
 }
