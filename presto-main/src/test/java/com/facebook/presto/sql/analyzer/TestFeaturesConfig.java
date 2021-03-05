@@ -153,7 +153,8 @@ public class TestFeaturesConfig
                 .setWarnOnNoTableLayoutFilter("")
                 .setInlineSqlFunctions(true)
                 .setCheckAccessControlOnUtilizedColumnsOnly(false)
-                .setAllowWindowOrderByLiterals(true));
+                .setAllowWindowOrderByLiterals(true)
+                .setEnforceFixedDistributionForOutputOperator(false));
     }
 
     @Test
@@ -260,6 +261,7 @@ public class TestFeaturesConfig
                 .put("inline-sql-functions", "false")
                 .put("check-access-control-on-utilized-columns-only", "true")
                 .put("is-allow-window-order-by-literals", "false")
+                .put("enforce-fixed-distribution-for-output-operator", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -362,7 +364,8 @@ public class TestFeaturesConfig
                 .setWarnOnNoTableLayoutFilter("ry@nlikestheyankees,ds")
                 .setInlineSqlFunctions(false)
                 .setCheckAccessControlOnUtilizedColumnsOnly(true)
-                .setAllowWindowOrderByLiterals(false);
+                .setAllowWindowOrderByLiterals(false)
+                .setEnforceFixedDistributionForOutputOperator(true);
         assertFullMapping(properties, expected);
     }
 

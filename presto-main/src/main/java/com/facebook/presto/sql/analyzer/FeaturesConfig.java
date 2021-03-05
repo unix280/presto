@@ -179,6 +179,8 @@ public class FeaturesConfig
 
     private PartitioningPrecisionStrategy partitioningPrecisionStrategy = PartitioningPrecisionStrategy.AUTOMATIC;
 
+    private boolean enforceFixedDistributionForOutputOperator;
+
     public enum PartitioningPrecisionStrategy
     {
         // Let Presto decide when to repartition
@@ -1501,6 +1503,18 @@ public class FeaturesConfig
     public FeaturesConfig setAllowWindowOrderByLiterals(boolean value)
     {
         this.isAllowWindowOrderByLiterals = value;
+        return this;
+    }
+
+    public boolean isEnforceFixedDistributionForOutputOperator()
+    {
+        return enforceFixedDistributionForOutputOperator;
+    }
+
+    @Config("enforce-fixed-distribution-for-output-operator")
+    public FeaturesConfig setEnforceFixedDistributionForOutputOperator(boolean enforceFixedDistributionForOutputOperator)
+    {
+        this.enforceFixedDistributionForOutputOperator = enforceFixedDistributionForOutputOperator;
         return this;
     }
 }
