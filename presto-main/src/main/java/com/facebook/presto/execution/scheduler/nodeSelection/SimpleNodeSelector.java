@@ -49,10 +49,12 @@ import static com.facebook.presto.execution.scheduler.NodeScheduler.selectExactN
 import static com.facebook.presto.execution.scheduler.NodeScheduler.selectNodes;
 import static com.facebook.presto.execution.scheduler.NodeScheduler.toWhenHasSplitQueueSpaceFuture;
 import static com.facebook.presto.execution.scheduler.nodeSelection.NodeSelectionUtils.sortedNodes;
+import static com.facebook.presto.metadata.InternalNode.NodeStatus.DEAD;
 import static com.facebook.presto.spi.StandardErrorCode.NODE_SELECTION_NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -104,9 +106,15 @@ public class SimpleNodeSelector
     }
 
     @Override
-    public List<InternalNode> allNodes()
+    public List<InternalNode> getActiveNodes()
     {
-        return ImmutableList.copyOf(nodeMap.get().get().getNodesByHostAndPort().values());
+        return ImmutableList.copyOf(nodeMap.get().get().getActiveNodes());
+    }
+
+    @Override
+    public List<InternalNode> getAllNodes()
+    {
+        return ImmutableList.copyOf(nodeMap.get().get().getAllNodes());
     }
 
     @Override
@@ -152,7 +160,10 @@ public class SimpleNodeSelector
                     }
                     candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
                     preferredNodeCount = OptionalInt.of(candidateNodes.size());
-                    candidateNodes = ImmutableList.<InternalNode>builder().addAll(candidateNodes).addAll(randomNodeSelection.pickNodes(split)).build();
+                    candidateNodes = ImmutableList.<InternalNode>builder()
+                            .addAll(candidateNodes)
+                            .addAll(randomNodeSelection.pickNodes(split))
+                            .build();
                     break;
                 case NO_PREFERENCE:
                     candidateNodes = randomNodeSelection.pickNodes(split);
@@ -162,7 +173,7 @@ public class SimpleNodeSelector
             }
 
             if (candidateNodes.isEmpty()) {
-                log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
+                log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getActiveNodes());
                 throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
             }
 
@@ -216,6 +227,11 @@ public class SimpleNodeSelector
         InternalNode chosenNode = null;
         for (int i = 0; i < candidateNodes.size(); i++) {
             InternalNode node = candidateNodes.get(i);
+            if (node.getNodeStatus() == DEAD) {
+                // Node is down. Do not schedule split
+                continue;
+            }
+
             if (assignmentStats.getUnacknowledgedSplitCountForStage(node) >= maxUnacknowledgedSplitsPerTask) {
                 continue;
             }
