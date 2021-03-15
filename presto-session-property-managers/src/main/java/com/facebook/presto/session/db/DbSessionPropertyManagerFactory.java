@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.session;
+package com.facebook.presto.session.db;
 
 import com.facebook.airlift.bootstrap.Bootstrap;
 import com.facebook.airlift.json.JsonModule;
@@ -24,29 +24,27 @@ import java.util.Map;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
 
-public class FileSessionPropertyManagerFactory
+public class DbSessionPropertyManagerFactory
         implements SessionPropertyConfigurationManagerFactory
 {
     @Override
     public String getName()
     {
-        return "file";
+        return "db";
     }
 
     @Override
     public SessionPropertyConfigurationManager create(Map<String, String> config, SessionPropertyConfigurationManagerContext context)
     {
         try {
-            Bootstrap app = new Bootstrap(
-                    new JsonModule(),
-                    new FileSessionPropertyManagerModule());
-
+            Bootstrap app = new Bootstrap(new JsonModule(), new JsonModule(), new DbSessionPropertyManagerModule());
             Injector injector = app
                     .strictConfig()
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(config)
                     .initialize();
-            return injector.getInstance(FileSessionPropertyManager.class);
+
+            return injector.getInstance(DbSessionPropertyManager.class);
         }
         catch (Exception e) {
             throwIfUnchecked(e);

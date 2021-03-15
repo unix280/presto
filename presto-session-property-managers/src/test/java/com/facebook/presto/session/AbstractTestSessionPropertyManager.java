@@ -11,42 +11,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.facebook.presto.session;
 
-import com.facebook.airlift.testing.TempFile;
 import com.facebook.presto.spi.resourceGroups.QueryType;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
 import com.facebook.presto.spi.session.SessionConfigurationContext;
-import com.facebook.presto.spi.session.SessionPropertyConfigurationManager;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-import static com.facebook.presto.session.FileSessionPropertyManager.CODEC;
-import static org.testng.Assert.assertEquals;
-
-public class TestFileSessionPropertyManager
+@Test
+public abstract class AbstractTestSessionPropertyManager
 {
-    private static final SessionConfigurationContext CONTEXT = new SessionConfigurationContext(
+    protected static final SessionConfigurationContext CONTEXT = new SessionConfigurationContext(
             "user",
             Optional.of("source"),
             ImmutableSet.of("tag1", "tag2"),
             Optional.of(QueryType.DATA_DEFINITION.toString()),
             new ResourceGroupId(ImmutableList.of("global", "pipeline", "user_foo", "bar")));
 
+    protected abstract void assertProperties(Map<String, String> properties, SessionMatchSpec... spec)
+            throws Exception;
+
     @Test
     public void testResourceGroupMatch()
-            throws IOException
+            throws Exception
     {
         Map<String, String> properties = ImmutableMap.of("PROPERTY1", "VALUE1", "PROPERTY2", "VALUE2");
         SessionMatchSpec spec = new SessionMatchSpec(
@@ -62,7 +56,7 @@ public class TestFileSessionPropertyManager
 
     @Test
     public void testClientTagMatch()
-            throws IOException
+            throws Exception
     {
         ImmutableMap<String, String> properties = ImmutableMap.of("PROPERTY", "VALUE");
         SessionMatchSpec spec = new SessionMatchSpec(
@@ -78,7 +72,7 @@ public class TestFileSessionPropertyManager
 
     @Test
     public void testMultipleMatch()
-            throws IOException
+            throws Exception
     {
         SessionMatchSpec spec1 = new SessionMatchSpec(
                 Optional.empty(),
@@ -86,7 +80,7 @@ public class TestFileSessionPropertyManager
                 Optional.of(ImmutableList.of("tag2")),
                 Optional.empty(),
                 Optional.empty(),
-                ImmutableMap.of("PROPERTY1", "VALUE1"));
+                ImmutableMap.of("PROPERTY1", "VALUE1", "PROPERTY3", "VALUE3"));
         SessionMatchSpec spec2 = new SessionMatchSpec(
                 Optional.empty(),
                 Optional.empty(),
@@ -95,12 +89,12 @@ public class TestFileSessionPropertyManager
                 Optional.empty(),
                 ImmutableMap.of("PROPERTY1", "VALUE1", "PROPERTY2", "VALUE2"));
 
-        assertProperties(ImmutableMap.of("PROPERTY1", "VALUE1", "PROPERTY2", "VALUE2"), spec1, spec2);
+        assertProperties(ImmutableMap.of("PROPERTY1", "VALUE1", "PROPERTY2", "VALUE2", "PROPERTY3", "VALUE3"), spec1, spec2);
     }
 
     @Test
     public void testNoMatch()
-            throws IOException
+            throws Exception
     {
         SessionMatchSpec spec = new SessionMatchSpec(
                 Optional.empty(),
@@ -111,16 +105,5 @@ public class TestFileSessionPropertyManager
                 ImmutableMap.of("PROPERTY", "VALUE"));
 
         assertProperties(ImmutableMap.of(), spec);
-    }
-
-    private static void assertProperties(Map<String, String> properties, SessionMatchSpec... spec)
-            throws IOException
-    {
-        try (TempFile tempFile = new TempFile()) {
-            Path configurationFile = tempFile.path();
-            Files.write(configurationFile, CODEC.toJsonBytes(Arrays.asList(spec)));
-            SessionPropertyConfigurationManager manager = new FileSessionPropertyManager(new FileSessionPropertyManagerConfig().setConfigFile(configurationFile.toFile()));
-            assertEquals(manager.getSystemSessionProperties(CONTEXT), properties);
-        }
     }
 }

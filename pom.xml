@@ -230,6 +230,13 @@
 
             <dependency>
                 <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-session-property-managers</artifactId>
+                <version>0.242</version>
+                <type>test-jar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-array</artifactId>
                 <version>${project.version}</version>
             </dependency>
