@@ -35,6 +35,7 @@ import static com.qubole.rubix.spi.CacheConfig.setCurrentNodeHostName;
 import static com.qubole.rubix.spi.CacheConfig.setDataTransferServerPort;
 import static com.qubole.rubix.spi.CacheConfig.setEmbeddedMode;
 import static com.qubole.rubix.spi.CacheConfig.setIsParallelWarmupEnabled;
+import static com.qubole.rubix.spi.CacheConfig.setMaxDisks;
 import static com.qubole.rubix.spi.CacheConfig.setOnMaster;
 
 public class RubixConfigurationInitializer
@@ -98,6 +99,7 @@ public class RubixConfigurationInitializer
         setEmbeddedMode(config, true);
         enableHeartbeat(config, false);
         setClusterNodeRefreshTime(config, 10);
+        setMaxDisks(config, 0);
 
         config.set("fs.s3.impl", RUBIX_S3_FS_CLASS_NAME);
         config.set("fs.s3a.impl", RUBIX_S3_FS_CLASS_NAME);
