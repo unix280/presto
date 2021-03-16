@@ -63,6 +63,8 @@ public class TestingSemiTransactionalHiveMetastore
     private final Map<HiveTableName, Table> tablesMap = new HashMap<>();
     private final Map<HiveTableName, List<String>> partitionsMap = new HashMap<>();
 
+    private List<String> partitionNames;
+
     private TestingSemiTransactionalHiveMetastore(HdfsEnvironment hdfsEnvironment, ExtendedHiveMetastore delegate, ListeningExecutorService renameExecutor, boolean skipDeletionForAlter, boolean skipTargetCleanupOnRollback, boolean undoMetastoreOperationsEnabled)
     {
         super(hdfsEnvironment, delegate, renameExecutor, skipDeletionForAlter, skipTargetCleanupOnRollback, undoMetastoreOperationsEnabled);
@@ -115,7 +117,7 @@ public class TestingSemiTransactionalHiveMetastore
     }
 
     @Override
-    public synchronized Set<ColumnStatisticType> getSupportedColumnStatistics(Type type)
+    public synchronized Set<ColumnStatisticType> getSupportedColumnStatistics(MetastoreContext metastoreContext, Type type)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
@@ -228,10 +230,15 @@ public class TestingSemiTransactionalHiveMetastore
         throw new UnsupportedOperationException("method not implemented");
     }
 
+    public synchronized void setPartitionNames(List<String> partitionNames)
+    {
+        this.partitionNames = partitionNames;
+    }
+
     @Override
     public synchronized Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        throw new UnsupportedOperationException("method not implemented");
+        return Optional.ofNullable(partitionNames);
     }
 
     @Override
