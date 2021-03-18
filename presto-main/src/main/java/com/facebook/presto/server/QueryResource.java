@@ -21,6 +21,7 @@ import com.facebook.presto.execution.StageId;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.google.common.collect.ImmutableList;
+import io.airlift.units.Duration;
 
 import javax.annotation.security.RolesAllowed;
 import javax.inject.Inject;
@@ -42,6 +43,7 @@ import static com.facebook.presto.connector.system.KillQueryProcedure.createPree
 import static com.facebook.presto.server.security.RoleType.ADMIN;
 import static com.facebook.presto.server.security.RoleType.USER;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Manage queries scheduled on this node
@@ -53,12 +55,32 @@ public class QueryResource
     // TODO There should be a combined interface for this
     private final DispatchManager dispatchManager;
     private final QueryManager queryManager;
+    private static final Duration DEFAULT_DURATION = new Duration(30, SECONDS);
 
     @Inject
     public QueryResource(DispatchManager dispatchManager, QueryManager queryManager)
     {
         this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
+    }
+
+    @GET
+    @Path("/count")
+    public int getClusterStateInfo(@QueryParam("duration") Duration duration)
+    {
+        int queryCount = 0;
+        long currentTime = System.currentTimeMillis();
+        Duration expectedDuration = duration == null ? DEFAULT_DURATION : duration;
+
+        long expectedTime = currentTime - expectedDuration.toMillis();
+
+        for (BasicQueryInfo queryInfo : dispatchManager.getQueries()) {
+            if (queryInfo.getQueryStats().getEndTime() == null
+                    || queryInfo.getQueryStats().getEndTime().getMillis() >= expectedTime) {
+                queryCount++;
+            }
+        }
+        return queryCount;
     }
 
     @GET
