@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.hive;
 
-import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Storage;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
@@ -54,7 +53,7 @@ public class HiveSplit
     private final OptionalInt tableBucketNumber;
     private final NodeSelectionStrategy nodeSelectionStrategy;
     private final int partitionDataColumnCount;
-    private final Map<Integer, Column> partitionSchemaDifference; // key: hiveColumnIndex
+    private final TableToPartitionMapping tableToPartitionMapping;
     private final Optional<BucketConversion> bucketConversion;
     private final boolean s3SelectPushdownEnabled;
     private final Optional<byte[]> extraFileInfo;
@@ -78,7 +77,7 @@ public class HiveSplit
             @JsonProperty("tableBucketNumber") OptionalInt tableBucketNumber,
             @JsonProperty("nodeSelectionStrategy") NodeSelectionStrategy nodeSelectionStrategy,
             @JsonProperty("partitionDataColumnCount") int partitionDataColumnCount,
-            @JsonProperty("partitionSchemaDifference") Map<Integer, Column> partitionSchemaDifference,
+            @JsonProperty("tableToPartitionMapping") TableToPartitionMapping tableToPartitionMapping,
             @JsonProperty("bucketConversion") Optional<BucketConversion> bucketConversion,
             @JsonProperty("s3SelectPushdownEnabled") boolean s3SelectPushdownEnabled,
             @JsonProperty("extraFileInfo") Optional<byte[]> extraFileInfo,
@@ -99,7 +98,7 @@ public class HiveSplit
         requireNonNull(readBucketNumber, "readBucketNumber is null");
         requireNonNull(tableBucketNumber, "tableBucketNumber is null");
         requireNonNull(nodeSelectionStrategy, "nodeSelectionStrategy is null");
-        requireNonNull(partitionSchemaDifference, "partitionSchemaDifference is null");
+        requireNonNull(tableToPartitionMapping, "tableToPartitionMapping is null");
         requireNonNull(bucketConversion, "bucketConversion is null");
         requireNonNull(extraFileInfo, "extraFileInfo is null");
         requireNonNull(cacheQuotaRequirement, "cacheQuotaRequirement is null");
@@ -119,7 +118,7 @@ public class HiveSplit
         this.tableBucketNumber = tableBucketNumber;
         this.nodeSelectionStrategy = nodeSelectionStrategy;
         this.partitionDataColumnCount = partitionDataColumnCount;
-        this.partitionSchemaDifference = partitionSchemaDifference;
+        this.tableToPartitionMapping = tableToPartitionMapping;
         this.bucketConversion = bucketConversion;
         this.s3SelectPushdownEnabled = s3SelectPushdownEnabled;
         this.extraFileInfo = extraFileInfo;
@@ -226,9 +225,9 @@ public class HiveSplit
     }
 
     @JsonProperty
-    public Map<Integer, Column> getPartitionSchemaDifference()
+    public TableToPartitionMapping getTableToPartitionMapping()
     {
-        return partitionSchemaDifference;
+        return tableToPartitionMapping;
     }
 
     @JsonProperty

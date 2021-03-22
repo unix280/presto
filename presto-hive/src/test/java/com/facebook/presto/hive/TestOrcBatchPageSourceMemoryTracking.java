@@ -508,7 +508,7 @@ public class TestOrcBatchPageSourceMemoryTracking
                     ImmutableList.of(),
                     ImmutableMap.of(),
                     0,
-                    ImmutableMap.of(),
+                    TableToPartitionMapping.empty(),
                     Optional.empty(),
                     false,
                     DEFAULT_HIVE_FILE_CONTEXT,

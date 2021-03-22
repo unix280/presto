@@ -13,10 +13,8 @@
  */
 package com.facebook.presto.hive;
 
-import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Partition;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -25,18 +23,18 @@ public class HivePartitionMetadata
 {
     private final Optional<Partition> partition;
     private final HivePartition hivePartition;
-    private final Map<Integer, Column> partitionSchemaDifference;
+    private final TableToPartitionMapping tableToPartitionMapping;
     private final Optional<EncryptionInformation> encryptionInformation;
 
     HivePartitionMetadata(
             HivePartition hivePartition,
             Optional<Partition> partition,
-            Map<Integer, Column> partitionSchemaDifference,
+            TableToPartitionMapping tableToPartitionMapping,
             Optional<EncryptionInformation> encryptionInformation)
     {
         this.partition = requireNonNull(partition, "partition is null");
         this.hivePartition = requireNonNull(hivePartition, "hivePartition is null");
-        this.partitionSchemaDifference = requireNonNull(partitionSchemaDifference, "partitionSchemaDifference is null");
+        this.tableToPartitionMapping = requireNonNull(tableToPartitionMapping, "tableToPartitionMapping is null");
         this.encryptionInformation = requireNonNull(encryptionInformation, "encryptionInformation is null");
     }
 
@@ -53,9 +51,9 @@ public class HivePartitionMetadata
         return partition;
     }
 
-    public Map<Integer, Column> getPartitionSchemaDifference()
+    public TableToPartitionMapping getTableToPartitionMapping()
     {
-        return partitionSchemaDifference;
+        return tableToPartitionMapping;
     }
 
     public Optional<EncryptionInformation> getEncryptionInformation()

@@ -462,7 +462,7 @@ public class TestBackgroundHiveSplitLoader
                         new HivePartitionMetadata(
                                 new HivePartition(new SchemaTableName("testSchema", "table_name")),
                                 Optional.empty(),
-                                ImmutableMap.of(),
+                                TableToPartitionMapping.empty(),
                                 Optional.empty()));
 
         return new BackgroundHiveSplitLoader(
@@ -487,7 +487,7 @@ public class TestBackgroundHiveSplitLoader
                 new HivePartitionMetadata(
                         new HivePartition(new SchemaTableName("testSchema", "table_name")),
                         Optional.empty(),
-                        ImmutableMap.of(),
+                        TableToPartitionMapping.empty(),
                         Optional.empty()));
 
         ConnectorSession connectorSession = new TestingConnectorSession(
@@ -553,7 +553,7 @@ public class TestBackgroundHiveSplitLoader
                         return new HivePartitionMetadata(
                                 new HivePartition(new SchemaTableName("testSchema", "table_name")),
                                 Optional.empty(),
-                                ImmutableMap.of(),
+                                TableToPartitionMapping.empty(),
                                 Optional.empty());
                     case 1:
                         throw new RuntimeException("OFFLINE");

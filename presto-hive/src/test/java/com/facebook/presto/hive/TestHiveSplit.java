@@ -86,7 +86,7 @@ public class TestHiveSplit
                 OptionalInt.empty(),
                 NO_PREFERENCE,
                 10,
-                ImmutableMap.of(1, new Column("name", HIVE_STRING, Optional.empty())),
+                TableToPartitionMapping.mapColumnsByIndex(ImmutableMap.of(1, new Column("name", HIVE_STRING, Optional.empty()))),
                 Optional.of(new HiveSplit.BucketConversion(
                         32,
                         16,
@@ -116,7 +116,8 @@ public class TestHiveSplit
         assertEquals(actual.getPartitionKeys(), expected.getPartitionKeys());
         assertEquals(actual.getAddresses(), expected.getAddresses());
         assertEquals(actual.getPartitionDataColumnCount(), expected.getPartitionDataColumnCount());
-        assertEquals(actual.getPartitionSchemaDifference(), expected.getPartitionSchemaDifference());
+        assertEquals(actual.getTableToPartitionMapping().getPartitionSchemaDifference(), expected.getTableToPartitionMapping().getPartitionSchemaDifference());
+        assertEquals(actual.getTableToPartitionMapping().getTableToPartitionColumns(), expected.getTableToPartitionMapping().getTableToPartitionColumns());
         assertEquals(actual.getBucketConversion(), expected.getBucketConversion());
         assertEquals(actual.getNodeSelectionStrategy(), expected.getNodeSelectionStrategy());
         assertEquals(actual.isS3SelectPushdownEnabled(), expected.isS3SelectPushdownEnabled());
