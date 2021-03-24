@@ -375,6 +375,8 @@ public class PrestoSparkQueryRunner
                 Optional.of(sql),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
                 new TestingPrestoSparkTaskExecutorFactoryProvider(instanceId),
                 Optional.empty(),
                 Optional.empty());
