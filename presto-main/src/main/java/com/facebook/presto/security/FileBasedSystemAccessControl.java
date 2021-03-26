@@ -16,6 +16,7 @@ package com.facebook.presto.security;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.CatalogSchemaName;
 import com.facebook.presto.plugin.base.security.ForwardingSystemAccessControl;
+import com.facebook.presto.plugin.base.security.SchemaAccessControlRule;
 import com.facebook.presto.security.CatalogAccessControlRule.AccessMode;
 import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.PrestoException;
@@ -77,11 +78,13 @@ public class FileBasedSystemAccessControl
 
     private final List<CatalogAccessControlRule> catalogRules;
     private final Optional<List<PrincipalUserMatchRule>> principalUserMatchRules;
+    private final Optional<List<SchemaAccessControlRule>> schemaRules;
 
-    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules, Optional<List<PrincipalUserMatchRule>> principalUserMatchRules)
+    private FileBasedSystemAccessControl(List<CatalogAccessControlRule> catalogRules, Optional<List<PrincipalUserMatchRule>> principalUserMatchRules, Optional<List<SchemaAccessControlRule>> schemaRules)
     {
         this.catalogRules = catalogRules;
         this.principalUserMatchRules = principalUserMatchRules;
+        this.schemaRules = schemaRules;
     }
 
     public static class Factory
@@ -144,7 +147,7 @@ public class FileBasedSystemAccessControl
                     Optional.of(Pattern.compile(".*")),
                     Optional.of(Pattern.compile("system"))));
 
-            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules());
+            return new FileBasedSystemAccessControl(catalogRulesBuilder.build(), rules.getPrincipalUserMatchRules(), rules.getSchemaRules());
         }
     }
 
@@ -223,6 +226,10 @@ public class FileBasedSystemAccessControl
         if (!canAccessCatalog(identity, schema.getCatalogName(), ALL)) {
             denyCreateSchema(schema.toString());
         }
+
+        if (!isSchemaOwner(identity, schema.getSchemaName())) {
+            denyCreateSchema(schema.toString());
+        }
     }
 
     @Override
@@ -231,12 +238,20 @@ public class FileBasedSystemAccessControl
         if (!canAccessCatalog(identity, schema.getCatalogName(), ALL)) {
             denyDropSchema(schema.toString());
         }
+
+        if (!isSchemaOwner(identity, schema.getSchemaName())) {
+            denyDropSchema(schema.toString());
+        }
     }
 
     @Override
     public void checkCanRenameSchema(Identity identity, AccessControlContext context, CatalogSchemaName schema, String newSchemaName)
     {
         if (!canAccessCatalog(identity, schema.getCatalogName(), ALL)) {
+            denyRenameSchema(schema.toString(), newSchemaName);
+        }
+
+        if (!isSchemaOwner(identity, schema.getSchemaName()) || !isSchemaOwner(identity, newSchemaName)) {
             denyRenameSchema(schema.toString(), newSchemaName);
         }
     }
@@ -383,5 +398,20 @@ public class FileBasedSystemAccessControl
         if (!canAccessCatalog(identity, table.getCatalogName(), ALL)) {
             denyRevokeTablePrivilege(privilege.toString(), table.toString());
         }
+    }
+
+    private boolean isSchemaOwner(Identity identity, String schemaName)
+    {
+        if (!schemaRules.isPresent()) {
+            return true;
+        }
+
+        for (SchemaAccessControlRule rule : schemaRules.get()) {
+            Optional<Boolean> owner = rule.match(identity.getUser(), schemaName);
+            if (owner.isPresent()) {
+                return owner.get();
+            }
+        }
+        return false;
     }
 }
