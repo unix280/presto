@@ -1,6 +1,11 @@
 {
   "catalogs": [
     {
+      "user": "alice",
+      "catalog": "alice-catalog",
+      "allow": "read-only"
+    },
+    {
       "allow": true
     }
   ],
@@ -17,6 +22,11 @@
     {
       "user": "bob",
       "schema": "bob|some-schema",
+      "owner": true
+    },
+    {
+      "user": "alice",
+      "schema": "alice",
       "owner": true
     }
   ]

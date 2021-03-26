@@ -15,12 +15,10 @@ package com.facebook.presto.security;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.CatalogSchemaName;
-import com.facebook.presto.common.type.Type;
 import com.facebook.presto.plugin.base.security.ForwardingSystemAccessControl;
 import com.facebook.presto.plugin.base.security.SchemaAccessControlRule;
 import com.facebook.presto.security.CatalogAccessControlRule.AccessMode;
 import com.facebook.presto.spi.CatalogSchemaTableName;
-import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.security.AccessControlContext;
@@ -29,7 +27,6 @@ import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.Privilege;
 import com.facebook.presto.spi.security.SystemAccessControl;
 import com.facebook.presto.spi.security.SystemAccessControlFactory;
-import com.facebook.presto.spi.security.ViewExpression;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.units.Duration;
@@ -66,7 +63,6 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameS
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRevokeTablePrivilege;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetUser;
-import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Suppliers.memoizeWithExpiration;
 import static java.lang.String.format;
@@ -180,6 +176,7 @@ public class FileBasedSystemAccessControl
                 denySetUser(principal, userName);
             }
         }
+
         denySetUser(principal, userName);
     }
 
@@ -227,11 +224,7 @@ public class FileBasedSystemAccessControl
     @Override
     public void checkCanCreateSchema(Identity identity, AccessControlContext context, CatalogSchemaName schema)
     {
-        if (!canAccessCatalog(identity, schema.getCatalogName(), ALL)) {
-            denyCreateSchema(schema.toString());
-        }
-
-        if (!isSchemaOwner(identity, schema.getSchemaName())) {
+        if (!isSchemaOwner(identity, schema)) {
             denyCreateSchema(schema.toString());
         }
     }
@@ -239,11 +232,7 @@ public class FileBasedSystemAccessControl
     @Override
     public void checkCanDropSchema(Identity identity, AccessControlContext context, CatalogSchemaName schema)
     {
-        if (!canAccessCatalog(identity, schema.getCatalogName(), ALL)) {
-            denyDropSchema(schema.toString());
-        }
-
-        if (!isSchemaOwner(identity, schema.getSchemaName())) {
+        if (!isSchemaOwner(identity, schema)) {
             denyDropSchema(schema.toString());
         }
     }
@@ -251,11 +240,7 @@ public class FileBasedSystemAccessControl
     @Override
     public void checkCanRenameSchema(Identity identity, AccessControlContext context, CatalogSchemaName schema, String newSchemaName)
     {
-        if (!canAccessCatalog(identity, schema.getCatalogName(), ALL)) {
-            denyRenameSchema(schema.toString(), newSchemaName);
-        }
-
-        if (!isSchemaOwner(identity, schema.getSchemaName()) || !isSchemaOwner(identity, newSchemaName)) {
+        if (!isSchemaOwner(identity, schema) || !isSchemaOwner(identity, new CatalogSchemaName(schema.getCatalogName(), newSchemaName))) {
             denyRenameSchema(schema.toString(), newSchemaName);
         }
     }
@@ -273,14 +258,6 @@ public class FileBasedSystemAccessControl
         }
 
         return schemaNames;
-    }
-
-    @Override
-    public void checkCanShowCreateTable(Identity identity, AccessControlContext context, CatalogSchemaTableName table)
-    {
-        if (!canAccessCatalog(identity, table.getCatalogName(), ALL)) {
-            denyShowCreateTable(table.toString());
-        }
     }
 
     @Override
@@ -320,21 +297,6 @@ public class FileBasedSystemAccessControl
         }
 
         return tableNames;
-    }
-
-    @Override
-    public void checkCanShowColumnsMetadata(Identity identity, AccessControlContext context, CatalogSchemaTableName table)
-    {
-    }
-
-    @Override
-    public List<ColumnMetadata> filterColumns(Identity identity, AccessControlContext context, CatalogSchemaTableName table, List<ColumnMetadata> columns)
-    {
-        if (!canAccessCatalog(identity, table.getCatalogName(), READ_ONLY)) {
-            return ImmutableList.of();
-        }
-
-        return columns;
     }
 
     @Override
@@ -427,30 +389,22 @@ public class FileBasedSystemAccessControl
         }
     }
 
-    private boolean isSchemaOwner(Identity identity, String schemaName)
+    private boolean isSchemaOwner(Identity identity, CatalogSchemaName schema)
     {
+        if (!canAccessCatalog(identity, schema.getCatalogName(), ALL)) {
+            return false;
+        }
+
         if (!schemaRules.isPresent()) {
             return true;
         }
 
         for (SchemaAccessControlRule rule : schemaRules.get()) {
-            Optional<Boolean> owner = rule.match(identity.getUser(), schemaName);
+            Optional<Boolean> owner = rule.match(identity.getUser(), schema.getSchemaName());
             if (owner.isPresent()) {
                 return owner.get();
             }
         }
         return false;
-    }
-
-    @Override
-    public Optional<ViewExpression> getRowFilter(Identity identity, AccessControlContext context, CatalogSchemaTableName tableName)
-    {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<ViewExpression> getColumnMask(Identity identity, AccessControlContext context, CatalogSchemaTableName tableName, String columnName, Type type)
-    {
-        return Optional.empty();
     }
 }
