@@ -15,7 +15,7 @@ package com.facebook.presto.session.file;
 
 import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.json.JsonCodecFactory;
-import com.facebook.airlift.json.ObjectMapperProvider;
+import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.presto.session.AbstractSessionPropertyManager;
 import com.facebook.presto.session.SessionMatchSpec;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -38,7 +38,7 @@ public class FileSessionPropertyManager
         extends AbstractSessionPropertyManager
 {
     public static final JsonCodec<List<SessionMatchSpec>> CODEC = new JsonCodecFactory(
-            () -> new ObjectMapperProvider().get().enable(FAIL_ON_UNKNOWN_PROPERTIES))
+            () -> new JsonObjectMapperProvider().get().enable(FAIL_ON_UNKNOWN_PROPERTIES))
             .listJsonCodec(SessionMatchSpec.class);
 
     private final ImmutableList<SessionMatchSpec> sessionMatchSpecs;
