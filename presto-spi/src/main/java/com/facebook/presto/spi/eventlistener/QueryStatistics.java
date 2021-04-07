@@ -26,6 +26,7 @@ public class QueryStatistics
     private final Duration retriedCpuTime;
     private final Duration wallTime;
     private final Duration queuedTime;
+    private final Duration waitingForPrerequisitesTime;
     private final Optional<Duration> analysisTime;
 
     private final int peakRunningTasks;
@@ -55,6 +56,7 @@ public class QueryStatistics
             Duration retriedCpuTime,
             Duration wallTime,
             Duration queuedTime,
+            Duration waitingForPrerequisitesTime,
             Optional<Duration> analysisTime,
             int peakRunningTasks,
             long peakUserMemoryBytes,
@@ -79,6 +81,7 @@ public class QueryStatistics
         this.retriedCpuTime = requireNonNull(retriedCpuTime, "retriedCpuTime is null");
         this.wallTime = requireNonNull(wallTime, "wallTime is null");
         this.queuedTime = requireNonNull(queuedTime, "queuedTime is null");
+        this.waitingForPrerequisitesTime = requireNonNull(waitingForPrerequisitesTime, "waitingForPrerequisitesTime is null");
         this.analysisTime = requireNonNull(analysisTime, "analysisTime is null");
         this.peakRunningTasks = peakRunningTasks;
         this.peakUserMemoryBytes = peakUserMemoryBytes;
@@ -118,6 +121,11 @@ public class QueryStatistics
     public Duration getQueuedTime()
     {
         return queuedTime;
+    }
+
+    public Duration getWaitingForPrerequisitesTime()
+    {
+        return waitingForPrerequisitesTime;
     }
 
     public Optional<Duration> getAnalysisTime()
