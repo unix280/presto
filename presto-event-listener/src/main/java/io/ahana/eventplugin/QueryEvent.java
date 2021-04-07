@@ -24,29 +24,32 @@ public final class QueryEvent
     private final QueryCreatedEvent queryCreatedEvent;
     private final QueryCompletedEvent queryCompletedEvent;
     private final SplitCompletedEvent splitCompletedEvent;
+    private final String plan;
 
     public QueryEvent(
             String instanceId,
             String clusterName,
             QueryCreatedEvent queryCreatedEvent,
             QueryCompletedEvent queryCompletedEvent,
-            SplitCompletedEvent splitCompletedEvent)
+            SplitCompletedEvent splitCompletedEvent,
+            String plan)
     {
         this.instanceId = instanceId;
         this.clusterName = clusterName;
         this.queryCreatedEvent = queryCreatedEvent;
         this.queryCompletedEvent = queryCompletedEvent;
         this.splitCompletedEvent = splitCompletedEvent;
-    }
-
-    public String getClusterName()
-    {
-        return clusterName;
+        this.plan = plan;
     }
 
     public String getInstanceId()
     {
         return instanceId;
+    }
+
+    public String getClusterName()
+    {
+        return clusterName;
     }
 
     public QueryCreatedEvent getQueryCreatedEvent()
@@ -55,7 +58,6 @@ public final class QueryEvent
     }
 
     public QueryCompletedEvent getQueryCompletedEvent()
-
     {
         return queryCompletedEvent;
     }
@@ -63,5 +65,10 @@ public final class QueryEvent
     public SplitCompletedEvent getSplitCompletedEvent()
     {
         return splitCompletedEvent;
+    }
+
+    public String getPlan()
+    {
+        return plan;
     }
 }

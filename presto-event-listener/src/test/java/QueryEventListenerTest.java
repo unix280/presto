@@ -140,9 +140,9 @@ public class QueryEventListenerTest
                 "query",
                 "queryState",
                 URI.create("http://localhost"),
+                Optional.of(""),
                 Optional.of("plan"),
-                Optional.of("plan"),
-                Optional.of("payload"),
+                Optional.of(""),
                 new ArrayList<>());
     }
 

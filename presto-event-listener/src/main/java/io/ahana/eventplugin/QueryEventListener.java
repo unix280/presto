@@ -20,6 +20,7 @@ import com.facebook.presto.spi.eventlistener.QueryMetadata;
 import com.facebook.presto.spi.eventlistener.SplitCompletedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 
@@ -59,6 +60,8 @@ public final class QueryEventListener
             this.webSocketCollectorChannel = new WebSocketCollectorChannel(webSockerCollectUrl);
             this.webSocketCollectorChannel.connect();
         }
+
+        this.mapper.registerModule(new Jdk8Module());
     }
 
     @Override
@@ -72,12 +75,12 @@ public final class QueryEventListener
         QueryMetadata queryMetadata = new QueryMetadata(
                 queryCreatedEvent.getMetadata().getQueryId(),
                 queryCreatedEvent.getMetadata().getTransactionId(),
-                flattenQuery(query),
+                flatten(query),
                 queryCreatedEvent.getMetadata().getQueryState(),
                 queryCreatedEvent.getMetadata().getUri(),
-                queryCreatedEvent.getMetadata().getPlan(),
+                Optional.of(""),
                 queryCreatedEvent.getMetadata().getJsonPlan(),
-                queryCreatedEvent.getMetadata().getPayload(),
+                Optional.of(""),
                 queryCreatedEvent.getMetadata().getRuntimeOptimizedStages());
 
         QueryCreatedEvent queryCreatedEvent1 = new QueryCreatedEvent(
@@ -86,7 +89,8 @@ public final class QueryEventListener
                 queryMetadata);
 
         try {
-            String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, queryCreatedEvent1, null, null));
+            String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, queryCreatedEvent1, null,
+                    null, flatten(queryCreatedEvent.getMetadata().getPlan().orElse("null"))));
             logger.info(eventPayload);
             if (sendToWebSocketServer) {
                 this.webSocketCollectorChannel.sendMessage(eventPayload);
@@ -107,12 +111,12 @@ public final class QueryEventListener
         QueryMetadata queryMetadata = new QueryMetadata(
                 queryCompletedEvent.getMetadata().getQueryId(),
                 queryCompletedEvent.getMetadata().getTransactionId(),
-                flattenQuery(query),
+                flatten(query),
                 queryCompletedEvent.getMetadata().getQueryState(),
                 queryCompletedEvent.getMetadata().getUri(),
-                queryCompletedEvent.getMetadata().getPlan(),
+                Optional.of(""),
                 queryCompletedEvent.getMetadata().getJsonPlan(),
-                queryCompletedEvent.getMetadata().getPayload(),
+                Optional.of(""),
                 queryCompletedEvent.getMetadata().getRuntimeOptimizedStages());
 
         QueryCompletedEvent queryCompletedEvent1 = new QueryCompletedEvent(
@@ -131,7 +135,8 @@ public final class QueryEventListener
                 queryCompletedEvent.getOperatorStatistics());
 
         try {
-            String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, queryCompletedEvent1, null));
+            String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, queryCompletedEvent1,
+                    null, flatten(queryCompletedEvent.getMetadata().getPlan().orElse("null"))));
             logger.info(eventPayload);
             if (sendToWebSocketServer) {
                 this.webSocketCollectorChannel.sendMessage(eventPayload);
@@ -150,7 +155,8 @@ public final class QueryEventListener
         }
 
         try {
-            String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, null, splitCompletedEvent));
+            String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, null,
+                    splitCompletedEvent, null));
             logger.info(eventPayload);
             if (sendToWebSocketServer) {
                 this.webSocketCollectorChannel.sendMessage(eventPayload);
@@ -161,9 +167,9 @@ public final class QueryEventListener
         }
     }
 
-    private static String flattenQuery(String query)
+    private String flatten(String query)
     {
         return (Optional.ofNullable(query).isPresent())
-                ? query.replaceAll("\n", "") : "";
+                ? query.replaceAll("\n", "<<>>") : "";
     }
 }
