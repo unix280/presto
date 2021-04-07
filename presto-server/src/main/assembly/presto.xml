@@ -85,10 +85,6 @@
             <outputDirectory>plugin/example-http</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>${project.build.directory}/dependency/presto-juicyray-${project.version}</directory>
-            <outputDirectory>plugin/juicyray</outputDirectory>
-        </fileSet>
-        <fileSet>
             <directory>${project.build.directory}/dependency/presto-event-listener-${project.version}</directory>
             <outputDirectory>plugin/event-listener</outputDirectory>
         </fileSet>
