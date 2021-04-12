@@ -163,6 +163,8 @@ public class TestFeaturesConfig
                 .setSpoolingOutputBufferEnabled(false)
                 .setSpoolingOutputBufferThreshold(new DataSize(8, MEGABYTE))
                 .setSpoolingOutputBufferTempStorage("local")
+                .setPrestoSparkAssignBucketToPartitionForPartitionedTableWriteEnabled(false)
+                .setSpoolingOutputBufferTempStorage("local")
                 .setEmptyJoinOptimization(false)
                 .setEnforceFixedDistributionForOutputOperator(false)
                 .setHideUnauthorizedColumns(false));
@@ -280,6 +282,7 @@ public class TestFeaturesConfig
                 .put("spooling-output-buffer-enabled", "true")
                 .put("spooling-output-buffer-threshold", "16MB")
                 .put("spooling-output-buffer-temp-storage", "tempfs")
+                .put("spark.assign-bucket-to-partition-for-partitioned-table-write-enabled", "true")
                 .put("hide-unauthorized-columns", "true")
                 .build();
 
@@ -392,6 +395,8 @@ public class TestFeaturesConfig
                 .setEmptyJoinOptimization(true)
                 .setSpoolingOutputBufferEnabled(true)
                 .setSpoolingOutputBufferThreshold(new DataSize(16, MEGABYTE))
+                .setSpoolingOutputBufferTempStorage("tempfs")
+                .setPrestoSparkAssignBucketToPartitionForPartitionedTableWriteEnabled(true)
                 .setSpoolingOutputBufferTempStorage("tempfs")
                 .setEmptyJoinOptimization(true)
                 .setEnforceFixedDistributionForOutputOperator(true)
