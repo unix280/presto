@@ -27,7 +27,6 @@ public class GlueHiveMetastoreConfig
     private boolean pinGlueClientToCurrentRegion;
     private int maxGlueConnections = 5;
     private Optional<String> defaultWarehouseDir = Optional.empty();
-    private Optional<String> iamRole = Optional.empty();
     private Optional<String> catalogId = Optional.empty();
     private int partitionSegments = 5;
     private int getPartitionThreads = 20;
