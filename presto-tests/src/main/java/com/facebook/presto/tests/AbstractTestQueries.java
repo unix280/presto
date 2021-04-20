@@ -166,7 +166,7 @@ public abstract class AbstractTestQueries
     }
 
     @Test
-    public void emptyJoins()
+    public void testEmptyJoins()
     {
         // Empty predicate
         assertQuery("select 1 from (select * from orders where 1 = 0) DT join customer on DT.custkey=customer.custkey",
