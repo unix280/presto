@@ -170,7 +170,6 @@ public final class SystemSessionProperties
     public static final String INLINE_SQL_FUNCTIONS = "inline_sql_functions";
     public static final String REMOTE_FUNCTIONS_ENABLED = "remote_functions_enabled";
     public static final String CHECK_ACCESS_CONTROL_ON_UTILIZED_COLUMNS_ONLY = "check_access_control_on_utilized_columns_only";
-    public static final String SKIP_REDUNDANT_SORT = "skip_redundant_sort";
     public static final String ALLOW_WINDOW_ORDER_BY_LITERALS = "allow_window_order_by_literals";
 
     private final List<PropertyMetadata<?>> sessionProperties;
@@ -873,11 +872,6 @@ public final class SystemSessionProperties
                         featuresConfig.isLegacyDateTimestampToVarcharCoercion(),
                         true),
                 booleanProperty(
-                        SKIP_REDUNDANT_SORT,
-                        "Skip redundant sort operations",
-                        featuresConfig.isSkipRedundantSort(),
-                        false),
-                booleanProperty(
                         INLINE_SQL_FUNCTIONS,
                         "Inline SQL function definition at plan time",
                         featuresConfig.isInlineSqlFunctions(),
@@ -897,11 +891,6 @@ public final class SystemSessionProperties
                         "Allow ORDER BY literals in window functions",
                         featuresConfig.isAllowWindowOrderByLiterals(),
                         false));
-    }
-
-    public static boolean isSkipRedundantSort(Session session)
-    {
-        return session.getSystemProperty(SKIP_REDUNDANT_SORT, Boolean.class);
     }
 
     public static boolean isAllowWindowOrderByLiterals(Session session)

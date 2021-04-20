@@ -167,7 +167,6 @@ import static com.facebook.presto.metadata.MetadataUtil.createQualifiedObjectNam
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static com.facebook.presto.spi.StandardWarningCode.PERFORMANCE_WARNING;
-import static com.facebook.presto.spi.StandardWarningCode.REDUNDANT_ORDER_BY;
 import static com.facebook.presto.spi.function.FunctionKind.AGGREGATE;
 import static com.facebook.presto.spi.function.FunctionKind.WINDOW;
 import static com.facebook.presto.sql.NodeUtils.getSortItemsFromOrderBy;
@@ -838,16 +837,12 @@ class StatementAnalyzer
         {
             Scope withScope = analyzeWith(node, scope);
             Scope queryBodyScope = process(node.getQueryBody(), withScope);
-            List<Expression> orderByExpressions = emptyList();
             if (node.getOrderBy().isPresent()) {
-                orderByExpressions = analyzeOrderBy(node, getSortItemsFromOrderBy(node.getOrderBy()), queryBodyScope);
-                if (queryBodyScope.getOuterQueryParent().isPresent() && !node.getLimit().isPresent()) {
-                    // not the root scope and ORDER BY is ineffective
-                    analysis.markRedundantOrderBy(node.getOrderBy().get());
-                    warningCollector.add(new PrestoWarning(REDUNDANT_ORDER_BY, "ORDER BY in subquery may have no effect"));
-                }
+                analyzeOrderBy(node, queryBodyScope);
             }
-            analysis.setOrderByExpressions(node, orderByExpressions);
+            else {
+                analysis.setOrderByExpressions(node, emptyList());
+            }
 
             // Input fields == Output fields
             analysis.setOutputExpressions(node, descriptorToFields(queryBodyScope));
@@ -1137,22 +1132,12 @@ class StatementAnalyzer
             List<Expression> orderByExpressions = emptyList();
             Optional<Scope> orderByScope = Optional.empty();
             if (node.getOrderBy().isPresent()) {
-                if (node.getSelect().isDistinct()) {
-                    verifySelectDistinct(node, outputExpressions);
-                }
-
-                OrderBy orderBy = node.getOrderBy().get();
-                orderByScope = Optional.of(computeAndAssignOrderByScope(orderBy, sourceScope, outputScope));
-
-                orderByExpressions = analyzeOrderBy(node, orderBy.getSortItems(), orderByScope.get());
-
-                if (sourceScope.getOuterQueryParent().isPresent() && !node.getLimit().isPresent()) {
-                    // not the root scope and ORDER BY is ineffective
-                    analysis.markRedundantOrderBy(orderBy);
-                    warningCollector.add(new PrestoWarning(REDUNDANT_ORDER_BY, "ORDER BY in subquery may have no effect"));
-                }
+                orderByScope = Optional.of(computeAndAssignOrderByScope(node.getOrderBy().get(), sourceScope, outputScope));
+                orderByExpressions = analyzeOrderBy(node, orderByScope.get(), outputExpressions);
             }
-            analysis.setOrderByExpressions(node, orderByExpressions);
+            else {
+                analysis.setOrderByExpressions(node, emptyList());
+            }
 
             List<Expression> sourceExpressions = new ArrayList<>(outputExpressions);
             node.getHaving().ifPresent(sourceExpressions::add);
@@ -2240,6 +2225,27 @@ class StatementAnalyzer
             return withScope;
         }
 
+        private void analyzeOrderBy(Query node, Scope orderByScope)
+        {
+            checkState(node.getOrderBy().isPresent(), "orderBy is absent");
+
+            List<SortItem> sortItems = getSortItemsFromOrderBy(node.getOrderBy());
+            analyzeOrderBy(node, sortItems, orderByScope);
+        }
+
+        private List<Expression> analyzeOrderBy(QuerySpecification node, Scope orderByScope, List<Expression> outputExpressions)
+        {
+            checkState(node.getOrderBy().isPresent(), "orderBy is absent");
+
+            List<SortItem> sortItems = getSortItemsFromOrderBy(node.getOrderBy());
+
+            if (node.getSelect().isDistinct()) {
+                verifySelectDistinct(node, outputExpressions);
+            }
+
+            return analyzeOrderBy(node, sortItems, orderByScope);
+        }
+
         private void verifySelectDistinct(QuerySpecification node, List<Expression> outputExpressions)
         {
             for (SortItem item : node.getOrderBy().get().getSortItems()) {
@@ -2291,6 +2297,7 @@ class StatementAnalyzer
             }
 
             List<Expression> orderByFields = orderByFieldsBuilder.build();
+            analysis.setOrderByExpressions(node, orderByFields);
             return orderByFields;
         }
 
