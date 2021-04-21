@@ -143,7 +143,7 @@ jobs:
 
       - run:
           name: Run Maven Build
-          command: ./mvnw install -DskipTests -B -T C1 -P ci
+          command: ./mvnw install -DskipTests -B -T C1 -P ci -pl '!presto-docs'
 
       - save_package_cache
 
