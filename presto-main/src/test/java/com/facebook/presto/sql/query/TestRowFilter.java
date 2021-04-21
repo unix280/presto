@@ -14,7 +14,7 @@
 package com.facebook.presto.sql.query;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.metadata.QualifiedObjectName;
+import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.security.ViewExpression;
 import com.facebook.presto.testing.LocalQueryRunner;

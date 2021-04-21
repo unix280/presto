@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.security;
 
+import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveTransactionManager;
 import com.facebook.presto.hive.TransactionalMetadata;
 import com.facebook.presto.hive.authentication.HiveIdentity;
@@ -243,6 +244,12 @@ public class LegacyAccessControl
 
     @Override
     public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ViewExpression> getColumnMask(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, String columnName, Type type)
     {
         return Optional.empty();
     }
