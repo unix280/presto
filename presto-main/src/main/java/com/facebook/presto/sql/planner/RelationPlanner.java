@@ -175,7 +175,25 @@ class RelationPlanner
 
         List<VariableReferenceExpression> outputVariables = outputVariablesBuilder.build();
         PlanNode root = new TableScanNode(idAllocator.getNextId(), handle, outputVariables, columns.build(), TupleDomain.all(), TupleDomain.all());
-        return new RelationPlan(root, scope, outputVariables);
+        RelationPlan tableScan = new RelationPlan(root, scope, outputVariables);
+        tableScan = addRowFilters(node, tableScan);
+        return tableScan;
+    }
+
+    private RelationPlan addRowFilters(Table node, RelationPlan plan)
+    {
+        PlanBuilder planBuilder = initializePlanBuilder(plan);
+
+        for (Expression filter : analysis.getRowFilters(node)) {
+            planBuilder = subqueryPlanner.handleSubqueries(planBuilder, filter, filter);
+
+            planBuilder = planBuilder.withNewRoot(new FilterNode(
+                    idAllocator.getNextId(),
+                    planBuilder.getRoot(),
+                    castToRowExpression(planBuilder.rewrite(filter))));
+        }
+
+        return new RelationPlan(planBuilder.getRoot(), plan.getScope(), plan.getFieldMappings());
     }
 
     @Override

@@ -289,6 +289,11 @@ public class LocalQueryRunner
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
+    public static LocalQueryRunner create(Session defaultSession)
+    {
+        return new LocalQueryRunner(defaultSession);
+    }
+
     public LocalQueryRunner(Session defaultSession)
     {
         this(defaultSession, new FeaturesConfig(), new NodeSpillConfig(), false, false);

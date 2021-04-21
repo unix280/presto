@@ -22,6 +22,7 @@ import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.ViewExpression;
 import com.google.common.collect.ImmutableSet;
 
 import javax.inject.Inject;
@@ -277,6 +278,12 @@ public class FileBasedAccessControl
     @Override
     public void checkCanShowRoleGrants(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String catalogName)
     {
+    }
+
+    @Override
+    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    {
+        return Optional.empty();
     }
 
     private boolean canSetSessionProperty(ConnectorIdentity identity, String property)
