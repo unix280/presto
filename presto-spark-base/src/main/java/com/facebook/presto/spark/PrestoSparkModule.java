@@ -117,7 +117,6 @@ import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.DomainTranslator;
 import com.facebook.presto.spi.relation.PredicateCompiler;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
-import com.facebook.presto.spiller.FileSingleStreamSpillerFactory;
 import com.facebook.presto.spiller.GenericPartitioningSpillerFactory;
 import com.facebook.presto.spiller.GenericSpillerFactory;
 import com.facebook.presto.spiller.NodeSpillConfig;
@@ -125,6 +124,7 @@ import com.facebook.presto.spiller.PartitioningSpillerFactory;
 import com.facebook.presto.spiller.SingleStreamSpillerFactory;
 import com.facebook.presto.spiller.SpillerFactory;
 import com.facebook.presto.spiller.SpillerStats;
+import com.facebook.presto.spiller.TempStorageSingleStreamSpillerFactory;
 import com.facebook.presto.split.PageSinkManager;
 import com.facebook.presto.split.PageSinkProvider;
 import com.facebook.presto.split.PageSourceManager;
@@ -383,7 +383,7 @@ public class PrestoSparkModule
 
         // spill
         binder.bind(SpillerFactory.class).to(GenericSpillerFactory.class).in(Scopes.SINGLETON);
-        binder.bind(SingleStreamSpillerFactory.class).to(FileSingleStreamSpillerFactory.class).in(Scopes.SINGLETON);
+        binder.bind(SingleStreamSpillerFactory.class).to(TempStorageSingleStreamSpillerFactory.class).in(Scopes.SINGLETON);
         binder.bind(PartitioningSpillerFactory.class).to(GenericPartitioningSpillerFactory.class).in(Scopes.SINGLETON);
         binder.bind(SpillerStats.class).in(Scopes.SINGLETON);
 
