@@ -173,6 +173,6 @@ public enum HiveStorageFormat
 
     public static Optional<HiveStorageFormat> getHiveStorageFormat(StorageFormat storageFormat)
     {
-        return Optional.ofNullable(HIVE_STORAGE_FORMAT_FROM_STORAGE_FORMAT.get(new SerdeAndInputFormat(storageFormat.getSerDe(), storageFormat.getInputFormat())));
+        return Optional.ofNullable(HIVE_STORAGE_FORMAT_FROM_STORAGE_FORMAT.get(new SerdeAndInputFormat(storageFormat.getSerDeNullable(), storageFormat.getInputFormatNullable())));
     }
 }
