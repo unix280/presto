@@ -236,6 +236,7 @@ public class PrestoSparkQueryExecutionFactory
     private final TempStorageManager tempStorageManager;
     private final String storageBasedBroadcastJoinStorage;
     private final NodeMemoryConfig nodeMemoryConfig;
+    private final Set<PrestoSparkServiceWaitTimeMetrics> waitTimeMetrics;
 
     @Inject
     public PrestoSparkQueryExecutionFactory(
@@ -265,7 +266,8 @@ public class PrestoSparkQueryExecutionFactory
             Set<PrestoSparkAuthenticatorProvider> authenticatorProviders,
             TempStorageManager tempStorageManager,
             PrestoSparkConfig prestoSparkConfig,
-            NodeMemoryConfig nodeMemoryConfig)
+            NodeMemoryConfig nodeMemoryConfig,
+            Set<PrestoSparkServiceWaitTimeMetrics> waitTimeMetrics)
     {
         this.queryIdGenerator = requireNonNull(queryIdGenerator, "queryIdGenerator is null");
         this.sessionSupplier = requireNonNull(sessionSupplier, "sessionSupplier is null");
@@ -294,6 +296,7 @@ public class PrestoSparkQueryExecutionFactory
         this.tempStorageManager = requireNonNull(tempStorageManager, "tempStorageManager is null");
         this.storageBasedBroadcastJoinStorage = requireNonNull(prestoSparkConfig, "prestoSparkConfig is null").getStorageBasedBroadcastJoinStorage();
         this.nodeMemoryConfig = requireNonNull(nodeMemoryConfig, "nodeMemoryConfig is null");
+        this.waitTimeMetrics = ImmutableSet.copyOf(requireNonNull(waitTimeMetrics, "waitTimeMetrics is null"));
     }
 
     @Override
@@ -438,7 +441,8 @@ public class PrestoSparkQueryExecutionFactory
                     queryStatusInfoOutputLocation,
                     queryDataOutputLocation,
                     tempStorage,
-                    nodeMemoryConfig);
+                    nodeMemoryConfig,
+                    waitTimeMetrics);
         }
         catch (Throwable executionFailure) {
             queryStateTimer.beginFinishing();
@@ -840,6 +844,7 @@ public class PrestoSparkQueryExecutionFactory
         private final long queryCompletionDeadline;
         private final TempStorage tempStorage;
         private final NodeMemoryConfig nodeMemoryConfig;
+        private final Set<PrestoSparkServiceWaitTimeMetrics> waitTimeMetrics;
 
         private PrestoSparkQueryExecution(
                 JavaSparkContext sparkContext,
@@ -870,7 +875,8 @@ public class PrestoSparkQueryExecutionFactory
                 Optional<String> queryStatusInfoOutputLocation,
                 Optional<String> queryDataOutputLocation,
                 TempStorage tempStorage,
-                NodeMemoryConfig nodeMemoryConfig)
+                NodeMemoryConfig nodeMemoryConfig,
+                Set<PrestoSparkServiceWaitTimeMetrics> waitTimeMetrics)
         {
             this.sparkContext = requireNonNull(sparkContext, "sparkContext is null");
             this.session = requireNonNull(session, "session is null");
@@ -902,6 +908,7 @@ public class PrestoSparkQueryExecutionFactory
             this.queryDataOutputLocation = requireNonNull(queryDataOutputLocation, "queryDataOutputLocation is null");
             this.tempStorage = requireNonNull(tempStorage, "tempStorage is null");
             this.nodeMemoryConfig = requireNonNull(nodeMemoryConfig, "nodeMemoryConfig is null");
+            this.waitTimeMetrics = requireNonNull(waitTimeMetrics, "waitTimeMetrics is null");
         }
 
         @Override
@@ -1049,7 +1056,7 @@ public class PrestoSparkQueryExecutionFactory
                 Map<String, JavaFutureAction<List<Tuple2<MutablePartitionId, PrestoSparkSerializedPage>>>> inputFutures = inputRdds.entrySet().stream()
                         .collect(toImmutableMap(entry -> entry.getKey().toString(), entry -> entry.getValue().getRdd().collectAsync()));
 
-                waitForActionsCompletionWithTimeout(inputFutures.values(), computeNextTimeout(queryCompletionDeadline), MILLISECONDS);
+                waitForActionsCompletionWithTimeout(inputFutures.values(), computeNextTimeout(queryCompletionDeadline), MILLISECONDS, waitTimeMetrics);
 
                 Map<String, List<PrestoSparkSerializedPage>> inputs = inputFutures.entrySet().stream()
                         .collect(toImmutableMap(
@@ -1069,7 +1076,7 @@ public class PrestoSparkQueryExecutionFactory
             }
 
             RddAndMore<PrestoSparkSerializedPage> rootRdd = createRdd(root, PrestoSparkSerializedPage.class);
-            return rootRdd.collectAndDestroyDependenciesWithTimeout(computeNextTimeout(queryCompletionDeadline), MILLISECONDS);
+            return rootRdd.collectAndDestroyDependenciesWithTimeout(computeNextTimeout(queryCompletionDeadline), MILLISECONDS, waitTimeMetrics);
         }
 
         private <T extends PrestoSparkTaskOutput> RddAndMore<T> createRdd(SubPlan subPlan, Class<T> outputType)
@@ -1101,14 +1108,16 @@ public class PrestoSparkQueryExecutionFactory
                                 maxBroadcastMemory,
                                 queryCompletionDeadline,
                                 tempStorage,
-                                tempDataOperationContext);
+                                tempDataOperationContext,
+                                waitTimeMetrics);
                     }
                     else {
                         RddAndMore<PrestoSparkSerializedPage> childRdd = createRdd(child, PrestoSparkSerializedPage.class);
                         broadcastDependency = new PrestoSparkMemoryBasedBroadcastDependency(
                                 childRdd,
                                 maxBroadcastMemory,
-                                queryCompletionDeadline);
+                                queryCompletionDeadline,
+                                waitTimeMetrics);
                     }
 
                     broadcastInputs.put(childFragment.getId(), broadcastDependency.executeBroadcast(sparkContext));
@@ -1279,7 +1288,7 @@ public class PrestoSparkQueryExecutionFactory
         }
     }
 
-    private static <T> void waitForActionsCompletionWithTimeout(Collection<JavaFutureAction<T>> actions, long timeout, TimeUnit timeUnit)
+    private static <T> void waitForActionsCompletionWithTimeout(Collection<JavaFutureAction<T>> actions, long timeout, TimeUnit timeUnit, Set<PrestoSparkServiceWaitTimeMetrics> waitTimeMetrics)
             throws SparkException, TimeoutException
     {
         long deadline = System.currentTimeMillis() + timeUnit.toMillis(timeout);
@@ -1290,7 +1299,7 @@ public class PrestoSparkQueryExecutionFactory
                 if (nextTimeoutInMillis <= 0) {
                     throw new TimeoutException();
                 }
-                getActionResultWithTimeout(action, nextTimeoutInMillis, MILLISECONDS);
+                getActionResultWithTimeout(action, nextTimeoutInMillis, MILLISECONDS, waitTimeMetrics);
             }
         }
         finally {
