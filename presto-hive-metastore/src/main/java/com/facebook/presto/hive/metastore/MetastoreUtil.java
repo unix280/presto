@@ -321,7 +321,21 @@ public class MetastoreUtil
     {
         ImmutableList.Builder<Column> columns = ImmutableList.builder();
 
-        if (!tableToPartitionColumns.isPresent()) {
+        if (tableToPartitionColumns.isPresent()) {
+            Map<Integer, Integer> partitionToTableColumns = tableToPartitionColumns.get()
+                    .entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+
+            for (int i = 0; i < partitionColumnCount; i++) {
+                Column column = partitionSchemaDifference.get(i);
+                if (column == null) {
+                    column = tableSchema.get(partitionToTableColumns.get(i));
+                }
+                columns.add(column);
+            }
+        }
+        else {
             for (int i = 0; i < partitionColumnCount; i++) {
                 Column column = partitionSchemaDifference.get(i);
                 if (column == null) {
@@ -332,20 +346,6 @@ public class MetastoreUtil
                             tableSchema,
                             partitionSchemaDifference);
                     column = tableSchema.get(i);
-                }
-                columns.add(column);
-            }
-        }
-        else {
-            Map<Integer, Integer> partitionToTableColumns = tableToPartitionColumns.get()
-                    .entrySet()
-                    .stream()
-                    .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
-
-            for (int i = 0; i < partitionColumnCount; i++) {
-                Column column = partitionSchemaDifference.get(i);
-                if (column == null) {
-                    column = tableSchema.get(partitionToTableColumns.get(i));
                 }
                 columns.add(column);
             }
