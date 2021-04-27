@@ -497,9 +497,9 @@ jobs:
           command: |
             mvn_version=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
             latest_prestodb_version=$(echo "$mvn_version" | grep -Eo '^([0-9]+\.[0-9]+(\.[0-9]+)?)')
-            old_ahana_version=$(git describe --match "v[0-9]*.[0-9]*-AHN-[0-9]*.[0-9]*" --tags $(git rev-list --tags --max-count=1) | sed 's|.*-||')
+            old_ahana_version=$(git describe --match "v[0-9]*.[0-9]*-AHN-[0-9]*" --tags $(git rev-list --tags --max-count=1) | sed 's|.*-||')
             new_ahana_version=$(echo $old_ahana_version 0.1 | awk '{print $1 + $2}')
-            old_prestodb_version=$(git describe --match "v[0-9]*.[0-9]*-AHN-[0-9]*.[0-9]*" --tags $(git rev-list --tags --max-count=1) | awk -F- '{print $1}' | grep -Eo '[0-9]+\.[0-9]+')
+            old_prestodb_version=$(git describe --match "v[0-9]*.[0-9]*-AHN-[0-9]*" --tags $(git rev-list --tags --max-count=1) | awk -F- '{print $1}' | grep -Eo '[0-9]+\.[0-9]+')
             if [[ "$old_prestodb_version" == "$latest_prestodb_version" ]]
             then
               TAG_VERSION=AHN-${new_ahana_version}
