@@ -815,6 +815,7 @@ workflows:
             - docker_hub
           module: presto-main
           resource_class: xlarge
+          custom_mvn_opts: -Xmx13G -Xms1G -XX:+ExitOnOutOfMemoryError
           requires:
             - start_test_suite
       - test_specific_module:
