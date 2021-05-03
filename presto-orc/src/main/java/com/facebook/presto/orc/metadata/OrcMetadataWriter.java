@@ -35,6 +35,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map.Entry;
 
+import static com.facebook.presto.orc.metadata.ColumnEncoding.DEFAULT_SEQUENCE_ID;
 import static com.facebook.presto.orc.metadata.PostScript.MAGIC;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Math.toIntExact;
@@ -285,6 +286,10 @@ public class OrcMetadataWriter
 
     private static OrcProto.Stream toStream(Stream stream)
     {
+        checkArgument(
+                stream.getSequence() == DEFAULT_SEQUENCE_ID,
+                "Writing streams with non-zero sequence IDs is not supported in ORC : {} ",
+                stream);
         return OrcProto.Stream.newBuilder()
                 .setColumn(stream.getColumn())
                 .setKind(toStreamKind(stream.getStreamKind()))
@@ -317,7 +322,8 @@ public class OrcMetadataWriter
     {
         checkArgument(
                 !columnEncodings.getAdditionalSequenceEncodings().isPresent(),
-                "Writing columns with non-zero sequence IDs is not supported in ORC: " + columnEncodings);
+                "Writing columns with non-zero sequence IDs is not supported in ORC: {}",
+                columnEncodings);
 
         return OrcProto.ColumnEncoding.newBuilder()
                 .setKind(toColumnEncoding(columnEncodings.getColumnEncodingKind()))
