@@ -2874,9 +2874,7 @@ public class TestHiveIntegrationSmokeTest
     public void testFileSizeHiddenColumn()
     {
         @Language("SQL") String createTable = "CREATE TABLE test_file_size " +
-                "WITH (" +
-                "partitioned_by = ARRAY['col1']" +
-                ") AS " +
+                "AS " +
                 "SELECT * FROM (VALUES " +
                 "(0, 0), (3, 0), (6, 0), " +
                 "(1, 1), (4, 1), (7, 1), " +
@@ -2897,7 +2895,6 @@ public class TestHiveIntegrationSmokeTest
                 assertTrue(columnMetadata.isHidden());
             }
         }
-        assertEquals(getPartitions("test_file_size").size(), 3);
 
         MaterializedResult results = computeActual(format("SELECT *, \"%s\" FROM test_file_size", FILE_SIZE_COLUMN_NAME));
         Map<Integer, Long> fileSizeMap = new HashMap<>();
@@ -2927,7 +2924,9 @@ public class TestHiveIntegrationSmokeTest
         long testStartTime = Instant.now().toEpochMilli();
 
         @Language("SQL") String createTable = "CREATE TABLE test_file_modified_time " +
-                "AS " +
+                "WITH (" +
+                "partitioned_by = ARRAY['col1']" +
+                ") AS " +
                 "SELECT * FROM (VALUES " +
                 "(0, 0), (3, 0), (6, 0), " +
                 "(1, 1), (4, 1), (7, 1), " +
@@ -2948,6 +2947,7 @@ public class TestHiveIntegrationSmokeTest
                 assertTrue(columnMetadata.isHidden());
             }
         }
+        assertEquals(getPartitions("test_file_modified_time").size(), 3);
 
         MaterializedResult results = computeActual(format("SELECT *, \"%s\" FROM test_file_modified_time", FILE_MODIFIED_TIME_COLUMN_NAME));
         Map<Integer, Long> fileModifiedTimeMap = new HashMap<>();
