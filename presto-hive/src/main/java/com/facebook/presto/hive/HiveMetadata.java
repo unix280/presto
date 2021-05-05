@@ -2831,6 +2831,12 @@ public class HiveMetadata
     public ConnectorPartitioningHandle getPartitioningHandleForExchange(ConnectorSession session, int partitionCount, List<Type> partitionTypes)
     {
         BucketFunctionType bucketFunctionType = getBucketFunctionTypeForExchange(session);
+
+        if (isUsePageFileForHiveUnsupportedType(session)
+                && !partitionTypes.stream().allMatch(HiveTypeTranslator::isSupportedHiveType)) {
+            bucketFunctionType = PRESTO_NATIVE;
+        }
+
         switch (bucketFunctionType) {
             case HIVE_COMPATIBLE:
                 return createHiveCompatiblePartitioningHandle(
