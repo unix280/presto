@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 
+import static com.facebook.presto.hive.HiveQueryRunner.METASTORE_CONTEXT;
 import static com.facebook.presto.hive.TestHiveUtil.createTestingFileHiveMetastore;
 import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
@@ -69,14 +70,11 @@ public final class HiveBenchmarkQueryRunner
         // add hive
         File hiveDir = new File(tempDir, "hive_data");
         ExtendedHiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
-        MetastoreContext metastoreContext = new MetastoreContext(SESSION);
-        metastore.createDatabase(
-                metastoreContext,
-                Database.builder()
-                        .setDatabaseName("tpch")
-                        .setOwnerName("public")
-                        .setOwnerType(PrincipalType.ROLE)
-                        .build());
+        metastore.createDatabase(METASTORE_CONTEXT, Database.builder()
+                .setDatabaseName("tpch")
+                .setOwnerName("public")
+                .setOwnerType(PrincipalType.ROLE)
+                .build());
 
         Map<String, String> hiveCatalogConfig = ImmutableMap.<String, String>builder()
                 .put("hive.max-split-size", "10GB")

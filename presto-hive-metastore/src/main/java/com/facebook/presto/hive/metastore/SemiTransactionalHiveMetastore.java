@@ -376,7 +376,7 @@ public class SemiTransactionalHiveMetastore
         checkNoPartitionAction(table.getDatabaseName(), table.getTableName());
         SchemaTableName schemaTableName = new SchemaTableName(table.getDatabaseName(), table.getTableName());
         Action<TableAndMore> oldTableAction = tableActions.get(schemaTableName);
-        MetastoreContext metastoreContext = new MetastoreContext(session);
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource());
         TableAndMore tableAndMore = new TableAndMore(table, metastoreContext, Optional.of(principalPrivileges), currentPath, Optional.empty(), ignoreExisting, statistics, statistics);
         if (oldTableAction == null) {
             HdfsContext hdfsContext = new HdfsContext(session, table.getDatabaseName(), table.getTableName(), table.getStorage().getLocation(), true);
@@ -403,7 +403,7 @@ public class SemiTransactionalHiveMetastore
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Action<TableAndMore> oldTableAction = tableActions.get(schemaTableName);
         if (oldTableAction == null || oldTableAction.getType() == ActionType.ALTER) {
-            MetastoreContext metastoreContext = new MetastoreContext(hdfsContext.getIdentity());
+            MetastoreContext metastoreContext = new MetastoreContext(hdfsContext.getIdentity(), hdfsContext.getQueryId().orElse(PRESTO_QUERY_ID_NAME));
             tableActions.put(schemaTableName, new Action<>(ActionType.DROP, null, hdfsContext, metastoreContext));
             return;
         }
@@ -455,9 +455,9 @@ public class SemiTransactionalHiveMetastore
         // Data can only be inserted into partitions and unpartitioned tables. They can never be inserted into a partitioned table.
         // Therefore, this method assumes that the table is unpartitioned.
         setShared();
-        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity());
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Action<TableAndMore> oldTableAction = tableActions.get(schemaTableName);
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource());
         if (oldTableAction == null || oldTableAction.getData().getTable().getTableType().equals(TEMPORARY_TABLE)) {
             Table table = getTable(metastoreContext, databaseName, tableName)
                     .orElseThrow(() -> new TableNotFoundException(schemaTableName));
@@ -497,7 +497,7 @@ public class SemiTransactionalHiveMetastore
     public synchronized void truncateUnpartitionedTable(ConnectorSession session, String databaseName, String tableName)
     {
         checkReadable();
-        Optional<Table> table = getTable(new MetastoreContext(session.getIdentity()), databaseName, tableName);
+        Optional<Table> table = getTable(new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource()), databaseName, tableName);
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         if (!table.isPresent()) {
             throw new TableNotFoundException(schemaTableName);
@@ -772,10 +772,11 @@ public class SemiTransactionalHiveMetastore
             PartitionStatistics statisticsUpdate)
     {
         setShared();
-        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity());
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Map<List<String>, Action<PartitionAndMore>> partitionActionsOfTable = partitionActions.computeIfAbsent(schemaTableName, k -> new HashMap<>());
         Action<PartitionAndMore> oldPartitionAction = partitionActionsOfTable.get(partitionValues);
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource());
+
         if (oldPartitionAction == null) {
             Partition partition = delegate.getPartition(metastoreContext, databaseName, tableName, partitionValues)
                     .orElseThrow(() -> new PartitionNotFoundException(schemaTableName, partitionValues));
@@ -976,7 +977,7 @@ public class SemiTransactionalHiveMetastore
             for (Map.Entry<SchemaTableName, Action<TableAndMore>> entry : tableActions.entrySet()) {
                 SchemaTableName schemaTableName = entry.getKey();
                 Action<TableAndMore> action = entry.getValue();
-                MetastoreContext metastoreContext = new MetastoreContext(action.getHdfsContext().getIdentity());
+                MetastoreContext metastoreContext = new MetastoreContext(action.getHdfsContext().getIdentity(), action.getHdfsContext().getQueryId().orElse(""), action.getHdfsContext().getClientInfo(), action.getHdfsContext().getSource());
                 switch (action.getType()) {
                     case DROP:
                         committer.prepareDropTable(metastoreContext, schemaTableName);
@@ -1000,7 +1001,7 @@ public class SemiTransactionalHiveMetastore
                     List<String> partitionValues = partitionEntry.getKey();
                     Action<PartitionAndMore> action = partitionEntry.getValue();
                     HdfsContext hdfsContext = action.getHdfsContext();
-                    MetastoreContext metastoreContext = new MetastoreContext(action.getHdfsContext().getIdentity());
+                    MetastoreContext metastoreContext = new MetastoreContext(action.getHdfsContext().getIdentity(), action.getHdfsContext().getQueryId().orElse(""), action.getHdfsContext().getClientInfo(), action.getHdfsContext().getSource());
                     switch (action.getType()) {
                         case DROP:
                             committer.prepareDropPartition(metastoreContext, schemaTableName, partitionValues);
@@ -1194,8 +1195,7 @@ public class SemiTransactionalHiveMetastore
             }
             addTableOperations.add(new CreateTableOperation(metastoreContext, table, tableAndMore.getPrincipalPrivileges(), tableAndMore.isIgnoreExisting()));
             if (!isPrestoView(table)) {
-                updateStatisticsOperations.add(new UpdateStatisticsOperation(
-                        metastoreContext,
+                updateStatisticsOperations.add(new UpdateStatisticsOperation(metastoreContext,
                         new SchemaTableName(table.getDatabaseName(), table.getTableName()),
                         Optional.empty(),
                         tableAndMore.getStatisticsUpdate(), false));
@@ -1219,8 +1219,7 @@ public class SemiTransactionalHiveMetastore
             if (!targetPath.equals(currentPath)) {
                 asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, tableAndMore.getFileNames().get());
             }
-            updateStatisticsOperations.add(new UpdateStatisticsOperation(
-                    metastoreContext,
+            updateStatisticsOperations.add(new UpdateStatisticsOperation(metastoreContext,
                     new SchemaTableName(table.getDatabaseName(), table.getTableName()),
                     Optional.empty(),
                     tableAndMore.getStatisticsUpdate(), true));
@@ -1233,7 +1232,7 @@ public class SemiTransactionalHiveMetastore
                     () -> delegate.dropPartition(metastoreContext, schemaTableName.getSchemaName(), schemaTableName.getTableName(), partitionValues, true)));
         }
 
-        private void prepareAlterPartition(MetastoreContext metastoreContext, HdfsContext hdfsContext, PartitionAndMore partitionAndMore)
+        private void prepareAlterPartition(MetastoreContext metastoreContext, HdfsContext context, PartitionAndMore partitionAndMore)
         {
             deleteOnly = false;
 
@@ -1258,20 +1257,20 @@ public class SemiTransactionalHiveMetastore
             // Otherwise,
             // * Remember we will need to delete the location of the old partition at the end if transaction successfully commits
             if (targetLocation.equals(oldPartitionLocation)) {
-                Path oldPartitionStagingPath = new Path(oldPartitionPath.getParent(), "_temp_" + oldPartitionPath.getName() + "_" + hdfsContext.getQueryId());
+                Path oldPartitionStagingPath = new Path(oldPartitionPath.getParent(), "_temp_" + oldPartitionPath.getName() + "_" + context.getQueryId());
                 renameDirectory(
-                        hdfsContext,
+                        context,
                         hdfsEnvironment,
                         oldPartitionPath,
                         oldPartitionStagingPath,
-                        () -> renameTasksForAbort.add(new DirectoryRenameTask(hdfsContext, oldPartitionStagingPath, oldPartitionPath)));
+                        () -> renameTasksForAbort.add(new DirectoryRenameTask(context, oldPartitionStagingPath, oldPartitionPath)));
                 if (!skipDeletionForAlter) {
-                    deletionTasksForFinish.add(new DirectoryDeletionTask(hdfsContext, oldPartitionStagingPath));
+                    deletionTasksForFinish.add(new DirectoryDeletionTask(context, oldPartitionStagingPath));
                 }
             }
             else {
                 if (!skipDeletionForAlter) {
-                    deletionTasksForFinish.add(new DirectoryDeletionTask(hdfsContext, oldPartitionPath));
+                    deletionTasksForFinish.add(new DirectoryDeletionTask(context, oldPartitionPath));
                 }
             }
 
@@ -1279,16 +1278,15 @@ public class SemiTransactionalHiveMetastore
             Path targetPath = new Path(targetLocation);
             if (!targetPath.equals(currentPath)) {
                 renameDirectory(
-                        hdfsContext,
+                        context,
                         hdfsEnvironment,
                         currentPath,
                         targetPath,
-                        () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(hdfsContext, targetPath, true)));
+                        () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, true)));
             }
             // Partition alter must happen regardless of whether original and current location is the same
             // because metadata might change: e.g. storage format, column types, etc
-            alterPartitionOperations.add(new AlterPartitionOperation(
-                    metastoreContext,
+            alterPartitionOperations.add(new AlterPartitionOperation(metastoreContext,
                     new PartitionWithStatistics(partition, partitionName, partitionAndMore.getStatisticsUpdate()),
                     new PartitionWithStatistics(oldPartition.get(), partitionName, oldPartitionStatistics)));
         }
@@ -1319,7 +1317,7 @@ public class SemiTransactionalHiveMetastore
             }
         }
 
-        private void prepareAddPartition(MetastoreContext metastoreContext, HdfsContext hdfsContext, PartitionAndMore partitionAndMore)
+        private void prepareAddPartition(MetastoreContext metastoreContext, HdfsContext context, PartitionAndMore partitionAndMore)
         {
             deleteOnly = false;
 
@@ -1333,37 +1331,36 @@ public class SemiTransactionalHiveMetastore
                     schemaTableName,
                     ignored -> new PartitionAdder(metastoreContext, partition.getDatabaseName(), partition.getTableName(), delegate, PARTITION_COMMIT_BATCH_SIZE));
 
-            if (pathExists(hdfsContext, hdfsEnvironment, currentPath)) {
+            if (pathExists(context, hdfsEnvironment, currentPath)) {
                 if (!targetPath.equals(currentPath)) {
                     renameDirectory(
-                            hdfsContext,
+                            context,
                             hdfsEnvironment,
                             currentPath,
                             targetPath,
-                            () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(hdfsContext, targetPath, true)));
+                            () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, true)));
                 }
             }
             else {
-                cleanUpTasksForAbort.add(new DirectoryCleanUpTask(hdfsContext, targetPath, true));
-                createDirectory(hdfsContext, hdfsEnvironment, targetPath);
+                cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, true));
+                createDirectory(context, hdfsEnvironment, targetPath);
             }
             String partitionName = getPartitionName(metastoreContext, partition.getDatabaseName(), partition.getTableName(), partition.getValues());
             partitionAdder.addPartition(new PartitionWithStatistics(partition, partitionName, partitionAndMore.getStatisticsUpdate()));
         }
 
-        private void prepareInsertExistingPartition(MetastoreContext metastoreContext, HdfsContext hdfsContext, PartitionAndMore partitionAndMore)
+        private void prepareInsertExistingPartition(MetastoreContext metastoreContext, HdfsContext context, PartitionAndMore partitionAndMore)
         {
             deleteOnly = false;
 
             Partition partition = partitionAndMore.getPartition();
             Path targetPath = new Path(partition.getStorage().getLocation());
             Path currentPath = partitionAndMore.getCurrentLocation();
-            cleanUpTasksForAbort.add(new DirectoryCleanUpTask(hdfsContext, targetPath, false));
+            cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, targetPath, false));
             if (!targetPath.equals(currentPath)) {
-                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, hdfsContext, currentPath, targetPath, partitionAndMore.getFileNames());
+                asyncRename(hdfsEnvironment, renameExecutor, fileRenameCancelled, fileRenameFutures, context, currentPath, targetPath, partitionAndMore.getFileNames());
             }
-            updateStatisticsOperations.add(new UpdateStatisticsOperation(
-                    metastoreContext,
+            updateStatisticsOperations.add(new UpdateStatisticsOperation(metastoreContext,
                     new SchemaTableName(partition.getDatabaseName(), partition.getTableName()),
                     Optional.of(getPartitionName(metastoreContext, partition.getDatabaseName(), partition.getTableName(), partition.getValues())),
                     partitionAndMore.getStatisticsUpdate(),
@@ -1612,8 +1609,8 @@ public class SemiTransactionalHiveMetastore
                     Path baseDirectory = declaredIntentionToWrite.getStagingPathRoot();
                     pathsToClean.add(baseDirectory);
 
-                    MetastoreContext metastoreContext = declaredIntentionToWrite.getMetastoreContext();
                     SchemaTableName schemaTableName = declaredIntentionToWrite.getSchemaTableName();
+                    MetastoreContext metastoreContext = declaredIntentionToWrite.getMetastoreContext();
                     Optional<Table> table = delegate.getTable(metastoreContext, schemaTableName.getSchemaName(), schemaTableName.getTableName());
                     if (table.isPresent()) {
                         // check every existing partition that is outside for the base directory

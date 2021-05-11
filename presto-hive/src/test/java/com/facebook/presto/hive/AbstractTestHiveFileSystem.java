@@ -94,6 +94,7 @@ import static com.facebook.presto.hive.AbstractTestHiveClient.createTablePropert
 import static com.facebook.presto.hive.AbstractTestHiveClient.filterNonHiddenColumnHandles;
 import static com.facebook.presto.hive.AbstractTestHiveClient.filterNonHiddenColumnMetadata;
 import static com.facebook.presto.hive.AbstractTestHiveClient.getAllSplits;
+import static com.facebook.presto.hive.HiveQueryRunner.METASTORE_CONTEXT;
 import static com.facebook.presto.hive.HiveTestUtils.FILTER_STATS_CALCULATOR_SERVICE;
 import static com.facebook.presto.hive.HiveTestUtils.FUNCTION_AND_TYPE_MANAGER;
 import static com.facebook.presto.hive.HiveTestUtils.FUNCTION_RESOLUTION;
@@ -384,12 +385,12 @@ public abstract class AbstractTestHiveFileSystem
                 // CSV supports only unbounded VARCHAR type
                 continue;
             }
-            createTable(temporaryCreateTable, storageFormat);
+            createTable(METASTORE_CONTEXT, temporaryCreateTable, storageFormat);
             dropTable(temporaryCreateTable);
         }
     }
 
-    private void createTable(SchemaTableName tableName, HiveStorageFormat storageFormat)
+    private void createTable(MetastoreContext metastoreContext, SchemaTableName tableName, HiveStorageFormat storageFormat)
             throws Exception
     {
         List<ColumnMetadata> columns = ImmutableList.<ColumnMetadata>builder()
@@ -426,6 +427,7 @@ public abstract class AbstractTestHiveFileSystem
             // We work around that by using a dummy location when creating the
             // table and update it here to the correct location.
             metastoreClient.updateTableLocation(
+                    metastoreContext,
                     database,
                     tableName.getTableName(),
                     locationService.getTableWriteInfo(((HiveOutputTableHandle) outputHandle).getLocationHandle()).getTargetPath().toString());
@@ -552,9 +554,8 @@ public abstract class AbstractTestHiveFileSystem
             }
         }
 
-        public void updateTableLocation(String databaseName, String tableName, String location)
+        public void updateTableLocation(MetastoreContext metastoreContext, String databaseName, String tableName, String location)
         {
-            MetastoreContext metastoreContext = new MetastoreContext(TESTING_CONTEXT.getIdentity());
             Optional<Table> table = getTable(metastoreContext, databaseName, tableName);
             if (!table.isPresent()) {
                 throw new TableNotFoundException(new SchemaTableName(databaseName, tableName));

@@ -24,47 +24,63 @@ import static java.util.Objects.requireNonNull;
 
 public final class MetastoreContext
 {
-    private static final MetastoreContext NONE_CONTEXT = new MetastoreContext();
-
-    private final Optional<String> username;
-
-    private MetastoreContext()
-    {
-        this.username = Optional.empty();
-    }
-
-    public MetastoreContext(String username)
-    {
-        this.username = requireNonNull(Optional.of(username), "username is null");
-    }
+    private final String username;
+    private final String queryId;
+    private final Optional<String> clientInfo;
+    private final Optional<String> source;
 
     public MetastoreContext(ConnectorSession session)
     {
-        this(requireNonNull(session, "session is null").getIdentity());
+        this(requireNonNull(session, "session is null").getIdentity(), session.getQueryId());
     }
 
-    public MetastoreContext(ConnectorIdentity identity)
+    public MetastoreContext(ConnectorIdentity identity, String queryId)
     {
-        requireNonNull(identity, "identity is null");
-        this.username = Optional.of(requireNonNull(identity.getUser(), "identity.getUser() is null"));
+        this(requireNonNull(identity, "identity is null").getUser(), queryId, Optional.empty(), Optional.empty());
     }
 
-    // this should be called only by CachingHiveMetastore
-    public static MetastoreContext none()
+    public MetastoreContext(ConnectorIdentity identity, String queryId, Optional<String> clientInfo, Optional<String> source)
     {
-        return NONE_CONTEXT;
+        this(requireNonNull(identity, "identity is null").getUser(), queryId, clientInfo, source);
     }
 
-    public Optional<String> getUsername()
+    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source)
+    {
+        this.username = requireNonNull(username, "username is null");
+        this.queryId = requireNonNull(queryId, "queryId is null");
+        this.clientInfo = requireNonNull(clientInfo, "clientInfo is null");
+        this.source = requireNonNull(source, "source is null");
+    }
+
+    public String getUsername()
     {
         return username;
     }
+
+    public String getQueryId()
+    {
+        return queryId;
+    }
+
+    public Optional<String> getClientInfo()
+    {
+        return clientInfo;
+    }
+
+    public Optional<String> getSource()
+    {
+        return source;
+    }
+
 
     @Override
     public String toString()
     {
         return toStringHelper(this)
                 .add("username", username)
+                .add("queryId", queryId)
+                .add("clientInfo", clientInfo.orElse(""))
+                .add("source", source.orElse(""))
                 .toString();
     }
 
@@ -79,12 +95,15 @@ public final class MetastoreContext
         }
 
         MetastoreContext other = (MetastoreContext) o;
-        return Objects.equals(username, other.username);
+        return Objects.equals(username, other.username) &&
+                Objects.equals(queryId, other.queryId) &&
+                Objects.equals(clientInfo, other.clientInfo) &&
+                Objects.equals(source, other.source);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(username);
+        return Objects.hash(username, queryId, clientInfo, source);
     }
 }
