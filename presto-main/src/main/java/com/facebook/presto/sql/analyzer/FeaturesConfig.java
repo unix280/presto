@@ -173,6 +173,7 @@ public class FeaturesConfig
     private boolean pushdownDereferenceEnabled;
     private boolean inlineSqlFunctions = true;
     private boolean checkAccessControlOnUtilizedColumnsOnly;
+    private boolean skipRedundantSort = true;
     private boolean isAllowWindowOrderByLiterals = true;
 
     private String warnOnNoTableLayoutFilter = "";
@@ -1491,6 +1492,18 @@ public class FeaturesConfig
     public FeaturesConfig setCheckAccessControlOnUtilizedColumnsOnly(boolean checkAccessControlOnUtilizedColumnsOnly)
     {
         this.checkAccessControlOnUtilizedColumnsOnly = checkAccessControlOnUtilizedColumnsOnly;
+        return this;
+    }
+
+    public boolean isSkipRedundantSort()
+    {
+        return skipRedundantSort;
+    }
+
+    @Config("optimizer.skip-redundant-sort")
+    public FeaturesConfig setSkipRedundantSort(boolean value)
+    {
+        this.skipRedundantSort = value;
         return this;
     }
 
