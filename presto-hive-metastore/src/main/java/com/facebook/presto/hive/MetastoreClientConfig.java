@@ -20,6 +20,8 @@ import com.google.common.net.HostAndPort;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
 
+import javax.validation.constraints.DecimalMax;
+import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
@@ -47,6 +49,7 @@ public class MetastoreClientConfig
     private MetastoreCacheScope metastoreCacheScope = MetastoreCacheScope.ALL;
     private boolean deleteFilesOnDrop;
     private boolean metastoreImpersonationEnabled;
+    private double partitionCacheValidationPercentage;
 
     public HostAndPort getMetastoreSocksProxy()
     {
@@ -249,6 +252,20 @@ public class MetastoreClientConfig
     public MetastoreClientConfig setMetastoreImpersonationEnabled(boolean metastoreImpersonationEnabled)
     {
         this.metastoreImpersonationEnabled = metastoreImpersonationEnabled;
+        return this;
+    }
+
+    @DecimalMin("0.0")
+    @DecimalMax("100.0")
+    public double getPartitionCacheValidationPercentage()
+    {
+        return partitionCacheValidationPercentage;
+    }
+
+    @Config("hive.partition-cache-validation-percentage")
+    public MetastoreClientConfig setPartitionCacheValidationPercentage(double partitionCacheValidationPercentage)
+    {
+        this.partitionCacheValidationPercentage = partitionCacheValidationPercentage;
         return this;
     }
 }

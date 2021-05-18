@@ -45,7 +45,8 @@ public class TestMetastoreClientConfig
                 .setReplay(false)
                 .setPartitionVersioningEnabled(false)
                 .setMetastoreCacheScope(MetastoreCacheScope.ALL)
-                .setMetastoreImpersonationEnabled(false));
+                .setMetastoreImpersonationEnabled(false)
+                .setPartitionCacheValidationPercentage(0));
     }
 
     @Test
@@ -68,6 +69,7 @@ public class TestMetastoreClientConfig
                 .put("hive.metastore-cache-scope", "PARTITION")
                 .put("hive.metastore.thrift.delete-files-on-drop", "true")
                 .put("hive.metastore-impersonation-enabled", "true")
+                .put("hive.partition-cache-validation-percentage", "60.0")
                 .build();
 
         MetastoreClientConfig expected = new MetastoreClientConfig()
@@ -86,7 +88,8 @@ public class TestMetastoreClientConfig
                 .setDeleteFilesOnDrop(true)
                 .setPartitionVersioningEnabled(true)
                 .setMetastoreCacheScope(MetastoreCacheScope.PARTITION)
-                .setMetastoreImpersonationEnabled(true);
+                .setMetastoreImpersonationEnabled(true)
+                .setPartitionCacheValidationPercentage(60.0);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }
