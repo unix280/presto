@@ -235,7 +235,7 @@ MAVEN_HOME=`exec "$JAVACMD" \
                 ${WRAPPER_LAUNCHER} $MAVEN_CONFIG -v | sed -n 2p | awk -F" " '{print $3}'`
 
 #Copy s3 maven repository dependencies to Maven home lib
-if [[ ! -f "$MAVEN_HOME/lib/s3-storage-wagon-2.3.jar" ]]; then
+if [ ! -f "$MAVEN_HOME/lib/s3-storage-wagon-2.3.jar" ]; then
   cp $MAVEN_PROJECTBASEDIR/src/lib/* $MAVEN_HOME/lib/
 fi
 
