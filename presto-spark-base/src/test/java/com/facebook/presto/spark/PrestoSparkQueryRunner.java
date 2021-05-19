@@ -275,7 +275,8 @@ public class PrestoSparkQueryRunner
         Plugin hiveplugin = new TestingHivePlugin(metastore);
         pluginManager.installPlugin(hiveplugin, hiveplugin.getClass()::getClassLoader);
 
-        connectorManager.createConnection("hive", "hive", ImmutableMap.of());
+        connectorManager.createConnection("hive", "hive", ImmutableMap.of(
+                "hive.experimental-optimized-partition-update-serialization-enabled", "true"));
 
         metadata.registerBuiltInFunctions(AbstractTestQueries.CUSTOM_FUNCTIONS);
 
