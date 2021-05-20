@@ -49,6 +49,7 @@ import java.util.stream.Collectors;
 
 import static com.facebook.presto.hive.metastore.MetastoreUtil.verifyCanDropColumn;
 import static com.facebook.presto.hive.metastore.PrestoTableType.TEMPORARY_TABLE;
+import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.csvSchemaFields;
 import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.fromMetastoreApiPartition;
 import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.fromMetastoreApiTable;
 import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.isAvroTableWithSchemaSet;
@@ -89,8 +90,11 @@ public class BridgingHiveMetastore
     public Optional<Table> getTable(String databaseName, String tableName)
     {
         return delegate.getTable(databaseName, tableName).map(table -> {
-            if (isAvroTableWithSchemaSet(table) || isCsvTable(table)) {
+            if (isAvroTableWithSchemaSet(table)) {
                 return fromMetastoreApiTable(table, delegate.getFields(databaseName, tableName).get());
+            }
+            if (isCsvTable(table)) {
+                return fromMetastoreApiTable(table, csvSchemaFields(table.getSd().getCols()));
             }
             return fromMetastoreApiTable(table);
         });

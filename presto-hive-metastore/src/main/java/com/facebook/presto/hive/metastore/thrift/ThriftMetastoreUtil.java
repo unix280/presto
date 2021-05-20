@@ -109,6 +109,7 @@ import static com.facebook.presto.spi.security.PrincipalType.USER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.nullToEmpty;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.lang.Math.round;
 import static java.lang.String.format;
@@ -436,6 +437,13 @@ public final class ThriftMetastoreUtil
     public static boolean isCsvTable(org.apache.hadoop.hive.metastore.api.Table table)
     {
         return CSV.getSerDe().equals(getSerdeInfo(table).getSerializationLib());
+    }
+
+    public static List<FieldSchema> csvSchemaFields(List<FieldSchema> schemas)
+    {
+        return schemas.stream()
+                .map(schema -> new FieldSchema(schema.getName(), HiveType.HIVE_STRING.toString(), schema.getComment()))
+                .collect(toImmutableList());
     }
 
     private static SerDeInfo getSerdeInfo(org.apache.hadoop.hive.metastore.api.Table table)
