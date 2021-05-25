@@ -14,10 +14,6 @@
 package com.facebook.presto.hive.rubix;
 
 import com.facebook.presto.spi.HostAddress;
-import com.qubole.rubix.presto.CachingPrestoGoogleHadoopFileSystem;
-import com.qubole.rubix.presto.CachingPrestoNativeAzureFileSystem;
-import com.qubole.rubix.presto.CachingPrestoS3FileSystem;
-import com.qubole.rubix.presto.PrestoClusterManager;
 import org.apache.hadoop.conf.Configuration;
 
 import javax.inject.Inject;
@@ -37,6 +33,7 @@ import static com.qubole.rubix.spi.CacheConfig.setEmbeddedMode;
 import static com.qubole.rubix.spi.CacheConfig.setIsParallelWarmupEnabled;
 import static com.qubole.rubix.spi.CacheConfig.setMaxDisks;
 import static com.qubole.rubix.spi.CacheConfig.setOnMaster;
+import static com.qubole.rubix.spi.CacheConfig.setPrestoClusterManager;
 
 public class RubixConfigurationInitializer
         implements RubixCacheConfigurationInitializer
@@ -100,6 +97,7 @@ public class RubixConfigurationInitializer
         enableHeartbeat(config, false);
         setClusterNodeRefreshTime(config, 10);
         setMaxDisks(config, 0);
+        setPrestoClusterManager(config, PrestoClusterManager.class.getName());
 
         config.set("fs.s3.impl", RUBIX_S3_FS_CLASS_NAME);
         config.set("fs.s3a.impl", RUBIX_S3_FS_CLASS_NAME);

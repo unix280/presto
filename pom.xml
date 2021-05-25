@@ -83,7 +83,7 @@
         <air.test.jvmsize>4g</air.test.jvmsize>
 
         <air.javadoc.lint>-missing</air.javadoc.lint>
-        <rubix.version>0.3.11.1</rubix.version>
+        <rubix.version>0.3.18</rubix.version>
     </properties>
 
     <modules>

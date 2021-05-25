@@ -101,7 +101,8 @@ public class RubixInitializer
                         BookKeeper bookKeeper = bookKeeperServer.startServer(configuration, metricRegistry);
                         LocalDataTransferServer.startServer(configuration, metricRegistry, bookKeeper);
 
-                        CachingFileSystem.setLocalBookKeeper(bookKeeper, "catalog=" + catalog);
+                        CachingFileSystem.setLocalBookKeeper(configuration, bookKeeper, "catalog=" + catalog);
+                        PrestoClusterManager.setNodeManager(nodeManager);
                         log.info("Rubix initialized successfully");
                         rubixConfigurationInitializer.initializationDone();
                     }
