@@ -134,7 +134,7 @@ public class FeaturesConfig
     private boolean defaultFilterFactorEnabled;
     private boolean pushAggregationThroughJoin = true;
     private double memoryRevokingTarget = 0.5;
-    private double memoryRevokingThreshold = 0.9;
+    private double memoryRevokingThreshold = 0.7;
     private boolean parseDecimalLiteralsAsDouble;
     private boolean useMarkDistinct = true;
     private boolean preferPartialAggregation = true;

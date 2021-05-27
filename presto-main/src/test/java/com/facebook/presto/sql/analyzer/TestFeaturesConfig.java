@@ -93,7 +93,7 @@ public class TestFeaturesConfig
                 .setSpillerSpillPaths("")
                 .setSpillerThreads(4)
                 .setSpillMaxUsedSpaceThreshold(0.9)
-                .setMemoryRevokingThreshold(0.9)
+                .setMemoryRevokingThreshold(0.7)
                 .setMemoryRevokingTarget(0.5)
                 .setTaskSpillingStrategy(ORDER_BY_CREATE_TIME)
                 .setSingleStreamSpillerChoice(SingleStreamSpillerChoice.LOCAL_FILE)
