@@ -239,12 +239,12 @@ public class TestJdbcComputePushdown
 
     private static JdbcColumnHandle integerJdbcColumnHandle(String name)
     {
-        return new JdbcColumnHandle(CONNECTOR_ID, name, new JdbcTypeHandle(Types.BIGINT, "integer", 10, 0), BIGINT, false);
+        return new JdbcColumnHandle(CONNECTOR_ID, name, new JdbcTypeHandle(Types.BIGINT, "integer", 10, 0), BIGINT, false, Optional.empty());
     }
 
     private static JdbcColumnHandle booleanJdbcColumnHandle(String name)
     {
-        return new JdbcColumnHandle(CONNECTOR_ID, name, new JdbcTypeHandle(Types.BOOLEAN, "boolean", 1, 0), BOOLEAN, false);
+        return new JdbcColumnHandle(CONNECTOR_ID, name, new JdbcTypeHandle(Types.BOOLEAN, "boolean", 1, 0), BOOLEAN, false, Optional.empty());
     }
 
     private static JdbcColumnHandle getColumnHandleForVariable(String name, Type type)
