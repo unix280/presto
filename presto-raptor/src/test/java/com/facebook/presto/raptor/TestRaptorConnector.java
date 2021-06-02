@@ -39,6 +39,7 @@ import com.facebook.presto.spi.PageSinkContext;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.testing.MaterializedResult;
 import com.facebook.presto.testing.TestingConnectorSession;
 import com.facebook.presto.testing.TestingNodeManager;
@@ -220,6 +221,7 @@ public class TestRaptorConnector
     {
         ConnectorSession session = new TestingConnectorSession(
                 "user",
+                new ConnectorIdentity("user", Optional.empty(), Optional.empty()),
                 Optional.of("test"),
                 Optional.empty(),
                 getTimeZoneKey(userTimeZone),
