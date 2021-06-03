@@ -20,7 +20,6 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
-import com.amazonaws.auth.InstanceProfileCredentialsProvider;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
@@ -56,7 +55,6 @@ public class PrestoS3ClientFactory
     private static final String S3_ACCESS_KEY = "presto.s3.access-key";
     private static final String S3_SECRET_KEY = "presto.s3.secret-key";
     private static final String S3_CREDENTIALS_PROVIDER = "presto.s3.credentials-provider";
-    private static final String S3_USE_INSTANCE_CREDENTIALS = "presto.s3.use-instance-credentials";
     private static final String S3_CONNECT_TIMEOUT = "presto.s3.connect-timeout";
     private static final String S3_SOCKET_TIMEOUT = "presto.s3.socket-timeout";
     private static final String S3_SSL_ENABLED = "presto.s3.ssl.enabled";
@@ -137,11 +135,6 @@ public class PrestoS3ClientFactory
         Optional<AWSCredentials> credentials = getAwsCredentials(conf);
         if (credentials.isPresent()) {
             return new AWSStaticCredentialsProvider(credentials.get());
-        }
-
-        boolean useInstanceCredentials = conf.getBoolean(S3_USE_INSTANCE_CREDENTIALS, defaults.isS3UseInstanceCredentials());
-        if (useInstanceCredentials) {
-            return InstanceProfileCredentialsProvider.getInstance();
         }
 
         String providerClass = conf.get(S3_CREDENTIALS_PROVIDER);

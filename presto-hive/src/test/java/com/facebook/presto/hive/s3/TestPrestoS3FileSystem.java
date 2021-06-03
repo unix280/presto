@@ -85,7 +85,6 @@ import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SKIP_GLACIER
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_STAGING_DIRECTORY;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_USER_AGENT_PREFIX;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_USER_AGENT_SUFFIX;
-import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_USE_INSTANCE_CREDENTIALS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
@@ -152,7 +151,6 @@ public class TestPrestoS3FileSystem
     {
         Configuration config = new Configuration();
         config.set(S3_IAM_ROLE, "role");
-        config.setBoolean(S3_USE_INSTANCE_CREDENTIALS, false);
 
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             fs.initialize(new URI("s3n://test-bucket/"), config);
@@ -178,7 +176,6 @@ public class TestPrestoS3FileSystem
             throws Exception
     {
         Configuration config = new Configuration();
-        config.setBoolean(S3_USE_INSTANCE_CREDENTIALS, false);
 
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             fs.initialize(new URI("s3n://test-bucket/"), config);
@@ -455,7 +452,6 @@ public class TestPrestoS3FileSystem
             throws Exception
     {
         Configuration config = new Configuration();
-        config.set(S3_USE_INSTANCE_CREDENTIALS, "false");
         config.set(S3_CREDENTIALS_PROVIDER, TestCredentialsProvider.class.getName());
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             fs.initialize(new URI("s3n://test-bucket/"), config);
@@ -468,7 +464,6 @@ public class TestPrestoS3FileSystem
             throws Exception
     {
         Configuration config = new Configuration();
-        config.set(S3_USE_INSTANCE_CREDENTIALS, "false");
         config.set(S3_CREDENTIALS_PROVIDER, "com.example.DoesNotExist");
         try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
             fs.initialize(new URI("s3n://test-bucket/"), config);

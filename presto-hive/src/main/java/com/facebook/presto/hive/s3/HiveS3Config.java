@@ -16,6 +16,7 @@ package com.facebook.presto.hive.s3;
 import com.facebook.airlift.configuration.Config;
 import com.facebook.airlift.configuration.ConfigDescription;
 import com.facebook.airlift.configuration.ConfigSecuritySensitive;
+import com.facebook.airlift.configuration.DefunctConfig;
 import com.google.common.base.StandardSystemProperty;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
@@ -30,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
+@DefunctConfig("hive.s3.use-instance-credentials")
 public class HiveS3Config
 {
     private String s3AwsAccessKey;
@@ -37,7 +39,6 @@ public class HiveS3Config
     private String s3Endpoint;
     private PrestoS3SignerType s3SignerType;
     private boolean s3PathStyleAccess;
-    private boolean s3UseInstanceCredentials;
     private String s3IamRole;
     private String s3IamRoleSessionName = "presto-session";
     private boolean s3SslEnabled = true;
@@ -120,18 +121,6 @@ public class HiveS3Config
     public HiveS3Config setS3PathStyleAccess(boolean s3PathStyleAccess)
     {
         this.s3PathStyleAccess = s3PathStyleAccess;
-        return this;
-    }
-
-    public boolean isS3UseInstanceCredentials()
-    {
-        return s3UseInstanceCredentials;
-    }
-
-    @Config("hive.s3.use-instance-credentials")
-    public HiveS3Config setS3UseInstanceCredentials(boolean s3UseInstanceCredentials)
-    {
-        this.s3UseInstanceCredentials = s3UseInstanceCredentials;
         return this;
     }
 
