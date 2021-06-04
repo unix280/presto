@@ -74,6 +74,7 @@ public class QueryStats
     private final int completedDrivers;
 
     private final double cumulativeUserMemory;
+    private final double cumulativeTotalMemory;
     private final DataSize userMemoryReservation;
     private final DataSize totalMemoryReservation;
     private final DataSize peakUserMemoryReservation;
@@ -143,6 +144,7 @@ public class QueryStats
             @JsonProperty("completedDrivers") int completedDrivers,
 
             @JsonProperty("cumulativeUserMemory") double cumulativeUserMemory,
+            @JsonProperty("cumulativeTotalMemory") double cumulativeTotalMemory,
             @JsonProperty("userMemoryReservation") DataSize userMemoryReservation,
             @JsonProperty("totalMemoryReservation") DataSize totalMemoryReservation,
             @JsonProperty("peakUserMemoryReservation") DataSize peakUserMemoryReservation,
@@ -218,6 +220,8 @@ public class QueryStats
         this.completedDrivers = completedDrivers;
         checkArgument(cumulativeUserMemory >= 0, "cumulativeUserMemory is negative");
         this.cumulativeUserMemory = cumulativeUserMemory;
+        checkArgument(cumulativeTotalMemory >= 0, "cumulativeTotalMemory is negative");
+        this.cumulativeTotalMemory = cumulativeTotalMemory;
         this.userMemoryReservation = requireNonNull(userMemoryReservation, "userMemoryReservation is null");
         this.totalMemoryReservation = requireNonNull(totalMemoryReservation, "totalMemoryReservation is null");
         this.peakUserMemoryReservation = requireNonNull(peakUserMemoryReservation, "peakUserMemoryReservation is null");
@@ -281,6 +285,7 @@ public class QueryStats
         int completedDrivers = 0;
 
         double cumulativeUserMemory = 0;
+        double cumulativeTotalMemory = 0;
         long userMemoryReservation = 0;
         long totalMemoryReservation = 0;
 
@@ -327,6 +332,7 @@ public class QueryStats
             completedDrivers += stageExecutionStats.getCompletedDrivers();
 
             cumulativeUserMemory += stageExecutionStats.getCumulativeUserMemory();
+            cumulativeTotalMemory += stageExecutionStats.getCumulativeTotalMemory();
             userMemoryReservation += stageExecutionStats.getUserMemoryReservation().toBytes();
             totalMemoryReservation += stageExecutionStats.getTotalMemoryReservation().toBytes();
             totalScheduledTime += stageExecutionStats.getTotalScheduledTime().roundTo(MILLISECONDS);
@@ -412,6 +418,7 @@ public class QueryStats
                 completedDrivers,
 
                 cumulativeUserMemory,
+                cumulativeTotalMemory,
                 succinctBytes(userMemoryReservation),
                 succinctBytes(totalMemoryReservation),
                 peakUserMemoryReservation,
@@ -487,6 +494,7 @@ public class QueryStats
                 new Duration(0, MILLISECONDS),
                 new Duration(0, MILLISECONDS),
                 new Duration(0, MILLISECONDS),
+                0,
                 0,
                 0,
                 0,
@@ -664,6 +672,12 @@ public class QueryStats
     public double getCumulativeUserMemory()
     {
         return cumulativeUserMemory;
+    }
+
+    @JsonProperty
+    public double getCumulativeTotalMemory()
+    {
+        return cumulativeTotalMemory;
     }
 
     @JsonProperty

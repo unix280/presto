@@ -74,6 +74,7 @@ public class StageExecutionInfo
         int completedDrivers = 0;
 
         double cumulativeUserMemory = 0;
+        double cumulativeTotalMemory = 0;
         long userMemoryReservation = 0;
         long totalMemoryReservation = 0;
 
@@ -125,6 +126,7 @@ public class StageExecutionInfo
             completedDrivers += taskStats.getCompletedDrivers();
 
             cumulativeUserMemory += taskStats.getCumulativeUserMemory();
+            cumulativeTotalMemory += taskStats.getCumulativeTotalMemory();
 
             long taskUserMemory = taskStats.getUserMemoryReservationInBytes();
             long taskSystemMemory = taskStats.getSystemMemoryReservationInBytes();
@@ -193,6 +195,7 @@ public class StageExecutionInfo
                 completedDrivers,
 
                 cumulativeUserMemory,
+                cumulativeTotalMemory,
                 succinctBytes(userMemoryReservation),
                 succinctBytes(totalMemoryReservation),
                 peakUserMemoryReservation,

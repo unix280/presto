@@ -177,6 +177,7 @@ public class QueryMonitor
                         0,
                         0,
                         0,
+                        0,
                         true,
                         new RuntimeStats()),
                 createQueryContext(queryInfo.getSession(), queryInfo.getResourceGroupId()),
@@ -313,6 +314,7 @@ public class QueryMonitor
                 queryStats.getWrittenIntermediatePhysicalDataSize().toBytes(),
                 queryStats.getSpilledDataSize().toBytes(),
                 queryStats.getCumulativeUserMemory(),
+                queryStats.getCumulativeTotalMemory(),
                 queryStats.getCompletedDrivers(),
                 queryInfo.isCompleteInfo(),
                 queryStats.getRuntimeStats());

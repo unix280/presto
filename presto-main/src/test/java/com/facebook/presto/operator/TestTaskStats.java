@@ -44,6 +44,7 @@ public class TestTaskStats
             10,
 
             11.0,
+            43.0,
             12,
             13,
             14,
