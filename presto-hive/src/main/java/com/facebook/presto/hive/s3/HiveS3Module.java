@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.s3;
 
 import com.facebook.airlift.configuration.AbstractConfigurationAwareModule;
+import com.facebook.presto.hive.DynamicConfigurationProvider;
 import com.facebook.presto.hive.HiveClientConfig;
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
@@ -21,6 +22,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
 
 import static com.facebook.airlift.configuration.ConfigBinder.configBinder;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.inject.multibindings.Multibinder.newSetBinder;
 import static java.util.Objects.requireNonNull;
 import static org.weakref.jmx.ObjectNames.generatedNameOf;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
@@ -42,6 +45,8 @@ public class HiveS3Module
     {
         S3FileSystemType type = buildConfigObject(HiveClientConfig.class).getS3FileSystemType();
         if (type == S3FileSystemType.PRESTO) {
+            bindSecurityMapping(binder);
+
             binder.bind(S3ConfigurationUpdater.class).to(PrestoS3ConfigurationUpdater.class).in(Scopes.SINGLETON);
             configBinder(binder).bindConfig(HiveS3Config.class);
 
@@ -58,6 +63,16 @@ public class HiveS3Module
         }
         else {
             throw new RuntimeException("Unknown file system type: " + type);
+        }
+    }
+
+    private void bindSecurityMapping(Binder binder)
+    {
+        if (buildConfigObject(S3SecurityMappingConfig.class).getConfigFile().isPresent()) {
+            checkArgument(!buildConfigObject(HiveClientConfig.class).isS3SelectPushdownEnabled(), "S3 security mapping is not compatible with S3 Select pushdown");
+
+            newSetBinder(binder, DynamicConfigurationProvider.class).addBinding()
+                    .to(S3SecurityMappingConfigurationProvider.class).in(Scopes.SINGLETON);
         }
     }
 
