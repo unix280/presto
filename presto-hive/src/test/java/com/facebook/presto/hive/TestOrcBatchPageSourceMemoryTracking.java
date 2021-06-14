@@ -401,7 +401,7 @@ public class TestOrcBatchPageSourceMemoryTracking
 
             partitionKeys = testColumns.stream()
                     .filter(TestColumn::isPartitionKey)
-                    .map(input -> new HivePartitionKey(input.getName(), (String) input.getWriteValue()))
+                    .map(input -> new HivePartitionKey(input.getName(), Optional.ofNullable((String) input.getWriteValue())))
                     .collect(toList());
 
             table = new TableHandle(
