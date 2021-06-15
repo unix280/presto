@@ -1062,6 +1062,9 @@ public class PrestoSparkQueryExecutionFactory
 
                 waitForActionsCompletionWithTimeout(inputFutures.values(), computeNextTimeout(queryCompletionDeadline), MILLISECONDS, waitTimeMetrics);
 
+                // release memory retained by the RDDs (splits and dependencies)
+                inputRdds = null;
+
                 ImmutableMap.Builder<String, List<PrestoSparkSerializedPage>> inputs = ImmutableMap.builder();
                 long totalNumberOfPagesReceived = 0;
                 long totalCompressedSizeInBytes = 0;
