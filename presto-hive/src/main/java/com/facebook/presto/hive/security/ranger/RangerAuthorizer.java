@@ -45,7 +45,6 @@ public class RangerAuthorizer
 
     public RangerAuthorizer(ServicePolicies servicePolicies)
     {
-
         RangerPolicyEngineOptions rangerPolicyEngineOptions = new RangerPolicyEngineOptions();
         Configuration conf = new Configuration();
         conf.set("hive.policyengine.option.disable.tagpolicy.evaluation", "true");
@@ -60,7 +59,10 @@ public class RangerAuthorizer
     private static <T> T jsonParse(Response response, Class<T> clazz)
             throws IOException
     {
-        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(response.body().byteStream()));
+        BufferedReader bufferedReader = null;
+        if (response.body() != null) {
+            bufferedReader = new BufferedReader(new InputStreamReader(response.body().byteStream()));
+        }
         ObjectMapper mapper = new ObjectMapper();
         return mapper.readValue(bufferedReader, clazz);
     }
