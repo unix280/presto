@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Optional;
 
 import static com.facebook.presto.orc.metadata.PostScript.MAGIC;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -56,7 +57,12 @@ public class OrcMetadataWriter
     }
 
     @Override
-    public int writePostscript(SliceOutput output, int footerLength, int metadataLength, CompressionKind compression, int compressionBlockSize)
+    public int writePostscript(SliceOutput output,
+            int footerLength,
+            int metadataLength,
+            CompressionKind compression,
+            int compressionBlockSize,
+            Optional<DwrfStripeCacheData> dwrfStripeCacheData)
             throws IOException
     {
         OrcProto.PostScript postScriptProtobuf = OrcProto.PostScript.newBuilder()
@@ -70,6 +76,12 @@ public class OrcMetadataWriter
                 .build();
 
         return writeProtobufObject(output, postScriptProtobuf);
+    }
+
+    @Override
+    public int writeDwrfStripeCache(SliceOutput output, Optional<DwrfStripeCacheData> dwrfStripeCacheData)
+    {
+        return 0;
     }
 
     @Override
