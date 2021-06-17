@@ -24,6 +24,7 @@ import com.facebook.presto.testing.TestingConnectorSession;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
@@ -183,6 +184,7 @@ public class TestPinotSplitManager
                         forbidSegmentQueries),
                 new FeaturesConfig().isLegacyTimestamp(),
                 Optional.empty(),
+                ImmutableSet.of(),
                 Optional.empty(),
                 ImmutableMap.of());
     }
@@ -203,6 +205,7 @@ public class TestPinotSplitManager
                         limitLarge),
                 new FeaturesConfig().isLegacyTimestamp(),
                 Optional.empty(),
+                ImmutableSet.of(),
                 Optional.empty(),
                 ImmutableMap.of());
     }
