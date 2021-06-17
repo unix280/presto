@@ -86,7 +86,7 @@ public class RangerAuthorizer
         return builder.build();
     }
 
-    public boolean authorizeHiveResource(String database, String table, String column, String accessType, String user, Set<String> userGroups)
+    public boolean authorizeHiveResource(String database, String table, String column, String accessType, String user, Set<String> userGroups, Set<String> userRoles)
     {
         String keyDatabase = "database";
         String keyTable = "table";
@@ -104,7 +104,7 @@ public class RangerAuthorizer
             resource.setValue(keyColumn, column);
         }
 
-        RangerAccessRequest request = new RangerAccessRequestImpl(resource, accessType.toLowerCase(ENGLISH), user, userGroups, null);
+        RangerAccessRequest request = new RangerAccessRequestImpl(resource, accessType.toLowerCase(ENGLISH), user, userGroups, userRoles);
         RangerAccessResult result = plugin.isAccessAllowed(request);
         return result != null && result.getIsAllowed();
     }

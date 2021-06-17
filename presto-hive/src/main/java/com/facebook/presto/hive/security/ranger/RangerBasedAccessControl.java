@@ -40,13 +40,18 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_MGR_DOWNLOAD_URL;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_GROUP_URL;
+import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_ROLES_URL;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyAddColumn;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyCreateTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyCreateView;
@@ -75,6 +80,7 @@ public class RangerBasedAccessControl
 
     private RangerAuthorizer rangerAuthorizer;
     private Users users;
+    private static Map<String, Set<String>> userRolesMapping = new HashMap<>();
 
     @TestOnly
     public RangerBasedAccessControl()
@@ -87,7 +93,6 @@ public class RangerBasedAccessControl
         requireNonNull(config.getRangerHttpEndPoint(), "Ranger service http end point is null");
         requireNonNull(config.getRangerHiveServiceName(), "Ranger hive service name is null");
 
-        OkHttpClient httpClient = null;
         ServicePolicies servicePolicies;
         try {
             OkHttpClient client = getAuthHttpClient(config);
@@ -104,6 +109,7 @@ public class RangerBasedAccessControl
             servicePolicies = getHiveServicePolicies(client, hiveServicePolicyUrl);
             users = getUsers(client, getUsersUrl);
             rangerAuthorizer = new RangerAuthorizer(servicePolicies);
+            userRolesMapping = getRolesForUserList(client, config.getRangerHttpEndPoint());
 
             log.info("Retrieved policies count " + servicePolicies.getPolicies().size());
             log.info("Retrieved users count " + users.getvXUsers().size());
@@ -136,6 +142,31 @@ public class RangerBasedAccessControl
         }
 
         return users.getValue();
+    }
+
+    private Map<String, Set<String>> getRolesForUserList(OkHttpClient client, String rangerEndPoint)
+    {
+        List<String> usersList = users.getvXUsers().stream().map(VXUser::getName).collect(Collectors.toList());
+        HttpUrl getRolesUrl;
+        for (String user : usersList) {
+            getRolesUrl = requireNonNull(HttpUrl.get(URI.create(rangerEndPoint)))
+                    .newBuilder()
+                    .encodedPath(RANGER_REST_USER_ROLES_URL + "/" + user)
+                    .build();
+            userRolesMapping.put(user, getRolesForUser(client, getRolesUrl));
+        }
+        return userRolesMapping;
+    }
+
+    private Set<String> getRolesForUser(OkHttpClient client, HttpUrl endPtUri)
+    {
+        Request request = new Request.Builder().url(endPtUri).header("Accept", "application/json").build();
+        JsonCodec<List> rolesJsonCodec = jsonCodec(List.class);
+        JsonResponse<List> roles = JsonResponse.execute(rolesJsonCodec, client, request);
+        if (!roles.hasValue()) {
+            throw new RuntimeException(format("Request to %s failed: %s [Error: %s]", endPtUri, roles, roles.getResponseBody()));
+        }
+        return new HashSet<>(roles.getValue());
     }
 
     @TestOnly
@@ -189,7 +220,7 @@ public class RangerBasedAccessControl
     private boolean checkAccess(ConnectorIdentity identity, SchemaTableName tableName, String column, HiveAccessType accessType)
     {
         return rangerAuthorizer.authorizeHiveResource(tableName.getSchemaName(), tableName.getTableName(), column,
-                accessType.toString(), identity.getUser(), getGroupsForUser(identity.getUser()));
+                accessType.toString(), identity.getUser(), getGroupsForUser(identity.getUser()), userRolesMapping.get(identity.getUser()));
     }
 
     /**
@@ -237,9 +268,10 @@ public class RangerBasedAccessControl
     {
         Set<String> allowedSchemas = new HashSet<>();
         Set<String> groups = getGroupsForUser(identity.getUser());
+        Set<String> roles = userRolesMapping.get(identity.getUser());
 
         for (String schema : schemaNames) {
-            if (rangerAuthorizer.authorizeHiveResource(schema, null, null, HiveAccessType.SELECT.toString(), identity.getUser(), groups)) {
+            if (rangerAuthorizer.authorizeHiveResource(schema, null, null, HiveAccessType.SELECT.toString(), identity.getUser(), groups, roles)) {
                 allowedSchemas.add(schema);
             }
         }
@@ -268,9 +300,10 @@ public class RangerBasedAccessControl
     {
         Set<SchemaTableName> allowedTables = new HashSet<>();
         Set<String> groups = getGroupsForUser(identity.getUser());
+        Set<String> roles = userRolesMapping.get(identity.getUser());
 
         for (SchemaTableName table : tableNames) {
-            if (rangerAuthorizer.authorizeHiveResource(table.getSchemaName(), table.getTableName(), null, HiveAccessType.SELECT.toString(), identity.getUser(), groups)) {
+            if (rangerAuthorizer.authorizeHiveResource(table.getSchemaName(), table.getTableName(), null, HiveAccessType.SELECT.toString(), identity.getUser(), groups, roles)) {
                 allowedTables.add(table);
             }
         }
