@@ -31,6 +31,7 @@ import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.apache.ranger.plugin.policyengine.RangerPolicyEngine;
 import org.apache.ranger.plugin.util.ServicePolicies;
 import org.jetbrains.annotations.TestOnly;
 
@@ -271,7 +272,7 @@ public class RangerBasedAccessControl
         Set<String> roles = userRolesMapping.get(identity.getUser());
 
         for (String schema : schemaNames) {
-            if (rangerAuthorizer.authorizeHiveResource(schema, null, null, HiveAccessType.SELECT.toString(), identity.getUser(), groups, roles)) {
+            if (rangerAuthorizer.authorizeHiveResource(schema, null, null, RangerPolicyEngine.ANY_ACCESS, identity.getUser(), groups, roles)) {
                 allowedSchemas.add(schema);
             }
         }
@@ -303,7 +304,7 @@ public class RangerBasedAccessControl
         Set<String> roles = userRolesMapping.get(identity.getUser());
 
         for (SchemaTableName table : tableNames) {
-            if (rangerAuthorizer.authorizeHiveResource(table.getSchemaName(), table.getTableName(), null, HiveAccessType.SELECT.toString(), identity.getUser(), groups, roles)) {
+            if (rangerAuthorizer.authorizeHiveResource(table.getSchemaName(), table.getTableName(), null, RangerPolicyEngine.ANY_ACCESS, identity.getUser(), groups, roles)) {
                 allowedTables.add(table);
             }
         }
