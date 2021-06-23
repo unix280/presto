@@ -92,8 +92,7 @@ public class TestProgressMonitor
                 data,
                 StatementStats.builder()
                         .setState(state)
-                        .setQueued(state.equals("QUEUED"))
-                        .setQueued(state.equals("WAITING_FOR_PREREQUISITES"))
+                        .setWaitingForPrerequisites(state.equals("WAITING_FOR_PREREQUISITES"))
                         .setScheduled(true)
                         .build(),
                 null,
@@ -134,7 +133,7 @@ public class TestProgressMonitor
 
                 List<QueryStats> queryStatsList = progressMonitor.finish();
                 assertGreaterThanOrEqual(queryStatsList.size(), 5); // duplicate stats is possible
-                assertEquals(queryStatsList.get(0).getState(), "QUEUED");
+                assertEquals(queryStatsList.get(0).getState(), "WAITING_FOR_PREREQUISITES");
                 assertEquals(queryStatsList.get(queryStatsList.size() - 1).getState(), "FINISHED");
             }
         }
