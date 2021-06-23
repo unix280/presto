@@ -647,6 +647,7 @@ public class PrestoSparkQueryExecutionFactory
                 stats.getPeakTotalMemoryBytes(),
                 stats.getPeakTaskTotalMemoryBytes(),
                 stats.getSpilledBytes(),
+                null,
                 null);
 
         return new PrestoSparkQueryStatusInfo(

@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.client;
 
+import com.facebook.presto.common.RuntimeStats;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -47,6 +48,7 @@ public class StatementStats
     private final long peakTaskTotalMemoryBytes;
     private final long spilledBytes;
     private final StageStats rootStage;
+    private final RuntimeStats runtimeStats;
 
     @JsonCreator
     public StatementStats(
@@ -68,7 +70,8 @@ public class StatementStats
             @JsonProperty("peakTotalMemoryBytes") long peakTotalMemoryBytes,
             @JsonProperty("peakTaskTotalMemoryBytes") long peakTaskTotalMemoryBytes,
             @JsonProperty("spilledBytes") long spilledBytes,
-            @JsonProperty("rootStage") StageStats rootStage)
+            @JsonProperty("rootStage") StageStats rootStage,
+            @JsonProperty("runtimeStats") RuntimeStats runtimeStats)
     {
         this.state = requireNonNull(state, "state is null");
         this.queued = queued;
@@ -89,6 +92,7 @@ public class StatementStats
         this.peakTaskTotalMemoryBytes = peakTaskTotalMemoryBytes;
         this.spilledBytes = spilledBytes;
         this.rootStage = rootStage;
+        this.runtimeStats = runtimeStats;
     }
 
     @JsonProperty
@@ -200,6 +204,13 @@ public class StatementStats
         return rootStage;
     }
 
+    @Nullable
+    @JsonProperty
+    public RuntimeStats getRuntimeStats()
+    {
+        return runtimeStats;
+    }
+
     @JsonProperty
     public OptionalDouble getProgressPercentage()
     {
@@ -267,6 +278,7 @@ public class StatementStats
         private long peakTaskTotalMemoryBytes;
         private long spilledBytes;
         private StageStats rootStage;
+        private RuntimeStats runtimeStats;
 
         private Builder() {}
 
@@ -384,6 +396,12 @@ public class StatementStats
             return this;
         }
 
+        public Builder setRuntimeStats(RuntimeStats runtimeStats)
+        {
+            this.runtimeStats = runtimeStats;
+            return this;
+        }
+
         public StatementStats build()
         {
             return new StatementStats(
@@ -405,7 +423,8 @@ public class StatementStats
                     peakTotalMemoryBytes,
                     peakTaskTotalMemoryBytes,
                     spilledBytes,
-                    rootStage);
+                    rootStage,
+                    runtimeStats);
         }
     }
 }

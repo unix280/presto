@@ -408,7 +408,7 @@ public class DriverContext
                 outputDataSize.convertToMostSuccinctDataSize(),
                 outputPositions,
                 succinctBytes(physicalWrittenDataSize),
-                ImmutableList.copyOf(transform(operatorContexts, OperatorContext::getOperatorStats)));
+                operators);
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)

@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator;
 
+import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.util.Mergeable;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -84,6 +85,8 @@ public class OperatorStats
 
     private final OperatorInfo info;
 
+    private final RuntimeStats runtimeStats;
+
     @JsonCreator
     public OperatorStats(
             @JsonProperty("stageId") int stageId,
@@ -132,7 +135,8 @@ public class OperatorStats
 
             @JsonProperty("blockedReason") Optional<BlockedReason> blockedReason,
 
-            @JsonProperty("info") OperatorInfo info)
+            @JsonProperty("info") OperatorInfo info,
+            @JsonProperty("runtimeStats") RuntimeStats runtimeStats)
     {
         this.stageId = stageId;
         this.stageExecutionId = stageExecutionId;
@@ -182,6 +186,8 @@ public class OperatorStats
         this.peakTotalMemoryReservation = requireNonNull(peakTotalMemoryReservation, "peakTotalMemoryReservation is null");
 
         this.spilledDataSize = requireNonNull(spilledDataSize, "spilledDataSize is null");
+
+        this.runtimeStats = runtimeStats;
 
         this.blockedReason = blockedReason;
 
@@ -398,6 +404,13 @@ public class OperatorStats
         return spilledDataSize;
     }
 
+    @Nullable
+    @JsonProperty
+    public RuntimeStats getRuntimeStats()
+    {
+        return runtimeStats;
+    }
+
     @JsonProperty
     public Optional<BlockedReason> getBlockedReason()
     {
@@ -457,6 +470,8 @@ public class OperatorStats
 
         Optional<BlockedReason> blockedReason = this.blockedReason;
 
+        RuntimeStats runtimeStats = RuntimeStats.copyOf(this.runtimeStats);
+
         Mergeable<OperatorInfo> base = getMergeableInfoOrNull(info);
         for (OperatorStats operator : operators) {
             checkArgument(operator.getOperatorId() == operatorId, "Expected operatorId to be %s but was %s", operatorId, operator.getOperatorId());
@@ -507,6 +522,8 @@ public class OperatorStats
             if (base != null && info != null && base.getClass() == info.getClass()) {
                 base = mergeInfo(base, info);
             }
+
+            runtimeStats.mergeWith(operator.getRuntimeStats());
         }
 
         return new OperatorStats(
@@ -556,7 +573,8 @@ public class OperatorStats
 
                 blockedReason,
 
-                (OperatorInfo) base);
+                (OperatorInfo) base,
+                runtimeStats);
     }
 
     @SuppressWarnings("unchecked")
@@ -614,6 +632,7 @@ public class OperatorStats
                 peakTotalMemoryReservation,
                 spilledDataSize,
                 blockedReason,
-                (info != null && info.isFinal()) ? info : null);
+                (info != null && info.isFinal()) ? info : null,
+                runtimeStats);
     }
 }

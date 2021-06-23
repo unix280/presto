@@ -271,7 +271,8 @@ public class QueryMonitor
                         operatorSummary.getPeakSystemMemoryReservation(),
                         operatorSummary.getPeakTotalMemoryReservation(),
                         operatorSummary.getSpilledDataSize(),
-                        Optional.ofNullable(operatorSummary.getInfo()).map(operatorInfoCodec::toJson)))
+                        Optional.ofNullable(operatorSummary.getInfo()).map(operatorInfoCodec::toJson),
+                        operatorSummary.getRuntimeStats()))
                 .collect(toImmutableList());
     }
 
