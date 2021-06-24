@@ -182,6 +182,12 @@ public class RangerBasedAccessControl
         this.users = users;
     }
 
+    @TestOnly
+    public void setUserRoles(Map<String, Set<String>> userRolesMapping)
+    {
+        this.userRolesMapping = userRolesMapping;
+    }
+
     private static <T> T jsonParse(Response response, Class<T> clazz)
             throws IOException
     {
