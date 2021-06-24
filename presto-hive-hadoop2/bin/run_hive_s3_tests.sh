@@ -7,6 +7,8 @@ set -euo pipefail -x
 cleanup_docker_containers
 start_docker_containers
 
+test_directory="$(date '+%Y%m%d-%H%M%S')-$(uuidgen | sha1sum | cut -b 1-6)"
+
 # insert AWS credentials
 exec_in_hadoop_master_container cp /etc/hadoop/conf/core-site.xml.s3-template /etc/hadoop/conf/core-site.xml
 exec_in_hadoop_master_container sed -i \
@@ -16,7 +18,7 @@ exec_in_hadoop_master_container sed -i \
  /etc/hadoop/conf/core-site.xml
 
 # create test table
-table_path="s3a://${AWS_S3_BUCKET}/presto_test_external_fs/"
+table_path="s3a://${AWS_S3_BUCKET}/${test_directory}/presto_test_external_fs/"
 exec_in_hadoop_master_container hadoop fs -mkdir -p "${table_path}"
 exec_in_hadoop_master_container hadoop fs -copyFromLocal -f /tmp/test1.csv "${table_path}"
 exec_in_hadoop_master_container hadoop fs -copyFromLocal -f /tmp/test1.csv.gz "${table_path}"
@@ -40,7 +42,8 @@ set +e
   -Dhive.hadoop2.databaseName=default \
   -Dhive.hadoop2.s3.awsAccessKey=${AWS_S3_ACCESS_KEY} \
   -Dhive.hadoop2.s3.awsSecretKey=${AWS_S3_SECRET_KEY} \
-  -Dhive.hadoop2.s3.writableBucket=${AWS_S3_BUCKET}
+  -Dhive.hadoop2.s3.writableBucket=${AWS_S3_BUCKET} \
+  -Dhive.hadoop2.s3.testDirectory="${test_directory}"
 EXIT_CODE=$?
 set -e
 popd
