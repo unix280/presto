@@ -14,6 +14,17 @@ executors:
       MAVEN_SKIP_CHECKS_AND_DOCS: "-Dair.check.skip-all=true -Dmaven.javadoc.skip=true"
       MAVEN_FAST_INSTALL: "-DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -B -q -T C1"
 
+  openjdk-s3-test:
+    machine:
+      image: ubuntu-1604:202004-01
+    working_directory: ~/prestodb
+    environment:
+      MAVEN_OPTS: "-Xmx2G -Xms1G -XX:+ExitOnOutOfMemoryError"
+      MAVEN_SKIP_CHECKS_AND_DOCS: "-Dair.check.skip-all=true -Dmaven.javadoc.skip=true"
+      MAVEN_FAST_INSTALL: "-DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -B -q -T C1"
+      AWS_S3_BUCKET: "presto-ci-s3-tests"
+      S3_BUCKET_ENDPOINT: "s3.us-east-2.amazonaws.com"
+
   openjdk:
     docker:
       - image: circleci/openjdk:8-jdk-stretch-node
@@ -409,6 +420,28 @@ jobs:
       - run:
           name: Test hive
           command: presto-hive-hadoop2/bin/run_hive_tests.sh
+
+      - persist_test_results
+
+  hive_s3_tests:
+    executor: openjdk-s3-test
+    resource_class: large
+    steps:
+      - checkout
+
+      - restore_package_cache
+
+      - run:
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Install test dependencies
+          command: ./mvnw install $MAVEN_FAST_INSTALL -pl presto-hive-hadoop2 -am
+
+      - run:
+          name: Test hive
+          command: presto-hive-hadoop2/bin/run_hive_s3_tests.sh
 
       - persist_test_results
 
@@ -890,6 +923,12 @@ workflows:
             - docker_hub
           requires:
             - start_test_suite
+      - hive_s3_tests:
+          context:
+            - docker_hub
+            - prestodb_staging
+          requires:
+            - start_test_suite
 #      - kudu_tests:
 #          context:
 #            - docker_hub
@@ -934,6 +973,7 @@ workflows:
             # - product_test_specific_environment
             # - product_test_specific_environment_2
             - hive_tests
+            - hive_s3_tests
             # - kudu_tests
             # - spark_integration_tests
       - tag_version:

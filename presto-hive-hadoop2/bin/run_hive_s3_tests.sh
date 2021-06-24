@@ -10,13 +10,13 @@ start_docker_containers
 # insert AWS credentials
 exec_in_hadoop_master_container cp /etc/hadoop/conf/core-site.xml.s3-template /etc/hadoop/conf/core-site.xml
 exec_in_hadoop_master_container sed -i \
-  -e "s|%AWS_ACCESS_KEY%|${AWS_ACCESS_KEY_ID}|g" \
-  -e "s|%AWS_SECRET_KEY%|${AWS_SECRET_ACCESS_KEY}|g" \
+  -e "s|%AWS_ACCESS_KEY%|${AWS_S3_ACCESS_KEY}|g" \
+  -e "s|%AWS_SECRET_KEY%|${AWS_S3_SECRET_KEY}|g" \
   -e "s|%S3_BUCKET_ENDPOINT%|${S3_BUCKET_ENDPOINT}|g" \
  /etc/hadoop/conf/core-site.xml
 
 # create test table
-table_path="s3a://${S3_BUCKET}/presto_test_external_fs/"
+table_path="s3a://${AWS_S3_BUCKET}/presto_test_external_fs/"
 exec_in_hadoop_master_container hadoop fs -mkdir -p "${table_path}"
 exec_in_hadoop_master_container hadoop fs -copyFromLocal -f /tmp/test1.csv "${table_path}"
 exec_in_hadoop_master_container hadoop fs -copyFromLocal -f /tmp/test1.csv.gz "${table_path}"
@@ -38,9 +38,9 @@ set +e
   -Dhive.hadoop2.metastoreHost=localhost \
   -Dhive.hadoop2.metastorePort=9083 \
   -Dhive.hadoop2.databaseName=default \
-  -Dhive.hadoop2.s3.awsAccessKey=${AWS_ACCESS_KEY_ID} \
-  -Dhive.hadoop2.s3.awsSecretKey=${AWS_SECRET_ACCESS_KEY} \
-  -Dhive.hadoop2.s3.writableBucket=${S3_BUCKET}
+  -Dhive.hadoop2.s3.awsAccessKey=${AWS_S3_ACCESS_KEY} \
+  -Dhive.hadoop2.s3.awsSecretKey=${AWS_S3_SECRET_KEY} \
+  -Dhive.hadoop2.s3.writableBucket=${AWS_S3_BUCKET}
 EXIT_CODE=$?
 set -e
 popd
