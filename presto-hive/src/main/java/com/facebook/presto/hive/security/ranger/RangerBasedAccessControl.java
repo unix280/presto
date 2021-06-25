@@ -54,6 +54,7 @@ import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlC
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_GROUP_URL;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_ROLES_URL;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyAddColumn;
+import static com.facebook.presto.spi.security.AccessDeniedException.denyCreateSchema;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyCreateTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyCreateView;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyCreateViewWithSelect;
@@ -236,6 +237,11 @@ public class RangerBasedAccessControl
      */
     public void checkCanCreateSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
+        if (!rangerAuthorizer.authorizeHiveResource(schemaName, null, null,
+                HiveAccessType.CREATE.toString(), identity.getUser(), getGroupsForUser(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
+            denyCreateSchema(schemaName, format("Access denied - User [ %s ] does not have [CREATE] " +
+                    "privilege on [ %s ] ", identity.getUser(), schemaName));
+        }
     }
 
     /**
@@ -245,8 +251,8 @@ public class RangerBasedAccessControl
      */
     public void checkCanDropSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
-        SchemaTableName schemaTableName = new SchemaTableName(schemaName, schemaName);
-        if (!checkAccess(identity, schemaTableName, null, HiveAccessType.DROP)) {
+        if (!rangerAuthorizer.authorizeHiveResource(schemaName, null, null,
+                HiveAccessType.DROP.toString(), identity.getUser(), getGroupsForUser(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
             denyDropSchema(schemaName, format("Access denied - User [ %s ] does not have [DROP] " +
                     "privilege on [ %s ] ", identity.getUser(), schemaName));
         }
