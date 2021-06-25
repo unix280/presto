@@ -65,7 +65,6 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyDropVie
 import static com.facebook.presto.spi.security.AccessDeniedException.denyInsertTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameColumn;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameTable;
-import static com.facebook.presto.spi.security.AccessDeniedException.denySelectColumns;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -374,8 +373,8 @@ public class RangerBasedAccessControl
             }
         }
         if (deniedColumns.size() > 0) {
-            denySelectColumns(tableName.getTableName(), columnNames, format("Access denied - User [ %s ] does not have [SELECT] " +
-                    "privilege on all mentioned columns of [ %s/%s ] ", identity.getUser(), tableName.getSchemaName(), tableName.getTableName()));
+            throw new AccessDeniedException(format("User [ %s ] does not have [SELECT] " +
+                    "privilege on all mentioned columns of [ %s/%s ]", identity.getUser(), tableName.getSchemaName(), tableName.getTableName()));
         }
     }
 
