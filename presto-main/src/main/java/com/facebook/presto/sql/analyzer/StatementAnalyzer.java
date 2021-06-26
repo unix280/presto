@@ -1252,7 +1252,7 @@ class StatementAnalyzer
                 if (materializedViewAnalysisState.isNotVisited()) {
                     MaterializedViewStatus materializedViewStatus = metadata.getMaterializedViewStatus(session, materializedViewName);
                     if (!materializedViewStatus.isFullyMaterialized()) {
-                        return processMaterializedView(table, materializedViewName, scope, name, optionalMaterializedView.get(), statement, materializedViewStatus);
+                        return processMaterializedView(table, materializedViewName, scope, name, optionalMaterializedView.get(), materializedViewStatus);
                     }
                 }
                 if (materializedViewAnalysisState.isVisited()) {
@@ -1374,11 +1374,11 @@ class StatementAnalyzer
                 Optional<Scope> scope,
                 QualifiedObjectName materializedViewQualifiedObjectName,
                 ConnectorMaterializedViewDefinition materializedViewDefinition,
-                Statement statement,
                 MaterializedViewStatus materializedViewStatus)
         {
-            validateMaterialziedViewQueryPlan(statement);
-            String newSql = getMaterializedViewSQL((Query) statement, materializedViewDefinition, materializedViewStatus);
+            validateMaterialziedViewQueryPlan(sqlParser.createStatement(materializedViewDefinition.getOriginalSql(), createParsingOptions(session, warningCollector)));
+
+            String newSql = getMaterializedViewSQL(materializedView, materializedViewDefinition, materializedViewStatus);
 
             Query query = (Query) sqlParser.createStatement(newSql, createParsingOptions(session, warningCollector));
             analysis.registerNamedQuery(materializedView, query);
@@ -1396,7 +1396,7 @@ class StatementAnalyzer
         }
 
         private String getMaterializedViewSQL(
-                Query statement,
+                Table materializedView,
                 ConnectorMaterializedViewDefinition connectorMaterializedViewDefinition,
                 MaterializedViewStatus materializedViewStatus)
         {
@@ -1415,7 +1415,7 @@ class StatementAnalyzer
             Query predicateStitchedQuery = (Query) new PredicateStitcher(session, partitionPredicates).process(createSqlStatement, new PredicateStitcherContext());
             QuerySpecification materializedViewQuerySpecification = new QuerySpecification(
                     selectList(new AllColumns()),
-                    ((QuerySpecification) statement.getQueryBody()).getFrom(),
+                    Optional.of(materializedView),
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
