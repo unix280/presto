@@ -174,6 +174,8 @@ public class TestFeaturesConfig
                 .setOffsetClauseEnabled(false)
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
                 .setMaterializedViewDataConsistencyEnabled(true)
+                .setQueryOptimizationWithMaterializedViewEnabled(false)
+                .setMaterializedViewDataConsistencyEnabled(true)
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
                 .setPrestoSparkAssignBucketToPartitionForPartitionedTableWriteEnabled(false)
@@ -306,6 +308,7 @@ public class TestFeaturesConfig
                 .put("partial-results-max-execution-time-multiplier", "1.5")
                 .put("offset-clause-enabled", "true")
                 .put("materialized-view-data-consistency-enabled", "false")
+                .put("query-optimization-with-materialized-view-enabled", "true")
                 .put("hide-unauthorized-columns", "true")
                 .build();
 
@@ -429,6 +432,8 @@ public class TestFeaturesConfig
                 .setPartialResultsCompletionRatioThreshold(0.9)
                 .setOffsetClauseEnabled(true)
                 .setPartialResultsMaxExecutionTimeMultiplier(1.5)
+                .setMaterializedViewDataConsistencyEnabled(false)
+                .setQueryOptimizationWithMaterializedViewEnabled(true)
                 .setMaterializedViewDataConsistencyEnabled(false)
                 .setPartialResultsMaxExecutionTimeMultiplier(1.5)
                 .setPartialResultsMaxExecutionTimeMultiplier(1.5)

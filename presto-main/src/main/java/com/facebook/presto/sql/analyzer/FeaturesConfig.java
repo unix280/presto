@@ -202,6 +202,8 @@ public class FeaturesConfig
     private boolean offsetClauseEnabled;
     private boolean materializedViewDataConsistencyEnabled = true;
 
+    private boolean queryOptimizationWithMaterializedViewEnabled;
+
     private boolean hideUnauthorizedColumns;
 
     public enum PartitioningPrecisionStrategy
@@ -1772,6 +1774,19 @@ public class FeaturesConfig
     public FeaturesConfig setMaterializedViewDataConsistencyEnabled(boolean materializedViewDataConsistencyEnabled)
     {
         this.materializedViewDataConsistencyEnabled = materializedViewDataConsistencyEnabled;
+        return this;
+    }
+
+    public boolean isQueryOptimizationWithMaterializedViewEnabled()
+    {
+        return queryOptimizationWithMaterializedViewEnabled;
+    }
+
+    @Config("query-optimization-with-materialized-view-enabled")
+    @ConfigDescription("Experimental: Enable query optimization using materialized view. It only supports simple query formats for now.")
+    public FeaturesConfig setQueryOptimizationWithMaterializedViewEnabled(boolean value)
+    {
+        this.queryOptimizationWithMaterializedViewEnabled = value;
         return this;
     }
 
