@@ -20,6 +20,7 @@ import io.airlift.units.Duration;
 
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class AlluxioCacheConfig
@@ -37,6 +38,8 @@ public class AlluxioCacheConfig
     private int timeoutThreads = 64;
     private int evictionRetries = 10;
     private EvictionPolicy evictionPolicy = EvictionPolicy.LRU;
+    private boolean shadowCacheEnabled;
+    private Duration shadowCacheWindow = new Duration(7, DAYS);
 
     public boolean isMetricsCollectionEnabled()
     {
@@ -204,6 +207,32 @@ public class AlluxioCacheConfig
     public AlluxioCacheConfig setCacheQuotaEnabled(boolean cacheQuotaEnabled)
     {
         this.cacheQuotaEnabled = cacheQuotaEnabled;
+        return this;
+    }
+
+    public boolean isShadowCacheEnabled()
+    {
+        return shadowCacheEnabled;
+    }
+
+    @Config("cache.alluxio.shadow-cache-enabled")
+    @ConfigDescription("Whether to enable alluxio shadow cache")
+    public AlluxioCacheConfig setShadowCacheEnabled(boolean shadowCacheEnabled)
+    {
+        this.shadowCacheEnabled = shadowCacheEnabled;
+        return this;
+    }
+
+    public Duration getShadowCacheWindow()
+    {
+        return shadowCacheWindow;
+    }
+
+    @Config("cache.alluxio.shadow-cache-window")
+    @ConfigDescription("The time window of alluxio shadow cache for working set calculation")
+    public AlluxioCacheConfig setShadowCacheWindow(Duration shadowCacheWindow)
+    {
+        this.shadowCacheWindow = shadowCacheWindow;
         return this;
     }
 }
