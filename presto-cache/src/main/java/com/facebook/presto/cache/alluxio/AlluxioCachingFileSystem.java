@@ -24,7 +24,9 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 
+import static alluxio.Constants.SCHEME;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.hash.Hashing.md5;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -63,7 +65,17 @@ public class AlluxioCachingFileSystem
                 throw new IOException("Failed to open file", e);
             }
         });
-        localCacheFileSystem.initialize(uri, configuration);
+
+        // create an URI with alluxio:// scheme for use with Alluxio
+        URI alluxioUri;
+        try {
+            alluxioUri = new URI(SCHEME, uri.getSchemeSpecificPart(), uri.getFragment());
+        }
+        catch (URISyntaxException e) {
+            throw new IOException("Unable to create Alluxio URI", e);
+        }
+
+        localCacheFileSystem.initialize(alluxioUri, configuration);
     }
 
     @Override
