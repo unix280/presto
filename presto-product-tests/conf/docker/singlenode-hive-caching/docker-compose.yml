@@ -1,0 +1,9 @@
+version: '2'
+services:
+
+  presto-master:
+    volumes:
+      - ../../../conf/presto/etc/environment-specific-catalogs/singlenode-cached/hive.properties:/docker/volumes/conf/presto/etc/catalog/hive.properties
+      - ../../../conf/presto/etc/catalog/hive.properties:/docker/volumes/conf/presto/etc/catalog/hivenoncached.properties
+    tmpfs:
+      - /tmp/cache:rw
