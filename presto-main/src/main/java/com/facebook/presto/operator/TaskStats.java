@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator;
 
+import com.facebook.presto.common.RuntimeStats;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -80,6 +81,9 @@ public class TaskStats
 
     private final List<PipelineStats> pipelines;
 
+    // RuntimeStats aggregated at the task level including the metrics exposed in this task and each operator of this task.
+    private final RuntimeStats runtimeStats;
+
     public TaskStats(DateTime createTime, DateTime endTime)
     {
         this(
@@ -119,7 +123,8 @@ public class TaskStats
                 0L,
                 0,
                 0L,
-                ImmutableList.of());
+                ImmutableList.of(),
+                new RuntimeStats());
     }
 
     @JsonCreator
@@ -171,7 +176,8 @@ public class TaskStats
             @JsonProperty("fullGcCount") int fullGcCount,
             @JsonProperty("fullGcTimeInMillis") long fullGcTimeInMillis,
 
-            @JsonProperty("pipelines") List<PipelineStats> pipelines)
+            @JsonProperty("pipelines") List<PipelineStats> pipelines,
+            @JsonProperty("runtimeStats") RuntimeStats runtimeStats)
     {
         this.createTime = requireNonNull(createTime, "createTime is null");
         this.firstStartTime = firstStartTime;
@@ -235,6 +241,7 @@ public class TaskStats
         this.fullGcTimeInMillis = fullGcTimeInMillis;
 
         this.pipelines = ImmutableList.copyOf(requireNonNull(pipelines, "pipelines is null"));
+        this.runtimeStats = requireNonNull(runtimeStats, "runtimeStats is null");
     }
 
     @JsonProperty
@@ -463,6 +470,12 @@ public class TaskStats
         return fullGcTimeInMillis;
     }
 
+    @JsonProperty
+    public RuntimeStats getRuntimeStats()
+    {
+        return runtimeStats;
+    }
+
     public TaskStats summarize()
     {
         return new TaskStats(
@@ -502,7 +515,8 @@ public class TaskStats
                 physicalWrittenDataSizeInBytes,
                 fullGcCount,
                 fullGcTimeInMillis,
-                ImmutableList.of());
+                ImmutableList.of(),
+                runtimeStats);
     }
 
     public TaskStats summarizeFinal()
@@ -546,6 +560,7 @@ public class TaskStats
                 fullGcTimeInMillis,
                 pipelines.stream()
                         .map(PipelineStats::summarize)
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()),
+                runtimeStats);
     }
 }

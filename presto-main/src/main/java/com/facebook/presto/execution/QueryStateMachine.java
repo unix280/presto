@@ -986,7 +986,8 @@ public class QueryStateMachine
                 queryStats.getWrittenOutputPhysicalDataSize(),
                 queryStats.getWrittenIntermediatePhysicalDataSize(),
                 queryStats.getStageGcStatistics(),
-                ImmutableList.of()); // Remove the operator summaries as OperatorInfo (especially ExchangeClientStatus) can hold onto a large amount of memory
+                ImmutableList.of(), // Remove the operator summaries as OperatorInfo (especially ExchangeClientStatus) can hold onto a large amount of memory
+                queryStats.getRuntimeStats());
     }
 
     public static class QueryOutputManager

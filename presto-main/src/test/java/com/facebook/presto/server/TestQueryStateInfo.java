@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.server;
 
+import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryState;
 import com.facebook.presto.execution.QueryStats;
@@ -151,7 +152,8 @@ public class TestQueryStateInfo
                         DataSize.valueOf("35GB"),
                         DataSize.valueOf("36GB"),
                         ImmutableList.of(),
-                        ImmutableList.of()),
+                        ImmutableList.of(),
+                        new RuntimeStats()),
                 Optional.empty(),
                 Optional.empty(),
                 ImmutableMap.of(),

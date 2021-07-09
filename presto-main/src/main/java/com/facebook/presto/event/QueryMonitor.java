@@ -20,6 +20,7 @@ import com.facebook.airlift.stats.Distribution;
 import com.facebook.airlift.stats.Distribution.DistributionSnapshot;
 import com.facebook.presto.SessionRepresentation;
 import com.facebook.presto.client.NodeVersion;
+import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.eventlistener.EventListenerManager;
 import com.facebook.presto.execution.Column;
 import com.facebook.presto.execution.ExecutionFailureInfo;
@@ -171,7 +172,8 @@ public class QueryMonitor
                         0,
                         0,
                         0,
-                        true),
+                        true,
+                        new RuntimeStats()),
                 createQueryContext(queryInfo.getSession(), queryInfo.getResourceGroupId()),
                 new QueryIOMetadata(ImmutableList.of(), Optional.empty()),
                 createQueryFailureInfo(failure, Optional.empty()),
@@ -302,7 +304,8 @@ public class QueryMonitor
                 queryStats.getSpilledDataSize().toBytes(),
                 queryStats.getCumulativeUserMemory(),
                 queryStats.getCompletedDrivers(),
-                queryInfo.isCompleteInfo());
+                queryInfo.isCompleteInfo(),
+                queryStats.getRuntimeStats());
     }
 
     private QueryContext createQueryContext(SessionRepresentation session, Optional<ResourceGroupId> resourceGroup)
