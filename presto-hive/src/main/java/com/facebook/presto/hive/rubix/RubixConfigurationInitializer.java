@@ -41,6 +41,7 @@ public class RubixConfigurationInitializer
     private static final String RUBIX_S3_FS_CLASS_NAME = CachingPrestoS3FileSystem.class.getName();
     private static final String RUBIX_AZURE_FS_CLASS_NAME = CachingPrestoNativeAzureFileSystem.class.getName();
     private static final String RUBIX_GS_FS_CLASS_NAME = CachingPrestoGoogleHadoopFileSystem.class.getName();
+    private static final String RUBIX_DISTRIBUTED_FS_CLASS_NAME = CachingPrestoDistributedFileSystem.class.getName();
 
     private final boolean parallelWarmupEnabled;
     private final String cacheLocation;
@@ -104,6 +105,7 @@ public class RubixConfigurationInitializer
         config.set("fs.s3n.impl", RUBIX_S3_FS_CLASS_NAME);
         config.set("fs.wasb.impl", RUBIX_AZURE_FS_CLASS_NAME);
         config.set("fs.gs.impl", RUBIX_GS_FS_CLASS_NAME);
+        config.set("fs.hdfs.impl", RUBIX_DISTRIBUTED_FS_CLASS_NAME);
         return config;
     }
 

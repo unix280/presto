@@ -15,6 +15,7 @@ package com.facebook.presto.hive.rubix;
 
 import com.codahale.metrics.MetricRegistry;
 import com.facebook.airlift.log.Logger;
+import com.facebook.presto.hive.HdfsConfigurationInitializer;
 import com.facebook.presto.hive.gcs.GcsConfigurationInitializer;
 import com.facebook.presto.hive.s3.S3ConfigurationUpdater;
 import com.facebook.presto.spi.Node;
@@ -48,14 +49,16 @@ public class RubixInitializer
     private final Set<RubixCacheConfigurationInitializer> configurationInitializers;
     private final S3ConfigurationUpdater s3ConfigurationUpdater;
     private final GcsConfigurationInitializer gcsConfigurationInitializer;
+    private final HdfsConfigurationInitializer hdfsConfigurationInitializer;
 
     @Inject
-    public RubixInitializer(RubixConfigurationInitializer rubixConfigurationInitializer, Set<RubixCacheConfigurationInitializer> configurationInitializers, S3ConfigurationUpdater s3ConfigurationUpdater, GcsConfigurationInitializer gcsConfigurationInitializer)
+    public RubixInitializer(RubixConfigurationInitializer rubixConfigurationInitializer, Set<RubixCacheConfigurationInitializer> configurationInitializers, S3ConfigurationUpdater s3ConfigurationUpdater, GcsConfigurationInitializer gcsConfigurationInitializer, HdfsConfigurationInitializer hdfsConfigurationInitializer)
     {
         this.rubixConfigurationInitializer = rubixConfigurationInitializer;
         this.configurationInitializers = configurationInitializers;
         this.s3ConfigurationUpdater = s3ConfigurationUpdater;
         this.gcsConfigurationInitializer = gcsConfigurationInitializer;
+        this.hdfsConfigurationInitializer = hdfsConfigurationInitializer;
     }
 
     public void initializeRubix(NodeManager nodeManager, String catalog)
@@ -92,6 +95,7 @@ public class RubixInitializer
                         }
                         s3ConfigurationUpdater.updateConfiguration(configuration);
                         gcsConfigurationInitializer.updateConfiguration(configuration);
+                        hdfsConfigurationInitializer.updateConfiguration(configuration);
 
                         // RubixConfigurationInitializer.initializeConfiguration will not update configurations yet as it has not been fully initialized
                         // Apply configurations from it by skipping init check
