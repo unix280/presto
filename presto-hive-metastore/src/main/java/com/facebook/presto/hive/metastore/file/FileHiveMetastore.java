@@ -23,6 +23,7 @@ import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.PartitionNotFoundException;
 import com.facebook.presto.hive.SchemaAlreadyExistsException;
 import com.facebook.presto.hive.TableAlreadyExistsException;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
@@ -144,7 +145,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void createDatabase(Database database)
+    public synchronized void createDatabase(HiveIdentity hiveIdentity, Database database)
     {
         requireNonNull(database, "database is null");
 
@@ -159,7 +160,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void dropDatabase(String databaseName)
+    public synchronized void dropDatabase(HiveIdentity hiveIdentity, String databaseName)
     {
         requireNonNull(databaseName, "databaseName is null");
 
@@ -172,7 +173,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void renameDatabase(String databaseName, String newDatabaseName)
+    public synchronized void renameDatabase(HiveIdentity hiveIdentity, String databaseName, String newDatabaseName)
     {
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(newDatabaseName, "newDatabaseName is null");
@@ -191,7 +192,12 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Optional<Database> getDatabase(String databaseName)
+    public synchronized Optional<Database> getDatabase(HiveIdentity hiveIdentity, String databaseName)
+    {
+        return getDatabase(databaseName);
+    }
+
+    private Optional<Database> getDatabase(String databaseName)
     {
         requireNonNull(databaseName, "databaseName is null");
 
@@ -214,7 +220,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized List<String> getAllDatabases()
+    public synchronized List<String> getAllDatabases(HiveIdentity hiveIdentity)
     {
         List<String> databases = getChildSchemaDirectories(catalogDirectory).stream()
                 .map(Path::getName)
@@ -223,7 +229,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void createTable(Table table, PrincipalPrivileges principalPrivileges)
+    public synchronized void createTable(HiveIdentity hiveIdentity, Table table, PrincipalPrivileges principalPrivileges)
     {
         checkArgument(!table.getTableType().equals(TEMPORARY_TABLE), "temporary tables must never be committed to the metastore");
 
@@ -270,7 +276,12 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Optional<Table> getTable(String databaseName, String tableName)
+    public synchronized Optional<Table> getTable(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    {
+        return getTable(databaseName, tableName);
+    }
+
+    private Optional<Table> getTable(String databaseName, String tableName)
     {
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(tableName, "tableName is null");
@@ -287,7 +298,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized PartitionStatistics getTableStatistics(String databaseName, String tableName)
+    public synchronized PartitionStatistics getTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName)
     {
         Path tableMetadataDirectory = getTableMetadataDirectory(databaseName, tableName);
         TableMetadata tableMetadata = readSchemaFile("table", tableMetadataDirectory, tableCodec)
@@ -298,7 +309,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Map<String, PartitionStatistics> getPartitionStatistics(String databaseName, String tableName, Set<String> partitionNames)
+    public synchronized Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Set<String> partitionNames)
     {
         Table table = getRequiredTable(databaseName, tableName);
         ImmutableMap.Builder<String, PartitionStatistics> statistics = ImmutableMap.builder();
@@ -327,9 +338,9 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void updateTableStatistics(String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
+    public synchronized void updateTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
     {
-        PartitionStatistics originalStatistics = getTableStatistics(databaseName, tableName);
+        PartitionStatistics originalStatistics = getTableStatistics(hiveIdentity, databaseName, tableName);
         PartitionStatistics updatedStatistics = update.apply(originalStatistics);
 
         Path tableMetadataDirectory = getTableMetadataDirectory(databaseName, tableName);
@@ -344,9 +355,9 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void updatePartitionStatistics(String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public synchronized void updatePartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
     {
-        PartitionStatistics originalStatistics = getPartitionStatistics(databaseName, tableName, ImmutableSet.of(partitionName)).get(partitionName);
+        PartitionStatistics originalStatistics = getPartitionStatistics(hiveIdentity, databaseName, tableName, ImmutableSet.of(partitionName)).get(partitionName);
         if (originalStatistics == null) {
             throw new PrestoException(HIVE_PARTITION_DROPPED_DURING_QUERY, "Statistics result does not contain entry for partition: " + partitionName);
         }
@@ -366,7 +377,12 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Optional<List<String>> getAllTables(String databaseName)
+    public synchronized Optional<List<String>> getAllTables(HiveIdentity hiveIdentity, String databaseName)
+    {
+        return getAllTables(databaseName);
+    }
+
+    private Optional<List<String>> getAllTables(String databaseName)
     {
         requireNonNull(databaseName, "databaseName is null");
 
@@ -383,7 +399,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Optional<List<String>> getAllViews(String databaseName)
+    public synchronized Optional<List<String>> getAllViews(HiveIdentity hiveIdentity, String databaseName)
     {
         Optional<List<String>> tables = getAllTables(databaseName);
         if (!tables.isPresent()) {
@@ -402,7 +418,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void dropTable(String databaseName, String tableName, boolean deleteData)
+    public synchronized void dropTable(HiveIdentity hiveIdentity, String databaseName, String tableName, boolean deleteData)
     {
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(tableName, "tableName is null");
@@ -423,7 +439,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void replaceTable(String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
+    public synchronized void replaceTable(HiveIdentity hiveIdentity, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
     {
         checkArgument(!newTable.getTableType().equals(TEMPORARY_TABLE), "temporary tables must never be stored in the metastore");
 
@@ -450,7 +466,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void renameTable(String databaseName, String tableName, String newDatabaseName, String newTableName)
+    public synchronized void renameTable(HiveIdentity hiveIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(tableName, "tableName is null");
@@ -474,7 +490,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void addColumn(String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
+    public synchronized void addColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
     {
         alterTable(databaseName, tableName, oldTable -> {
             if (oldTable.getColumn(columnName).isPresent()) {
@@ -489,7 +505,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void renameColumn(String databaseName, String tableName, String oldColumnName, String newColumnName)
+    public synchronized void renameColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String oldColumnName, String newColumnName)
     {
         alterTable(databaseName, tableName, oldTable -> {
             if (oldTable.getColumn(newColumnName).isPresent()) {
@@ -520,10 +536,10 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void dropColumn(String databaseName, String tableName, String columnName)
+    public synchronized void dropColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName)
     {
         alterTable(databaseName, tableName, oldTable -> {
-            verifyCanDropColumn(this, databaseName, tableName, columnName);
+            verifyCanDropColumn(this, hiveIdentity, databaseName, tableName, columnName);
             if (!oldTable.getColumn(columnName).isPresent()) {
                 SchemaTableName name = new SchemaTableName(databaseName, tableName);
                 throw new ColumnNotFoundException(name, columnName);
@@ -558,7 +574,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void addPartitions(String databaseName, String tableName, List<PartitionWithStatistics> partitions)
+    public synchronized void addPartitions(HiveIdentity hiveIdentity, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
     {
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(tableName, "tableName is null");
@@ -640,13 +656,13 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void dropPartition(String databaseName, String tableName, List<String> partitionValues, boolean deleteData)
+    public synchronized void dropPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionValues, boolean deleteData)
     {
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(tableName, "tableName is null");
         requireNonNull(partitionValues, "partitionValues is null");
 
-        Optional<Table> tableReference = getTable(databaseName, tableName);
+        Optional<Table> tableReference = getTable(hiveIdentity, databaseName, tableName);
         if (!tableReference.isPresent()) {
             return;
         }
@@ -662,7 +678,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void alterPartition(String databaseName, String tableName, PartitionWithStatistics partitionWithStatistics)
+    public synchronized void alterPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, PartitionWithStatistics partitionWithStatistics)
     {
         Table table = getRequiredTable(databaseName, tableName);
 
@@ -817,12 +833,13 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Optional<List<String>> getPartitionNames(String databaseName, String tableName)
+    public synchronized Optional<List<String>> getPartitionNames(HiveIdentity hiveIdentity, String databaseName, String tableName)
     {
+        requireNonNull(hiveIdentity, "hiveIdentity is null");
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(tableName, "tableName is null");
 
-        Optional<Table> tableReference = getTable(databaseName, tableName);
+        Optional<Table> tableReference = getTable(hiveIdentity, databaseName, tableName);
         if (!tableReference.isPresent()) {
             return Optional.empty();
         }
@@ -879,13 +896,13 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Optional<Partition> getPartition(String databaseName, String tableName, List<String> partitionValues)
+    public synchronized Optional<Partition> getPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionValues)
     {
         requireNonNull(databaseName, "databaseName is null");
         requireNonNull(tableName, "tableName is null");
         requireNonNull(partitionValues, "partitionValues is null");
 
-        Optional<Table> tableReference = getTable(databaseName, tableName);
+        Optional<Table> tableReference = getTable(hiveIdentity, databaseName, tableName);
         if (!tableReference.isPresent()) {
             return Optional.empty();
         }
@@ -898,13 +915,14 @@ public class FileHiveMetastore
 
     @Override
     public synchronized List<String> getPartitionNamesByFilter(
+            HiveIdentity hiveIdentity,
             String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
         List<String> parts = convertPredicateToParts(partitionPredicates);
         // todo this should be more efficient by selectively walking the directory tree
-        return getPartitionNames(databaseName, tableName).map(partitionNames -> partitionNames.stream()
+        return getPartitionNames(hiveIdentity, databaseName, tableName).map(partitionNames -> partitionNames.stream()
                 .filter(partitionName -> partitionMatches(partitionName, parts))
                 .collect(toImmutableList()))
                 .orElse(ImmutableList.of());
@@ -912,6 +930,7 @@ public class FileHiveMetastore
 
     @Override
     public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(
+            HiveIdentity hiveIdentity,
             String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
@@ -935,12 +954,12 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Map<String, Optional<Partition>> getPartitionsByNames(String databaseName, String tableName, List<String> partitionNames)
+    public synchronized Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames)
     {
         ImmutableMap.Builder<String, Optional<Partition>> builder = ImmutableMap.builder();
         for (String partitionName : partitionNames) {
             List<String> partitionValues = toPartitionValues(partitionName);
-            builder.put(partitionName, getPartition(databaseName, tableName, partitionValues));
+            builder.put(partitionName, getPartition(hiveIdentity, databaseName, tableName, partitionValues));
         }
         return builder.build();
     }
@@ -958,6 +977,12 @@ public class FileHiveMetastore
                 .map(PermissionMetadata::toHivePrivilegeInfo)
                 .collect(toSet()));
         return result.build();
+    }
+
+    @Override
+    public boolean isImpersonationEnabled()
+    {
+        return false;
     }
 
     @Override

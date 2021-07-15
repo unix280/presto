@@ -29,6 +29,7 @@ import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.VarbinaryType;
 import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.hive.RecordFileWriter.ExtendedRecordWriter;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.PrestoTableType;
@@ -350,7 +351,7 @@ public final class HiveWriteUtils
 
     public static Path getTableDefaultLocation(ConnectorSession session, SemiTransactionalHiveMetastore metastore, HdfsEnvironment hdfsEnvironment, String schemaName, String tableName)
     {
-        Optional<String> location = getDatabase(metastore, schemaName).getLocation();
+        Optional<String> location = getDatabase(metastore, session, schemaName).getLocation();
         if (!location.isPresent() || location.get().isEmpty()) {
             throw new PrestoException(HIVE_DATABASE_LOCATION_ERROR, format("Database '%s' location is not set", schemaName));
         }
@@ -369,9 +370,9 @@ public final class HiveWriteUtils
         return new Path(databasePath, tableName);
     }
 
-    private static Database getDatabase(SemiTransactionalHiveMetastore metastore, String database)
+    private static Database getDatabase(SemiTransactionalHiveMetastore metastore, ConnectorSession session, String database)
     {
-        return metastore.getDatabase(database).orElseThrow(() -> new SchemaNotFoundException(database));
+        return metastore.getDatabase(new HiveIdentity(session), database).orElseThrow(() -> new SchemaNotFoundException(database));
     }
 
     public static boolean isS3FileSystem(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)
