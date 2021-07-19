@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.glue;
 
+import com.facebook.airlift.concurrent.BoundedExecutor;
 import com.facebook.presto.hive.AbstractTestHiveClientLocal;
 import com.facebook.presto.hive.HdfsConfiguration;
 import com.facebook.presto.hive.HdfsConfigurationInitializer;
@@ -24,42 +25,23 @@ import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 import java.io.File;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 
-import static com.facebook.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.util.Locale.ENGLISH;
 import static java.util.UUID.randomUUID;
-import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 public class TestHiveClientGlueMetastore
         extends AbstractTestHiveClientLocal
 {
-    private ExecutorService executorService;
-
     public TestHiveClientGlueMetastore()
     {
         super("test_glue" + randomUUID().toString().toLowerCase(ENGLISH).replace("-", ""));
-    }
-
-    @BeforeClass
-    public void setUp()
-    {
-        executorService = newCachedThreadPool(daemonThreadsNamed("hive-glue-%s"));
-    }
-
-    @AfterClass(alwaysRun = true)
-    public void tearDown()
-    {
-        executorService.shutdownNow();
     }
 
     /**
@@ -77,6 +59,7 @@ public class TestHiveClientGlueMetastore
         GlueHiveMetastoreConfig glueConfig = new GlueHiveMetastoreConfig();
         glueConfig.setDefaultWarehouseDir(tempDir.toURI().toString());
 
+        Executor executor = new BoundedExecutor(this.executor, 10);
         return new GlueHiveMetastore(hdfsEnvironment, glueConfig, executor);
     }
 
