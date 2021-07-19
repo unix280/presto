@@ -25,6 +25,7 @@ import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import org.testng.annotations.Test;
 
 import java.io.File;
 import java.util.List;
@@ -34,8 +35,10 @@ import java.util.concurrent.Executor;
 import static java.util.Locale.ENGLISH;
 import static java.util.UUID.randomUUID;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
+@Test(singleThreaded = true)
 public class TestHiveClientGlueMetastore
         extends AbstractTestHiveClientLocal
 {
@@ -119,5 +122,28 @@ public class TestHiveClientGlueMetastore
         finally {
             dropTable(tablePartitionFormat);
         }
+    }
+
+    @Test
+    public void testGetDatabasesLogsStats()
+    {
+        GlueHiveMetastore metastore = (GlueHiveMetastore) getMetastoreClient();
+        GlueMetastoreStats stats = metastore.getStats();
+        double initialCallCount = stats.getGetDatabases().getTime().getAllTime().getCount();
+        long initialFailureCount = stats.getGetDatabases().getTotalFailures().getTotalCount();
+        getMetastoreClient().getAllDatabases();
+        assertEquals(stats.getGetDatabases().getTime().getAllTime().getCount(), initialCallCount + 1.0);
+        assertTrue(stats.getGetDatabases().getTime().getAllTime().getAvg() > 0.0);
+        assertEquals(stats.getGetDatabases().getTotalFailures().getTotalCount(), initialFailureCount);
+    }
+
+    @Test
+    public void testGetDatabaseFailureLogsStats()
+    {
+        GlueHiveMetastore metastore = (GlueHiveMetastore) getMetastoreClient();
+        GlueMetastoreStats stats = metastore.getStats();
+        long initialFailureCount = stats.getGetDatabase().getTotalFailures().getTotalCount();
+        assertThrows(() -> getMetastoreClient().getDatabase(null));
+        assertEquals(stats.getGetDatabase().getTotalFailures().getTotalCount(), initialFailureCount + 1);
     }
 }
