@@ -124,7 +124,7 @@ public class TestHiveClientGlueMetastore
         testStorePartitionWithStatistics(STATISTICS_PARTITIONED_TABLE_COLUMNS, BASIC_STATISTICS_1, BASIC_STATISTICS_2, BASIC_STATISTICS_1, EMPTY_TABLE_STATISTICS);
     }
 
-    @Test
+    @Override
     public void testGetPartitions() throws Exception
     {
         try {
