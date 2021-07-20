@@ -133,6 +133,20 @@ public class TestHiveStorageFormats
     }
 
     @Test(dataProvider = "storage_formats", groups = {STORAGE_FORMATS})
+    public void testOrcTableCreatedInPresto()
+    {
+        query("CREATE TABLE orc_table_created_in_presto WITH (format='ORC') AS SELECT 42 a");
+        assertThat(onHive().executeQuery("SELECT * FROM orc_table_created_in_presto"))
+                .containsOnly(row(42));
+        // Hive validates (`org.apache.orc.impl.ReaderImpl#ensureOrcFooter`) ORC footer only when loading it from the cache, so when querying *second* time.
+        assertThat(onHive().executeQuery("SELECT * FROM orc_table_created_in_presto"))
+                .containsOnly(row(42));
+        assertThat(onHive().executeQuery("SELECT * FROM orc_table_created_in_presto WHERE a < 43"))
+                .containsOnly(row(42));
+        query("DROP TABLE orc_table_created_in_presto");
+    }
+
+    @Test(dataProvider = "storage_formats", groups = {STORAGE_FORMATS})
     public void testInsertIntoPartitionedTable(StorageFormat storageFormat)
     {
         // only admin user is allowed to change session properties

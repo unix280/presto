@@ -35,6 +35,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map.Entry;
 
+import static com.facebook.presto.orc.metadata.PostScript.MAGIC;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Math.toIntExact;
 import static java.util.stream.Collectors.toList;
@@ -65,6 +66,7 @@ public class OrcMetadataWriter
                 .setCompression(toCompression(compression))
                 .setCompressionBlockSize(compressionBlockSize)
                 .setWriterVersion(ORC_WRITER_VERSION)
+                .setMagic(MAGIC.toStringUtf8())
                 .build();
 
         return writeProtobufObject(output, postScriptProtobuf);
