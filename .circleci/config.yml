@@ -790,6 +790,16 @@ workflows:
           requires:
             - start_test_suite
       - test_specific_module:
+          name: test_specific_module_presto_hive_glue
+          context:
+            - docker_hub
+            - prestodb_glue_tests
+          module: presto-hive
+          test_flags: -P test-hive-glue
+          resource_class: xlarge
+          requires:
+            - start_test_suite
+      - test_specific_module:
           name: test_specific_module_presto_hive_materialized_queries
           context:
             - docker_hub
@@ -958,6 +968,7 @@ workflows:
             - test_specific_module_presto_accumulo
             - test_specific_module_presto_cassandra
             - test_specific_module_presto_hive
+            - test_specific_module_presto_hive_glue
             - test_specific_module_presto_hive_materialized_queries
             - test_specific_module_presto_hive_materialized_aggregations
             - test_specific_module_presto_hive_recoverable_execution
