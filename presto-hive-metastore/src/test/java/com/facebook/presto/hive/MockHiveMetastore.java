@@ -14,6 +14,7 @@
 package com.facebook.presto.hive;
 
 import com.facebook.presto.common.predicate.Domain;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.PartitionNameWithVersion;
 import com.facebook.presto.hive.metastore.thrift.ThriftHiveMetastore;
@@ -39,7 +40,7 @@ public class MockHiveMetastore
     }
 
     @Override
-    public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(String databaseName, String tableName, Map<Column, Domain> partitionPredicates)
+    public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(HiveIdentity hiveIdentity, String databaseName, String tableName, Map<Column, Domain> partitionPredicates)
     {
         try {
             return clientProvider.createPartitionVersionSupportedMetastoreClient().getPartitionNamesWithVersionByFilter(databaseName, tableName, partitionPredicates);

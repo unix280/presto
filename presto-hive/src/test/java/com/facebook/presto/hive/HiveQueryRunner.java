@@ -19,6 +19,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.execution.QueryManagerConfig.ExchangeMaterializationStrategy;
 import com.facebook.presto.hive.TestHiveEventListenerPlugin.TestingHiveEventListenerPlugin;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.file.FileHiveMetastore;
@@ -51,6 +52,7 @@ import static com.facebook.presto.SystemSessionProperties.GROUPED_EXECUTION;
 import static com.facebook.presto.SystemSessionProperties.HASH_PARTITION_COUNT;
 import static com.facebook.presto.SystemSessionProperties.PARTITIONING_PROVIDER_CATALOG;
 import static com.facebook.presto.spi.security.SelectedRole.Type.ROLE;
+import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.facebook.presto.tests.QueryAssertions.copyTpchTables;
 import static com.facebook.presto.tpch.TpchMetadata.TINY_SCHEMA_NAME;
@@ -183,18 +185,19 @@ public final class HiveQueryRunner
             queryRunner.createCatalog(HIVE_CATALOG, HIVE_CATALOG, hiveProperties);
             queryRunner.createCatalog(HIVE_BUCKETED_CATALOG, HIVE_CATALOG, hiveBucketedProperties);
 
-            if (!metastore.getDatabase(TPCH_SCHEMA).isPresent()) {
-                metastore.createDatabase(createDatabaseMetastoreObject(TPCH_SCHEMA));
+            HiveIdentity hiveIdentity = new HiveIdentity(SESSION);
+            if (!metastore.getDatabase(hiveIdentity, TPCH_SCHEMA).isPresent()) {
+                metastore.createDatabase(hiveIdentity, createDatabaseMetastoreObject(TPCH_SCHEMA));
                 copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, createSession(Optional.empty()), tables);
             }
 
-            if (!metastore.getDatabase(TPCH_BUCKETED_SCHEMA).isPresent()) {
-                metastore.createDatabase(createDatabaseMetastoreObject(TPCH_BUCKETED_SCHEMA));
+            if (!metastore.getDatabase(hiveIdentity, TPCH_BUCKETED_SCHEMA).isPresent()) {
+                metastore.createDatabase(hiveIdentity, createDatabaseMetastoreObject(TPCH_BUCKETED_SCHEMA));
                 copyTpchTablesBucketed(queryRunner, "tpch", TINY_SCHEMA_NAME, createBucketedSession(Optional.empty()), tables);
             }
 
-            if (!metastore.getDatabase(TEMPORARY_TABLE_SCHEMA).isPresent()) {
-                metastore.createDatabase(createDatabaseMetastoreObject(TEMPORARY_TABLE_SCHEMA));
+            if (!metastore.getDatabase(hiveIdentity, TEMPORARY_TABLE_SCHEMA).isPresent()) {
+                metastore.createDatabase(hiveIdentity, createDatabaseMetastoreObject(TEMPORARY_TABLE_SCHEMA));
             }
 
             return queryRunner;

@@ -22,6 +22,7 @@ import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.HiveStorageFormat;
 import com.facebook.presto.hive.MetastoreClientConfig;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.google.common.collect.ImmutableList;
@@ -36,6 +37,7 @@ import java.util.concurrent.Executor;
 import static com.facebook.presto.hive.HiveStorageFormat.AVRO;
 import static com.facebook.presto.hive.HiveStorageFormat.CSV;
 import static com.facebook.presto.hive.HiveStorageFormat.PAGEFILE;
+import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.google.common.collect.Sets.difference;
 import static java.util.Locale.ENGLISH;
 import static java.util.UUID.randomUUID;
@@ -47,6 +49,8 @@ import static org.testng.Assert.assertTrue;
 public class TestHiveClientGlueMetastore
         extends AbstractTestHiveClientLocal
 {
+    private static final HiveIdentity HIVE_IDENTITY = new HiveIdentity(SESSION);
+
     public TestHiveClientGlueMetastore()
     {
         super("test_glue" + randomUUID().toString().toLowerCase(ENGLISH).replace("-", ""));
@@ -123,7 +127,7 @@ public class TestHiveClientGlueMetastore
     {
         try {
             createDummyPartitionedTable(tablePartitionFormat, CREATE_TABLE_COLUMNS_PARTITIONED);
-            Optional<List<String>> partitionNames = getMetastoreClient().getPartitionNames(tablePartitionFormat.getSchemaName(), tablePartitionFormat.getTableName());
+            Optional<List<String>> partitionNames = getMetastoreClient().getPartitionNames(HIVE_IDENTITY, tablePartitionFormat.getSchemaName(), tablePartitionFormat.getTableName());
             assertTrue(partitionNames.isPresent());
             assertEquals(partitionNames.get(), ImmutableList.of("ds=2016-01-01", "ds=2016-01-02"));
         }
@@ -139,7 +143,7 @@ public class TestHiveClientGlueMetastore
         GlueMetastoreStats stats = metastore.getStats();
         double initialCallCount = stats.getGetDatabases().getTime().getAllTime().getCount();
         long initialFailureCount = stats.getGetDatabases().getTotalFailures().getTotalCount();
-        getMetastoreClient().getAllDatabases();
+        getMetastoreClient().getAllDatabases(HIVE_IDENTITY);
         assertEquals(stats.getGetDatabases().getTime().getAllTime().getCount(), initialCallCount + 1.0);
         assertTrue(stats.getGetDatabases().getTime().getAllTime().getAvg() > 0.0);
         assertEquals(stats.getGetDatabases().getTotalFailures().getTotalCount(), initialFailureCount);
@@ -151,7 +155,7 @@ public class TestHiveClientGlueMetastore
         GlueHiveMetastore metastore = (GlueHiveMetastore) getMetastoreClient();
         GlueMetastoreStats stats = metastore.getStats();
         long initialFailureCount = stats.getGetDatabase().getTotalFailures().getTotalCount();
-        assertThrows(() -> getMetastoreClient().getDatabase(null));
+        assertThrows(() -> getMetastoreClient().getDatabase(HIVE_IDENTITY, null));
         assertEquals(stats.getGetDatabase().getTotalFailures().getTotalCount(), initialFailureCount + 1);
     }
 }

@@ -16,6 +16,7 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
@@ -90,25 +91,25 @@ public class TestingSemiTransactionalHiveMetastore
     }
 
     @Override
-    public synchronized List<String> getAllDatabases()
+    public synchronized List<String> getAllDatabases(HiveIdentity hiveIdentity)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Optional<Database> getDatabase(String databaseName)
+    public synchronized Optional<Database> getDatabase(HiveIdentity hiveIdentity, String databaseName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Optional<List<String>> getAllTables(String databaseName)
+    public synchronized Optional<List<String>> getAllTables(HiveIdentity hiveIdentity, String databaseName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Optional<Table> getTable(String databaseName, String tableName)
+    public synchronized Optional<Table> getTable(HiveIdentity hiveIdentity, String databaseName, String tableName)
     {
         return Optional.ofNullable(tablesMap.get(new HiveTableName(databaseName, tableName)));
     }
@@ -120,55 +121,55 @@ public class TestingSemiTransactionalHiveMetastore
     }
 
     @Override
-    public synchronized PartitionStatistics getTableStatistics(String databaseName, String tableName)
+    public synchronized PartitionStatistics getTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Map<String, PartitionStatistics> getPartitionStatistics(String databaseName, String tableName, Set<String> partitionNames)
+    public synchronized Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Set<String> partitionNames)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized HivePageSinkMetadata generatePageSinkMetadata(SchemaTableName schemaTableName)
+    public synchronized HivePageSinkMetadata generatePageSinkMetadata(HiveIdentity hiveIdentity, SchemaTableName schemaTableName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Optional<List<String>> getAllViews(String databaseName)
+    public synchronized Optional<List<String>> getAllViews(HiveIdentity hiveIdentity, String databaseName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void createDatabase(Database database)
+    public synchronized void createDatabase(HiveIdentity hiveIdentity, Database database)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void dropDatabase(String schemaName)
+    public synchronized void dropDatabase(HiveIdentity hiveIdentity, String schemaName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void renameDatabase(String source, String target)
+    public synchronized void renameDatabase(HiveIdentity hiveIdentity, String source, String target)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void setTableStatistics(Table table, PartitionStatistics tableStatistics)
+    public synchronized void setTableStatistics(HiveIdentity hiveIdentity, Table table, PartitionStatistics tableStatistics)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void setPartitionStatistics(Table table, Map<List<String>, PartitionStatistics> partitionStatisticsMap)
+    public synchronized void setPartitionStatistics(HiveIdentity hiveIdentity, Table table, Map<List<String>, PartitionStatistics> partitionStatisticsMap)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
@@ -180,37 +181,37 @@ public class TestingSemiTransactionalHiveMetastore
     }
 
     @Override
-    public synchronized void dropTable(HdfsContext context, String databaseName, String tableName)
+    public synchronized void dropTable(HdfsContext hdfsContext, String databaseName, String tableName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void replaceView(String databaseName, String tableName, Table table, PrincipalPrivileges principalPrivileges)
+    public synchronized void replaceView(HiveIdentity hiveIdentity, String databaseName, String tableName, Table table, PrincipalPrivileges principalPrivileges)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void renameTable(String databaseName, String tableName, String newDatabaseName, String newTableName)
+    public synchronized void renameTable(HiveIdentity hiveIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void addColumn(String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
+    public synchronized void addColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void renameColumn(String databaseName, String tableName, String oldColumnName, String newColumnName)
+    public synchronized void renameColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String oldColumnName, String newColumnName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized void dropColumn(String databaseName, String tableName, String columnName)
+    public synchronized void dropColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
@@ -228,25 +229,25 @@ public class TestingSemiTransactionalHiveMetastore
     }
 
     @Override
-    public synchronized Optional<List<String>> getPartitionNames(String databaseName, String tableName)
+    public synchronized Optional<List<String>> getPartitionNames(HiveIdentity hiveIdentity, String databaseName, String tableName)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Optional<List<String>> getPartitionNamesByFilter(String databaseName, String tableName, Map<Column, Domain> effectivePredicate)
+    public synchronized Optional<List<String>> getPartitionNamesByFilter(HiveIdentity hiveIdentity, String databaseName, String tableName, Map<Column, Domain> effectivePredicate)
     {
         return Optional.ofNullable(partitionsMap.get(new HiveTableName(databaseName, tableName)));
     }
 
     @Override
-    public synchronized Optional<Partition> getPartition(String databaseName, String tableName, List<String> partitionValues)
+    public synchronized Optional<Partition> getPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionValues)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
 
     @Override
-    public synchronized Map<String, Optional<Partition>> getPartitionsByNames(String databaseName, String tableName, List<String> partitionNames)
+    public synchronized Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames)
     {
         throw new UnsupportedOperationException("method not implemented");
     }
@@ -324,7 +325,7 @@ public class TestingSemiTransactionalHiveMetastore
     }
 
     @Override
-    public synchronized void declareIntentionToWrite(HdfsContext context, LocationHandle.WriteMode writeMode, Path stagingPathRoot, Optional<Path> tempPathRoot, String filePrefix, SchemaTableName schemaTableName, boolean temporaryTable)
+    public synchronized void declareIntentionToWrite(HdfsContext hdfsContext, LocationHandle.WriteMode writeMode, Path stagingPathRoot, Optional<Path> tempPathRoot, String filePrefix, SchemaTableName schemaTableName, boolean temporaryTable)
     {
         throw new UnsupportedOperationException("method not implemented");
     }

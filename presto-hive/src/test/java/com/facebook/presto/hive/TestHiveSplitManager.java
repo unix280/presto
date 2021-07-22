@@ -23,6 +23,7 @@ import com.facebook.presto.common.predicate.SortedRangeSet;
 import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.common.predicate.TupleDomain.ColumnDomain;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.datasink.OutputStreamDataSinkFactory;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
@@ -604,19 +605,19 @@ public class TestHiveSplitManager
         }
 
         @Override
-        public Optional<Table> getTable(String databaseName, String tableName)
+        public Optional<Table> getTable(HiveIdentity hiveIdentity, String databaseName, String tableName)
         {
             return Optional.of(table);
         }
 
         @Override
-        public Map<String, Optional<Partition>> getPartitionsByNames(String databaseName, String tableName, List<String> partitionNames)
+        public Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames)
         {
             return ImmutableMap.of(partitionWithStatistics.getPartitionName(), Optional.of(partitionWithStatistics.getPartition()));
         }
 
         @Override
-        public Map<String, PartitionStatistics> getPartitionStatistics(String databaseName, String tableName, Set<String> partitionNames)
+        public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Set<String> partitionNames)
         {
             return ImmutableMap.of(partitionWithStatistics.getPartitionName(), partitionWithStatistics.getStatistics());
         }

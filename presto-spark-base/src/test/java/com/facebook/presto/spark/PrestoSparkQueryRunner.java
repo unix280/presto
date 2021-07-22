@@ -27,6 +27,7 @@ import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.TestingHivePlugin;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
@@ -83,6 +84,7 @@ import static com.facebook.presto.spark.PrestoSparkSettingsRequirements.SPARK_EX
 import static com.facebook.presto.spark.PrestoSparkSettingsRequirements.SPARK_TASK_CPUS_PROPERTY;
 import static com.facebook.presto.spark.classloader_interface.SparkProcessType.DRIVER;
 import static com.facebook.presto.testing.MaterializedResult.DEFAULT_PRECISION;
+import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.facebook.presto.testing.TestingSession.TESTING_CATALOG;
 import static com.facebook.presto.testing.TestingSession.createBogusTestingCatalog;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
@@ -148,8 +150,9 @@ public class PrestoSparkQueryRunner
     {
         PrestoSparkQueryRunner queryRunner = new PrestoSparkQueryRunner("hive");
         ExtendedHiveMetastore metastore = queryRunner.getMetastore();
-        if (!metastore.getDatabase("tpch").isPresent()) {
-            metastore.createDatabase(createDatabaseMetastoreObject("tpch"));
+        HiveIdentity hiveIdentity = new HiveIdentity(SESSION);
+        if (!metastore.getDatabase(hiveIdentity, "tpch").isPresent()) {
+            metastore.createDatabase(hiveIdentity, createDatabaseMetastoreObject("tpch"));
             copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, queryRunner.getDefaultSession(), tables);
             copyTpchTablesBucketed(queryRunner, "tpch", TINY_SCHEMA_NAME, queryRunner.getDefaultSession(), tables);
         }
@@ -252,7 +255,8 @@ public class PrestoSparkQueryRunner
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
 
         this.metastore = new FileHiveMetastore(hdfsEnvironment, baseDir.toURI().toString(), "test");
-        metastore.createDatabase(createDatabaseMetastoreObject("hive_test"));
+        HiveIdentity hiveIdentity = new HiveIdentity(SESSION);
+        metastore.createDatabase(hiveIdentity, createDatabaseMetastoreObject("hive_test"));
         Plugin hiveplugin = new TestingHivePlugin(metastore);
         pluginManager.installPlugin(hiveplugin, hiveplugin.getClass()::getClassLoader);
 

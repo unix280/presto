@@ -21,6 +21,7 @@ import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.TestingHivePlugin;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.file.FileHiveMetastore;
@@ -41,6 +42,7 @@ import static com.facebook.presto.plugin.geospatial.TestGeoRelations.EQUALS_PAIR
 import static com.facebook.presto.plugin.geospatial.TestGeoRelations.OVERLAPS_PAIRS;
 import static com.facebook.presto.plugin.geospatial.TestGeoRelations.RELATION_GEOMETRIES_WKT;
 import static com.facebook.presto.plugin.geospatial.TestGeoRelations.TOUCHES_PAIRS;
+import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 
@@ -103,11 +105,13 @@ public class TestSpatialJoins
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
 
         FileHiveMetastore metastore = new FileHiveMetastore(hdfsEnvironment, baseDir.toURI().toString(), "test");
-        metastore.createDatabase(Database.builder()
-                .setDatabaseName("default")
-                .setOwnerName("public")
-                .setOwnerType(PrincipalType.ROLE)
-                .build());
+        metastore.createDatabase(
+                new HiveIdentity(SESSION),
+                Database.builder()
+                        .setDatabaseName("default")
+                        .setOwnerName("public")
+                        .setOwnerType(PrincipalType.ROLE)
+                        .build());
         queryRunner.installPlugin(new TestingHivePlugin(metastore));
 
         queryRunner.createCatalog("hive", "hive");

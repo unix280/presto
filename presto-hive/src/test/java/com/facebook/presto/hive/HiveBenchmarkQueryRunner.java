@@ -15,6 +15,7 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.benchmark.BenchmarkSuite;
+import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.spi.security.PrincipalType;
@@ -28,6 +29,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import static com.facebook.presto.hive.TestHiveUtil.createTestingFileHiveMetastore;
+import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
@@ -67,11 +69,14 @@ public final class HiveBenchmarkQueryRunner
         // add hive
         File hiveDir = new File(tempDir, "hive_data");
         ExtendedHiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
-        metastore.createDatabase(Database.builder()
-                .setDatabaseName("tpch")
-                .setOwnerName("public")
-                .setOwnerType(PrincipalType.ROLE)
-                .build());
+        HiveIdentity hiveIdentity = new HiveIdentity(SESSION);
+        metastore.createDatabase(
+                hiveIdentity,
+                Database.builder()
+                        .setDatabaseName("tpch")
+                        .setOwnerName("public")
+                        .setOwnerType(PrincipalType.ROLE)
+                        .build());
 
         Map<String, String> hiveCatalogConfig = ImmutableMap.<String, String>builder()
                 .put("hive.max-split-size", "10GB")
