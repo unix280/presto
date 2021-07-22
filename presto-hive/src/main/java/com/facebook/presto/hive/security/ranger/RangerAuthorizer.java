@@ -22,6 +22,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.ranger.authorization.hadoop.config.RangerPluginConfig;
+import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
@@ -47,12 +48,11 @@ public class RangerAuthorizer
     {
         RangerPolicyEngineOptions rangerPolicyEngineOptions = new RangerPolicyEngineOptions();
         Configuration conf = new Configuration();
-        conf.set("hive.policyengine.option.disable.tagpolicy.evaluation", "true");
-        rangerPolicyEngineOptions.configureForPlugin(conf, "hive");
-        RangerPluginConfig rangerPluginConfig = new RangerPluginConfig("hive", null, "standalone-hive", null, null,
+        rangerPolicyEngineOptions.configureDefaultRangerAdmin(conf, "hive");
+        RangerPluginConfig rangerPluginConfig = new RangerPluginConfig("hive", "hive", "hive", "Presto", null,
                 rangerPolicyEngineOptions);
         plugin = new RangerBasePlugin(rangerPluginConfig);
-        plugin.setResultProcessor(null);
+        plugin.setResultProcessor(new RangerDefaultAuditHandler());
         plugin.setPolicies(servicePolicies);
     }
 
