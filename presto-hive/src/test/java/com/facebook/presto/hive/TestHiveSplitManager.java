@@ -621,6 +621,12 @@ public class TestHiveSplitManager
         {
             return ImmutableMap.of(partitionWithStatistics.getPartitionName(), partitionWithStatistics.getStatistics());
         }
+
+        @Override
+        public boolean isImpersonationEnabled()
+        {
+            return false;
+        }
     }
 
     private static class TestingDirectoryLister
