@@ -175,6 +175,8 @@ public class TestFeaturesConfig
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
                 .setMaterializedViewDataConsistencyEnabled(true)
                 .setQueryOptimizationWithMaterializedViewEnabled(false)
+                .setAggregationIfToFilterRewriteEnabled(true)
+                .setQueryOptimizationWithMaterializedViewEnabled(false)
                 .setMaterializedViewDataConsistencyEnabled(true)
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
@@ -309,6 +311,7 @@ public class TestFeaturesConfig
                 .put("offset-clause-enabled", "true")
                 .put("materialized-view-data-consistency-enabled", "false")
                 .put("query-optimization-with-materialized-view-enabled", "true")
+                .put("optimizer.aggregation-if-to-filter-rewrite-enabled", "false")
                 .put("hide-unauthorized-columns", "true")
                 .build();
 
@@ -433,6 +436,8 @@ public class TestFeaturesConfig
                 .setOffsetClauseEnabled(true)
                 .setPartialResultsMaxExecutionTimeMultiplier(1.5)
                 .setMaterializedViewDataConsistencyEnabled(false)
+                .setQueryOptimizationWithMaterializedViewEnabled(true)
+                .setAggregationIfToFilterRewriteEnabled(false)
                 .setQueryOptimizationWithMaterializedViewEnabled(true)
                 .setMaterializedViewDataConsistencyEnabled(false)
                 .setPartialResultsMaxExecutionTimeMultiplier(1.5)
