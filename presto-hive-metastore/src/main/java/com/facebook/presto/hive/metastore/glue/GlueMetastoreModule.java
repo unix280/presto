@@ -47,6 +47,7 @@ public class GlueMetastoreModule
     public void configure(Binder binder)
     {
         configBinder(binder).bindConfig(GlueHiveMetastoreConfig.class);
+        configBinder(binder).bindConfig(GlueSecurityMappingConfig.class);
         binder.bind(GlueHiveMetastore.class).in(Scopes.SINGLETON);
         binder.bind(ExtendedHiveMetastore.class).annotatedWith(ForCachingHiveMetastore.class).to(GlueHiveMetastore.class).in(Scopes.SINGLETON);
         binder.bind(ExtendedHiveMetastore.class).to(CachingHiveMetastore.class).in(Scopes.SINGLETON);

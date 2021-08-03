@@ -31,6 +31,7 @@ public class GlueHiveMetastoreConfig
     private int partitionSegments = 5;
     private int getPartitionThreads = 20;
     private Optional<String> iamRole = Optional.empty();
+    private boolean impersonationEnabled;
 
     public Optional<String> getGlueRegion()
     {
@@ -137,6 +138,19 @@ public class GlueHiveMetastoreConfig
     public GlueHiveMetastoreConfig setIamRole(String iamRole)
     {
         this.iamRole = Optional.ofNullable(iamRole);
+        return this;
+    }
+
+    public boolean isImpersonationEnabled()
+    {
+        return impersonationEnabled;
+    }
+
+    @Config("hive.metastore.glue.impersonation.enabled")
+    @ConfigDescription("Should end user be impersonated when communicating with the Hive Glue Metastore")
+    public GlueHiveMetastoreConfig setImpersonationEnabled(boolean impersonationEnabled)
+    {
+        this.impersonationEnabled = impersonationEnabled;
         return this;
     }
 }
