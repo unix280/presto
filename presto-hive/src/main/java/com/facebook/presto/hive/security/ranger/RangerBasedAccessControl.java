@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
@@ -107,16 +108,22 @@ public class RangerBasedAccessControl
                     .encodedPath(RANGER_REST_USER_GROUP_URL)
                     .build();
 
+            long startTime = System.nanoTime();
             servicePolicies = getHiveServicePolicies(client, hiveServicePolicyUrl);
+            log.debug("Policy retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
+            startTime = System.nanoTime();
             users = getUsers(client, getUsersUrl);
-            rangerAuthorizer = new RangerAuthorizer(servicePolicies);
+            log.debug("User Group retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
+            rangerAuthorizer = new RangerAuthorizer(servicePolicies, config);
+            startTime = System.nanoTime();
             userRolesMapping = getRolesForUserList(client, config.getRangerHttpEndPoint());
+            log.debug("Roles retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
 
             log.info("Retrieved policies count " + servicePolicies.getPolicies().size());
             log.info("Retrieved users count " + users.getvXUsers().size());
         }
         catch (Exception e) {
-            log.error("Exception while querying ranger service ", e);
+            log.error(e, "Exception while querying ranger service ");
             throw new AccessDeniedException("Exception while querying ranger service ");
         }
     }

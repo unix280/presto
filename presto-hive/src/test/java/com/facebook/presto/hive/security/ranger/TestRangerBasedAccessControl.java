@@ -191,6 +191,7 @@ public class TestRangerBasedAccessControl
         String policyFilePath = this.getClass().getClassLoader().getResource("com.facebook.presto.hive.security.ranger/" + policyFile).getPath();
         String usersFilePath = this.getClass().getClassLoader().getResource("com.facebook.presto.hive.security.ranger/" + usersFile).getPath();
         String rolesFilePath = this.getClass().getClassLoader().getResource("com.facebook.presto.hive.security.ranger/" + rolesFile).getPath();
+        String auditFilePath = this.getClass().getClassLoader().getResource("com.facebook.presto.hive.security.ranger/" + "ranger-hive-audit.xml").getPath();
 
         ServicePolicies servicePolicies = jsonParse(new File(policyFilePath), ServicePolicies.class);
         Users users = jsonParse(new File(usersFilePath), Users.class);
@@ -202,7 +203,8 @@ public class TestRangerBasedAccessControl
                         entry -> new HashSet(entry.getValue())));
 
         RangerBasedAccessControl rangerBasedAccessControl = new RangerBasedAccessControl();
-        RangerAuthorizer rangerAuthorizer = new RangerAuthorizer(servicePolicies);
+        RangerBasedAccessControlConfig config = new RangerBasedAccessControlConfig().setRangerHiveServiceName("hive").setRangerHiveAuditPath(auditFilePath);
+        RangerAuthorizer rangerAuthorizer = new RangerAuthorizer(servicePolicies, config);
         rangerBasedAccessControl.setRangerAuthorizer(rangerAuthorizer);
         rangerBasedAccessControl.setUsers(users);
         rangerBasedAccessControl.setUserRoles(userRolesSet);

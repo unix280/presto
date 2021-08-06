@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.facebook.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static com.facebook.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
+import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_HIVE_AUDIT_PATH;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_HTTP_END_POINT;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_POLICY_REFRESH_PERIOD;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_HIVE_SERVICE_NAME;
@@ -50,7 +51,8 @@ public class TestRangerBasedAccessControlConfig
                 .setRangerRestKeystorePath(null)
                 .setRangerRestKeystorePwd(null)
                 .setRangerRestTruststorePath(null)
-                .setRangerRestTruststorePwd(null));
+                .setRangerRestTruststorePwd(null)
+                .setRangerHiveAuditPath(null));
     }
 
     @Test
@@ -66,6 +68,7 @@ public class TestRangerBasedAccessControlConfig
                 .put(RANGER_REST_POLICY_MGR_KEYSTORE_PWD, "key_pwd")
                 .put(RANGER_REST_POLICY_MGR_TRUST_STORE_PATH, "trust_path")
                 .put(RANGER_REST_POLICY_MGR_TRUST_STORE_PWD, "trust_pwd")
+                .put(RANGER_HIVE_AUDIT_PATH, "audit_path")
                 .build();
 
         RangerBasedAccessControlConfig expected = new RangerBasedAccessControlConfig()
@@ -77,7 +80,8 @@ public class TestRangerBasedAccessControlConfig
                 .setRangerRestKeystorePath("key_path")
                 .setRangerRestKeystorePwd("key_pwd")
                 .setRangerRestTruststorePath("trust_path")
-                .setRangerRestTruststorePwd("trust_pwd");
+                .setRangerRestTruststorePwd("trust_pwd")
+                .setRangerHiveAuditPath("audit_path");
         assertFullMapping(properties, expected);
     }
 

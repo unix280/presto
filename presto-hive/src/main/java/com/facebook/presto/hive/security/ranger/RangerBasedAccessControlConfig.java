@@ -38,6 +38,8 @@ public class RangerBasedAccessControlConfig
     public static final String RANGER_REST_POLICY_MGR_TRUST_STORE_PATH = "hive.ranger.service.truststore.path";
     public static final String RANGER_REST_POLICY_MGR_TRUST_STORE_PWD = "hive.ranger.service.truststore.password";
 
+    public static final String RANGER_HIVE_AUDIT_PATH = "hive.ranger.audit.path";
+
     private String rangerHttpEndPoint;
     private String rangerHiveServiceName;
     private Duration refreshPeriod = new Duration(60, TimeUnit.SECONDS);
@@ -47,6 +49,7 @@ public class RangerBasedAccessControlConfig
     private String rangerRestKeystorePwd;
     private String rangerRestTruststorePath;
     private String rangerRestTruststorePwd;
+    private String rangerHiveAuditPath;
 
     @MinDuration("60s")
     public Duration getRefreshPeriod()
@@ -158,6 +161,19 @@ public class RangerBasedAccessControlConfig
     public RangerBasedAccessControlConfig setRangerRestTruststorePwd(String rangerRestTruststorePwd)
     {
         this.rangerRestTruststorePwd = rangerRestTruststorePwd;
+        return this;
+    }
+
+    @NotNull
+    public String getRangerHiveAuditPath()
+    {
+        return rangerHiveAuditPath;
+    }
+
+    @Config(RANGER_HIVE_AUDIT_PATH)
+    public RangerBasedAccessControlConfig setRangerHiveAuditPath(String rangerHiveAuditPath)
+    {
+        this.rangerHiveAuditPath = rangerHiveAuditPath;
         return this;
     }
 }

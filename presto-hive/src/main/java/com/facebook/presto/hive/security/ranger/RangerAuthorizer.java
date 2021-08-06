@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.security.ranger;
 
 import com.amazonaws.util.StringUtils;
+import com.facebook.airlift.log.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.Credentials;
 import okhttp3.Interceptor;
@@ -21,6 +22,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.ranger.audit.provider.AuditProviderFactory;
 import org.apache.ranger.authorization.hadoop.config.RangerPluginConfig;
 import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
@@ -32,8 +34,10 @@ import org.apache.ranger.plugin.service.RangerBasePlugin;
 import org.apache.ranger.plugin.util.ServicePolicies;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.util.Set;
 
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
@@ -42,16 +46,38 @@ import static java.util.Objects.requireNonNull;
 
 public class RangerAuthorizer
 {
+    private static final Logger LOG = Logger.get(RangerAuthorizer.class);
     private static volatile RangerBasePlugin plugin;
+    public static final String CLUSTER_NAME = "Presto";
+    public static final String HIVE = "hive";
 
-    public RangerAuthorizer(ServicePolicies servicePolicies)
+    public RangerAuthorizer(ServicePolicies servicePolicies, RangerBasedAccessControlConfig rangerBasedAccessControlConfig)
     {
         RangerPolicyEngineOptions rangerPolicyEngineOptions = new RangerPolicyEngineOptions();
         Configuration conf = new Configuration();
         rangerPolicyEngineOptions.configureDefaultRangerAdmin(conf, "hive");
-        RangerPluginConfig rangerPluginConfig = new RangerPluginConfig("hive", "hive", "hive", "Presto", null,
+        RangerPluginConfig rangerPluginConfig = new RangerPluginConfig(HIVE, rangerBasedAccessControlConfig.getRangerHiveServiceName(), HIVE, CLUSTER_NAME, null,
                 rangerPolicyEngineOptions);
         plugin = new RangerBasePlugin(rangerPluginConfig);
+        try {
+            plugin.getConfig().addResource(new File(rangerBasedAccessControlConfig.getRangerHiveAuditPath()).toURI().toURL());
+        }
+        catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        AuditProviderFactory providerFactory = AuditProviderFactory.getInstance();
+
+        if (!providerFactory.isInitDone()) {
+            if (plugin.getConfig().getProperties() != null) {
+                providerFactory.init(plugin.getConfig().getProperties(), HIVE);
+            }
+            else {
+                LOG.error("Audit subsystem is not initialized correctly. Please check audit configuration. ");
+                LOG.error("No authorization audits will be generated. ");
+            }
+        }
+
         plugin.setResultProcessor(new RangerDefaultAuditHandler());
         plugin.setPolicies(servicePolicies);
     }
