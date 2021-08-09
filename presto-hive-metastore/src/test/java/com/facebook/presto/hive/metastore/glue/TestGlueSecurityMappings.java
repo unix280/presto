@@ -17,13 +17,12 @@ import com.facebook.presto.hive.authentication.HiveIdentity;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import org.testng.annotations.Test;
 
-import java.util.ArrayList;
+import java.io.File;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import static com.facebook.presto.hive.metastore.glue.TestGlueSecurityMappings.MappingSelector.empty;
+import static com.facebook.presto.plugin.base.JsonUtils.parseJson;
 import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.assertEquals;
 
@@ -34,23 +33,16 @@ public class TestGlueSecurityMappings
     @Test
     public void testMapping()
     {
-        GlueSecurityMapping adminUser = new GlueSecurityMapping(Optional.of(Pattern.compile("admin")), Optional.of("arn:aws:iam::123456789101:role/admin_role"));
-        GlueSecurityMapping analystUser = new GlueSecurityMapping(Optional.of(Pattern.compile("analyst")), Optional.of("arn:aws:iam::123456789101:role/analyst_role"));
-        GlueSecurityMapping defaultUser = new GlueSecurityMapping(Optional.empty(), Optional.of("arn:aws:iam::123456789101:role/default_role"));
+        String glueSecurityMappingConfigPath = this.getClass().getClassLoader().getResource("com.facebook.presto.hive.metastore.glue/glue-security-mapping.json").getPath();
 
-        List<GlueSecurityMapping> mappingList = new ArrayList<>();
-        mappingList.add(adminUser);
-        mappingList.add(analystUser);
-        mappingList.add(defaultUser);
-
-        GlueSecurityMappings mappings = new GlueSecurityMappings(mappingList);
+        GlueSecurityMappings mappings = parseJson(new File(glueSecurityMappingConfigPath).toPath(), GlueSecurityMappings.class);
 
         assertEquals(MappingResult.role("arn:aws:iam::123456789101:role/admin_role").getIamRole(),
                 mappings.getMapping(empty().withUser("admin").getHiveIdentity()).get().getIamRole());
         assertEquals(MappingResult.role("arn:aws:iam::123456789101:role/analyst_role").getIamRole(),
                 mappings.getMapping(empty().withUser("analyst").getHiveIdentity()).get().getIamRole());
         assertEquals(MappingResult.role("arn:aws:iam::123456789101:role/default_role").getIamRole(),
-                mappings.getMapping(empty().withUser("anyUser").getHiveIdentity()).get().getIamRole());
+                mappings.getMapping(empty().getHiveIdentity()).get().getIamRole());
     }
 
     public static class MappingSelector
@@ -90,7 +82,7 @@ public class TestGlueSecurityMappings
 
         private MappingResult(String iamRole)
         {
-            this.iamRole = requireNonNull(iamRole, "role is null");;
+            this.iamRole = requireNonNull(iamRole, "role is null");
         }
 
         public String getIamRole()
