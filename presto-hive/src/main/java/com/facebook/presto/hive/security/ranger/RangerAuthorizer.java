@@ -59,11 +59,15 @@ public class RangerAuthorizer
         RangerPluginConfig rangerPluginConfig = new RangerPluginConfig(HIVE, rangerBasedAccessControlConfig.getRangerHiveServiceName(), HIVE, CLUSTER_NAME, null,
                 rangerPolicyEngineOptions);
         plugin = new RangerBasePlugin(rangerPluginConfig);
-        try {
-            plugin.getConfig().addResource(new File(rangerBasedAccessControlConfig.getRangerHiveAuditPath()).toURI().toURL());
-        }
-        catch (MalformedURLException e) {
-            e.printStackTrace();
+
+        String hiveAuditPath = rangerBasedAccessControlConfig.getRangerHiveAuditPath();
+        if (!StringUtils.isNullOrEmpty(hiveAuditPath)) {
+            try {
+                plugin.getConfig().addResource(new File(hiveAuditPath).toURI().toURL());
+            }
+            catch (MalformedURLException e) {
+                e.printStackTrace();
+            }
         }
 
         AuditProviderFactory providerFactory = AuditProviderFactory.getInstance();

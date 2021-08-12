@@ -164,7 +164,6 @@ public class RangerBasedAccessControlConfig
         return this;
     }
 
-    @NotNull
     public String getRangerHiveAuditPath()
     {
         return rangerHiveAuditPath;
