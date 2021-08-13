@@ -139,8 +139,9 @@ public class StoragePartitionLoader
         this.hdfsContext = new HdfsContext(session, table.getDatabaseName(), table.getTableName(), table.getStorage().getLocation(), false);
         this.fileIterators = requireNonNull(fileIterators, "fileIterators is null");
         this.schedulerUsesHostAddresses = schedulerUsesHostAddresses;
-        this.hoodiePathFilterLoadingCache = CacheBuilder.newBuilder().build(CacheLoader.from(
-                (Function<Configuration, HoodieROTablePathFilter>) HoodieROTablePathFilter::new));
+        this.hoodiePathFilterLoadingCache = CacheBuilder.newBuilder()
+                .maximumSize(1000)
+                .build(CacheLoader.from((Function<Configuration, HoodieROTablePathFilter>) HoodieROTablePathFilter::new));
         this.partialAggregationsPushedDown = partialAggregationsPushedDown;
     }
 
