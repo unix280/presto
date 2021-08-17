@@ -50,6 +50,7 @@ public class RangerAuthorizer
     private static volatile RangerBasePlugin plugin;
     public static final String CLUSTER_NAME = "Presto";
     public static final String HIVE = "hive";
+    public static final String RANGER_ADUIT_ES_CLASS_NAME = "com.facebook.presto.hive.security.ranger.ElasticSearchAuditDestinationFromPresto";
 
     public RangerAuthorizer(ServicePolicies servicePolicies, RangerBasedAccessControlConfig rangerBasedAccessControlConfig)
     {
@@ -63,6 +64,7 @@ public class RangerAuthorizer
         String hiveAuditPath = rangerBasedAccessControlConfig.getRangerHiveAuditPath();
         if (!StringUtils.isNullOrEmpty(hiveAuditPath)) {
             try {
+                plugin.getConfig().set("xasecure.audit.destination.elasticsearch.classname", RANGER_ADUIT_ES_CLASS_NAME);
                 plugin.getConfig().addResource(new File(hiveAuditPath).toURI().toURL());
             }
             catch (MalformedURLException e) {
