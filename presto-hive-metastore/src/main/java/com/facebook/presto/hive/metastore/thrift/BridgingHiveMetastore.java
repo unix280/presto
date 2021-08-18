@@ -37,6 +37,7 @@ import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.units.Duration;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import javax.inject.Inject;
@@ -380,5 +381,11 @@ public class BridgingHiveMetastore
     public boolean isImpersonationEnabled()
     {
         return delegate.isImpersonationEnabled();
+    }
+
+    @Override
+    public void setPartitionLeases(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, String> partitionNameToLocation, Duration leaseDuration)
+    {
+        delegate.setPartitionLeases(metastoreContext, databaseName, tableName, partitionNameToLocation, leaseDuration);
     }
 }

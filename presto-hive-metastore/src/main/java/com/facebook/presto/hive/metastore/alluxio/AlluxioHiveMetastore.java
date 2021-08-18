@@ -46,6 +46,7 @@ import com.facebook.presto.spi.statistics.ColumnStatisticType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
+import io.airlift.units.Duration;
 
 import java.util.Collections;
 import java.util.List;
@@ -447,5 +448,11 @@ public class AlluxioHiveMetastore
     public boolean isImpersonationEnabled()
     {
         return false;
+    }
+
+    @Override
+    public void setPartitionLeases(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, String> partitionNameToLocation, Duration leaseDuration)
+    {
+        throw new UnsupportedOperationException("setPartitionLeases is not supported in AlluxioHiveMetastore");
     }
 }

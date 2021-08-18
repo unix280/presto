@@ -998,6 +998,12 @@ public class CachingHiveMetastore
         return cacheBuilder;
     }
 
+    @Override
+    public void setPartitionLeases(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, String> partitionNameToLocation, Duration leaseDuration)
+    {
+        delegate.setPartitionLeases(metastoreContext, databaseName, tableName, partitionNameToLocation, leaseDuration);
+    }
+
     public Set<HivePrivilegeInfo> loadTablePrivileges(KeyAndContext<UserTableKey> loadTablePrivilegesKey)
     {
         return delegate.listTablePrivileges(loadTablePrivilegesKey.getContext(), loadTablePrivilegesKey.getKey().getDatabase(), loadTablePrivilegesKey.getKey().getTable(), loadTablePrivilegesKey.getKey().getPrincipal());
@@ -1024,6 +1030,9 @@ public class CachingHiveMetastore
             return key;
         }
 
+        // QueryId changes for every query. For caching to be effective across multiple queries, we should NOT include queryId,
+        // other fields of MetastoreContext in equals() and hashCode() methods below.
+        // But we should include username because we want the cache to be effective at per-user level when impersonation is enabled.
         @Override
         public boolean equals(Object o)
         {

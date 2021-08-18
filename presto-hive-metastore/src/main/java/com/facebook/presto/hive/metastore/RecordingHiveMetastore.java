@@ -31,6 +31,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.units.Duration;
 import org.weakref.jmx.Managed;
 
 import javax.annotation.concurrent.Immutable;
@@ -480,6 +481,12 @@ public class RecordingHiveMetastore
                 roleGrantsCache,
                 principal,
                 () -> delegate.listRoleGrants(metastoreContext, principal));
+    }
+
+    @Override
+    public void setPartitionLeases(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, String> partitionNameToLocation, Duration leaseDuration)
+    {
+        throw new UnsupportedOperationException("setPartitionLeases is not supported in RecordingHiveMetastore");
     }
 
     private <K, V> V loadValue(Cache<K, V> cache, K key, Supplier<V> valueSupplier)

@@ -20,6 +20,7 @@ import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
+import io.airlift.units.Duration;
 
 import java.util.List;
 import java.util.Map;
@@ -117,4 +118,6 @@ public interface ExtendedHiveMetastore
     Set<HivePrivilegeInfo> listTablePrivileges(MetastoreContext metastoreContext, String databaseName, String tableName, PrestoPrincipal principal);
 
     boolean isImpersonationEnabled();
+
+    void setPartitionLeases(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, String> partitionNameToLocation, Duration leaseDuration);
 }
