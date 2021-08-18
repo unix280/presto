@@ -800,6 +800,16 @@ workflows:
           requires:
             - start_test_suite
       - test_specific_module:
+          name: test_specific_module_presto_hive_glue_impersonation
+          context:
+            - docker_hub
+            - prestodb_glue_tests_temp
+          module: presto-hive
+          test_flags: -P test-hive-glue-impersonation
+          resource_class: xlarge
+          requires:
+            - start_test_suite
+      - test_specific_module:
           name: test_specific_module_presto_hive_materialized_queries
           context:
             - docker_hub
@@ -969,6 +979,7 @@ workflows:
             - test_specific_module_presto_cassandra
             - test_specific_module_presto_hive
             - test_specific_module_presto_hive_glue
+            - test_specific_module_presto_hive_glue_impersonation
             - test_specific_module_presto_hive_materialized_queries
             - test_specific_module_presto_hive_materialized_aggregations
             - test_specific_module_presto_hive_recoverable_execution

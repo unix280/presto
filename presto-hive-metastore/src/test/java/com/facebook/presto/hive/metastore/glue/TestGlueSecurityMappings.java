@@ -33,7 +33,7 @@ public class TestGlueSecurityMappings
     @Test
     public void testMapping()
     {
-        String glueSecurityMappingConfigPath = this.getClass().getClassLoader().getResource("com.facebook.presto.hive.metastore.glue/glue-security-mapping.json").getPath();
+        String glueSecurityMappingConfigPath = this.getClass().getClassLoader().getResource("com.facebook.presto.hive.metastore.glue/security-mapping.json").getPath();
 
         GlueSecurityMappings mappings = parseJson(new File(glueSecurityMappingConfigPath).toPath(), GlueSecurityMappings.class);
 

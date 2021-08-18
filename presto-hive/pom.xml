@@ -880,6 +880,7 @@
                             <excludes>
                                 <!-- Exclude tests against Glue from build -->
                                 <exclude>**/TestHiveClientGlueMetastore.java</exclude>
+                                <exclude>**/TestHiveClientGlueMetastoreWithImpersonation.java</exclude>
                                 <exclude>**/TestHiveDistributedAggregationsWithExchangeMaterialization.java</exclude>
                                 <exclude>**/TestHiveDistributedQueriesWithExchangeMaterialization.java</exclude>
                                 <exclude>**/TestHiveDistributedQueriesWithOptimizedRepartitioning.java</exclude>
@@ -952,6 +953,22 @@
                         <configuration>
                             <includes>
                                 <include>**/TestHiveClientGlueMetastore.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>test-hive-glue-impersonation</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/TestHiveClientGlueMetastoreWithImpersonation.java</include>
                             </includes>
                         </configuration>
                     </plugin>
