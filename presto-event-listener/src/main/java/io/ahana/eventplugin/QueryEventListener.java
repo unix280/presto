@@ -24,6 +24,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -90,7 +91,7 @@ public final class QueryEventListener
 
         try {
             String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, queryCreatedEvent1, null,
-                    null, flatten(queryCreatedEvent.getMetadata().getPlan().orElse("null"))));
+                    null, flatten(queryCreatedEvent.getMetadata().getPlan().orElse("null")), 0, 0, 0, 0, 0));
             logger.info(eventPayload);
             if (sendToWebSocketServer) {
                 this.webSocketCollectorChannel.sendMessage(eventPayload);
@@ -136,7 +137,9 @@ public final class QueryEventListener
 
         try {
             String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, queryCompletedEvent1,
-                    null, flatten(queryCompletedEvent.getMetadata().getPlan().orElse("null"))));
+                    null, flatten(queryCompletedEvent.getMetadata().getPlan().orElse("null")), getTimeValue(queryCompletedEvent.getStatistics().getCpuTime()),
+                    getTimeValue(queryCompletedEvent.getStatistics().getRetriedCpuTime()), getTimeValue(queryCompletedEvent.getStatistics().getWallTime()), getTimeValue(queryCompletedEvent.getStatistics().getQueuedTime()),
+                    getTimeValue(queryCompletedEvent.getStatistics().getAnalysisTime().get())));
             logger.info(eventPayload);
             if (sendToWebSocketServer) {
                 this.webSocketCollectorChannel.sendMessage(eventPayload);
@@ -156,7 +159,8 @@ public final class QueryEventListener
 
         try {
             String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, null,
-                    splitCompletedEvent, null));
+                    splitCompletedEvent, null, getTimeValue(splitCompletedEvent.getStatistics().getCpuTime()), 0,
+                    getTimeValue(splitCompletedEvent.getStatistics().getWallTime()), getTimeValue(splitCompletedEvent.getStatistics().getQueuedTime()), 0));
             logger.info(eventPayload);
             if (sendToWebSocketServer) {
                 this.webSocketCollectorChannel.sendMessage(eventPayload);
@@ -171,5 +175,11 @@ public final class QueryEventListener
     {
         return (Optional.ofNullable(query).isPresent())
                 ? query.replaceAll("\n", "<<>>") : "";
+    }
+
+    private long getTimeValue(Duration duration)
+    {
+        return Optional.ofNullable(duration).isPresent()
+                ? duration.toMillis() : 0L;
     }
 }

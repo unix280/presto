@@ -25,6 +25,11 @@ public final class QueryEvent
     private final QueryCompletedEvent queryCompletedEvent;
     private final SplitCompletedEvent splitCompletedEvent;
     private final String plan;
+    private final long cpuTimeMillis;
+    private final long retriedCpuTimeMillis;
+    private final long wallTimeMillis;
+    private final long queuedTimeMillis;
+    private final long analysisTimeMillis;
 
     public QueryEvent(
             String instanceId,
@@ -32,7 +37,12 @@ public final class QueryEvent
             QueryCreatedEvent queryCreatedEvent,
             QueryCompletedEvent queryCompletedEvent,
             SplitCompletedEvent splitCompletedEvent,
-            String plan)
+            String plan,
+            long cpuTimeMillis,
+            long retriedCpuTimeMillis,
+            long wallTimeMillis,
+            long queuedTimeMillis,
+            long analysisTimeMillis)
     {
         this.instanceId = instanceId;
         this.clusterName = clusterName;
@@ -40,6 +50,11 @@ public final class QueryEvent
         this.queryCompletedEvent = queryCompletedEvent;
         this.splitCompletedEvent = splitCompletedEvent;
         this.plan = plan;
+        this.cpuTimeMillis = cpuTimeMillis;
+        this.retriedCpuTimeMillis = retriedCpuTimeMillis;
+        this.wallTimeMillis = wallTimeMillis;
+        this.queuedTimeMillis = queuedTimeMillis;
+        this.analysisTimeMillis = analysisTimeMillis;
     }
 
     public String getInstanceId()
@@ -70,5 +85,30 @@ public final class QueryEvent
     public String getPlan()
     {
         return plan;
+    }
+
+    public long getCpuTimeMillis()
+    {
+        return cpuTimeMillis;
+    }
+
+    public long getRetriedCpuTimeMillis()
+    {
+        return retriedCpuTimeMillis;
+    }
+
+    public long getWallTimeMillis()
+    {
+        return wallTimeMillis;
+    }
+
+    public long getQueuedTimeMillis()
+    {
+        return queuedTimeMillis;
+    }
+
+    public long getAnalysisTimeMillis()
+    {
+        return analysisTimeMillis;
     }
 }
