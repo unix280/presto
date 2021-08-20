@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.security;
 
 import com.facebook.airlift.configuration.AbstractConfigurationAwareModule;
+import com.facebook.presto.hive.security.lakeformation.LakeFormationSecurityModule;
 import com.facebook.presto.hive.security.ranger.RangerBasedAccessControlModule;
 import com.facebook.presto.plugin.base.security.FileBasedAccessControlModule;
 import com.facebook.presto.plugin.base.security.ReadOnlySecurityModule;
@@ -33,6 +34,7 @@ public class HiveSecurityModule
         bindSecurityModule("read-only", new ReadOnlySecurityModule());
         bindSecurityModule("sql-standard", new SqlStandardSecurityModule());
         bindSecurityModule("ranger", new RangerBasedAccessControlModule());
+        bindSecurityModule("lake-formation", new LakeFormationSecurityModule());
     }
 
     private void bindSecurityModule(String name, Module module)
