@@ -21,6 +21,7 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.BasicSessionCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
@@ -117,6 +118,7 @@ import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MULTIPART_MI
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_PATH_STYLE_ACCESS;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_PIN_CLIENT_TO_CURRENT_REGION;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SECRET_KEY;
+import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SESSION_TOKEN;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SIGNER_TYPE;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SKIP_GLACIER_OBJECTS;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SOCKET_TIMEOUT;
@@ -823,6 +825,7 @@ public class PrestoS3FileSystem
     {
         String accessKey = conf.get(S3_ACCESS_KEY);
         String secretKey = conf.get(S3_SECRET_KEY);
+        String sessionToken = conf.get(S3_SESSION_TOKEN);
 
         String userInfo = uri.getUserInfo();
         if (userInfo != null) {
@@ -839,7 +842,13 @@ public class PrestoS3FileSystem
         if (isNullOrEmpty(accessKey) || isNullOrEmpty(secretKey)) {
             return Optional.empty();
         }
-        return Optional.of(new BasicAWSCredentials(accessKey, secretKey));
+
+        if (isNullOrEmpty(sessionToken)) {
+            return Optional.of(new BasicAWSCredentials(accessKey, secretKey));
+        }
+        else {
+            return Optional.of(new BasicSessionCredentials(accessKey, secretKey, sessionToken));
+        }
     }
 
     private static class PrestoS3InputStream
