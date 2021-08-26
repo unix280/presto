@@ -198,6 +198,11 @@
         </dependency>
 
         <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-lakeformation</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>com.google.cloud.bigdataoss</groupId>
             <artifactId>util</artifactId>
         </dependency>

@@ -28,6 +28,7 @@ import com.facebook.presto.hive.rubix.RubixConfig;
 import com.facebook.presto.hive.rubix.RubixInitializer;
 import com.facebook.presto.hive.rubix.RubixModule;
 import com.facebook.presto.hive.s3.HiveS3Module;
+import com.facebook.presto.hive.s3.lakeformation.LakeFormationModule;
 import com.facebook.presto.hive.security.HiveSecurityModule;
 import com.facebook.presto.hive.security.SystemTableAwareAccessControl;
 import com.facebook.presto.spi.NodeManager;
@@ -90,6 +91,7 @@ public final class InternalHiveConnectorFactory
                     new HiveAuthenticationModule(),
                     new HiveProcedureModule(),
                     new CachingModule(),
+                    new LakeFormationModule(),
                     binder -> {
                         MBeanServer platformMBeanServer = ManagementFactory.getPlatformMBeanServer();
                         binder.bind(MBeanServer.class).toInstance(new RebindSafeMBeanServer(platformMBeanServer));
