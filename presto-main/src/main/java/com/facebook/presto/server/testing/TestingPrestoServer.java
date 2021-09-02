@@ -51,6 +51,7 @@ import com.facebook.presto.metadata.CatalogManager;
 import com.facebook.presto.metadata.InternalNode;
 import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.resourcemanager.ResourceManagerClusterStateProvider;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.security.AccessControlManager;
 import com.facebook.presto.server.GracefulShutdownHandler;
@@ -167,6 +168,7 @@ public class TestingPrestoServer
     private final boolean resourceManager;
     private final boolean coordinator;
     private final ServerInfoResource serverInfoResource;
+    private final ResourceManagerClusterStateProvider clusterStateProvider;
 
     public static class TestShutdownAction
             implements ShutdownAction
@@ -346,6 +348,7 @@ public class TestingPrestoServer
             clusterMemoryManager = injector.getInstance(ClusterMemoryManager.class);
             statsCalculator = injector.getInstance(StatsCalculator.class);
             eventListenerManager = ((TestingEventListenerManager) injector.getInstance(EventListenerManager.class));
+            clusterStateProvider = null;
         }
         else if (resourceManager) {
             dispatchManager = null;
@@ -357,6 +360,7 @@ public class TestingPrestoServer
             clusterMemoryManager = null;
             statsCalculator = null;
             eventListenerManager = ((TestingEventListenerManager) injector.getInstance(EventListenerManager.class));
+            clusterStateProvider = injector.getInstance(ResourceManagerClusterStateProvider.class);
         }
         else {
             dispatchManager = null;
@@ -368,6 +372,7 @@ public class TestingPrestoServer
             clusterMemoryManager = null;
             statsCalculator = null;
             eventListenerManager = null;
+            clusterStateProvider = null;
         }
         localMemoryManager = injector.getInstance(LocalMemoryManager.class);
         nodeManager = injector.getInstance(InternalNodeManager.class);
@@ -558,6 +563,11 @@ public class TestingPrestoServer
         return resourceGroupManager;
     }
 
+    public InternalNodeManager getNodeManager()
+    {
+        return nodeManager;
+    }
+
     public SessionPropertyDefaults getSessionPropertyDefaults()
     {
         return sessionPropertyDefaults;
@@ -615,6 +625,11 @@ public class TestingPrestoServer
         serviceSelectorManager.forceRefresh();
         nodeManager.refreshNodes();
         return nodeManager.getAllNodes();
+    }
+
+    public final ResourceManagerClusterStateProvider getClusterStateProvider()
+    {
+        return clusterStateProvider;
     }
 
     public Set<InternalNode> getActiveNodesWithConnector(ConnectorId connectorId)
