@@ -36,7 +36,7 @@ public class GlueSecurityMappings
     public Optional<GlueSecurityMapping> getMapping(HiveIdentity identity)
     {
         return mappings.stream()
-                .filter(mapping -> mapping.matches(identity))
+                .filter(mapping -> (mapping.matches(identity) && !mapping.getIamRole().isEmpty()))
                 .findFirst();
     }
 }

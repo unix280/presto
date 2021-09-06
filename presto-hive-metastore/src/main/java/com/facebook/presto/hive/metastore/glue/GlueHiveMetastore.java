@@ -47,8 +47,6 @@ import com.amazonaws.services.glue.model.GetTableRequest;
 import com.amazonaws.services.glue.model.GetTableResult;
 import com.amazonaws.services.glue.model.GetTablesRequest;
 import com.amazonaws.services.glue.model.GetTablesResult;
-import com.amazonaws.services.glue.model.GetUnfilteredTableRequest;
-import com.amazonaws.services.glue.model.GetUnfilteredTableResult;
 import com.amazonaws.services.glue.model.PartitionError;
 import com.amazonaws.services.glue.model.PartitionInput;
 import com.amazonaws.services.glue.model.PartitionValueList;
@@ -92,7 +90,6 @@ import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
-import com.google.common.base.Suppliers;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -107,7 +104,6 @@ import org.weakref.jmx.Managed;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -139,7 +135,6 @@ import static com.facebook.presto.hive.metastore.glue.GlueExpressionUtil.buildGl
 import static com.facebook.presto.hive.metastore.glue.converter.GlueInputConverter.convertColumn;
 import static com.facebook.presto.hive.metastore.glue.converter.GlueInputConverter.toTableInput;
 import static com.facebook.presto.hive.metastore.glue.converter.GlueToPrestoConverter.mappedCopy;
-import static com.facebook.presto.plugin.base.JsonUtils.parseJson;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.security.PrincipalType.USER;
@@ -148,7 +143,6 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Comparators.lexicographical;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.function.UnaryOperator.identity;
 import static java.util.stream.Collectors.toMap;
 
@@ -176,13 +170,15 @@ public class GlueHiveMetastore
     private final String catalogId;
     private final int partitionSegments;
     private final Executor executor;
+    private final String lakeFormationPartnerTagName;
+    private final String lakeFormationPartnerTagValue;
     private final boolean impersonationEnabled;
 
     @Inject
     public GlueHiveMetastore(
             HdfsEnvironment hdfsEnvironment,
             GlueHiveMetastoreConfig glueConfig,
-            GlueSecurityMappingConfig glueSecurityMappingConfig,
+            GlueSecurityMappingsSupplier glueSecurityMappingsSupplier,
             @ForGlueHiveMetastore Executor executor)
     {
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
@@ -192,17 +188,16 @@ public class GlueHiveMetastore
         this.catalogId = glueConfig.getCatalogId().orElse(null);
         this.partitionSegments = glueConfig.getPartitionSegments();
         this.executor = requireNonNull(executor, "executor is null");
-        if (glueSecurityMappingConfig.getConfigFile().isPresent()) {
-            this.mappings = getMappings(requireNonNull(glueSecurityMappingConfig, "glueSecurityMappingConfig is null"));
-        }
-        else {
-            this.mappings = null;
-        }
+        this.lakeFormationPartnerTagName = glueConfig.getLakeFormationPartnerTagName().orElse(LAKE_FORMATION_AUTHORIZED_CALLER);
+        this.lakeFormationPartnerTagValue = glueConfig.getLakeFormationPartnerTagValue().orElse(AHANA);
+        this.mappings = requireNonNull(glueSecurityMappingsSupplier, "glueSecurityMappingsSupplier is null").getMappingsSupplier();
         this.impersonationEnabled = glueConfig.isImpersonationEnabled();
 
         verify(!impersonationEnabled || mappings != null, "Glue Security Mapping has to be configured if impersonation is enabled");
+        verify(mappings == null || impersonationEnabled, "Impersonation has to be enabled to use Glue Security Mapping");
 
         this.awsCredentialsProviderLoadingCache = CacheBuilder.newBuilder()
+                .maximumSize(50)
                 .build(CacheLoader.from(this::createAssumeRoleCredentialsProvider));
     }
 
@@ -231,22 +226,6 @@ public class GlueHiveMetastore
         }
 
         return asyncGlueClientBuilder.build();
-    }
-
-    private static Supplier<GlueSecurityMappings> getMappings(GlueSecurityMappingConfig config)
-    {
-        File configFile = config.getConfigFile().orElseThrow(() -> new IllegalArgumentException("config file not set"));
-        Supplier<GlueSecurityMappings> supplier = () -> parseJson(configFile.toPath(), GlueSecurityMappings.class);
-        if (!config.getRefreshPeriod().isPresent()) {
-            return Suppliers.memoize(supplier::get);
-        }
-        return Suppliers.memoizeWithExpiration(
-                () -> {
-                    log.info("Refreshing Glue security mapping configuration from %s", configFile);
-                    return supplier.get();
-                },
-                config.getRefreshPeriod().get().toMillis(),
-                MILLISECONDS);
     }
 
     @Managed
@@ -331,14 +310,14 @@ public class GlueHiveMetastore
                 if (impersonationEnabled) {
                     AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
 
-                    GetUnfilteredTableResult getUnfilteredTableResult;
-                    getUnfilteredTableResult = glueClient.getUnfilteredTable(new GetUnfilteredTableRequest()
+                    GetTableResult getTableResult;
+                    getTableResult = glueClient.getTable(new GetTableRequest()
                             .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withName(tableName)
                             .withRequestCredentialsProvider(credentialsProvider));
 
-                    return Optional.of(getUnfilteredTableResult.getTable());
+                    return Optional.of(getTableResult.getTable());
                 }
                 else {
                     GetTableResult getTableResult;
@@ -1330,7 +1309,7 @@ public class GlueHiveMetastore
     private AWSCredentialsProvider createAssumeRoleCredentialsProvider(String iamRole)
     {
         Collection<Tag> tags = new ArrayList<>();
-        Tag tag = new Tag().withKey(LAKE_FORMATION_AUTHORIZED_CALLER).withValue(AHANA);
+        Tag tag = new Tag().withKey(lakeFormationPartnerTagName).withValue(lakeFormationPartnerTagValue);
         tags.add(tag);
 
         return new STSAssumeRoleSessionCredentialsProvider
@@ -1342,12 +1321,8 @@ public class GlueHiveMetastore
     private String getGlueIamRole(HiveIdentity hiveIdentity)
     {
         GlueSecurityMapping mapping = mappings.get().getMapping(hiveIdentity)
-                .orElseThrow(() -> new AccessDeniedException("No matching Glue Security Mapping"));
+                .orElseThrow(() -> new AccessDeniedException("No matching Glue Security Mapping or Glue Security Mapping has no role"));
 
-        if (mapping.getIamRole().isEmpty()) {
-            throw new AccessDeniedException("Glue Security Mapping has no role");
-        }
-        verify(!mapping.getIamRole().isEmpty(), "mapping must have role");
         return mapping.getIamRole();
     }
 }

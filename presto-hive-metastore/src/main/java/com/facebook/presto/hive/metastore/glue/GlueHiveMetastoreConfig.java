@@ -31,6 +31,8 @@ public class GlueHiveMetastoreConfig
     private int partitionSegments = 5;
     private int getPartitionThreads = 20;
     private Optional<String> iamRole = Optional.empty();
+    private Optional<String> lakeFormationPartnerTagValue = Optional.empty();
+    private Optional<String> lakeFormationPartnerTagName = Optional.empty();
     private boolean impersonationEnabled;
 
     public Optional<String> getGlueRegion()
@@ -138,6 +140,32 @@ public class GlueHiveMetastoreConfig
     public GlueHiveMetastoreConfig setIamRole(String iamRole)
     {
         this.iamRole = Optional.ofNullable(iamRole);
+        return this;
+    }
+
+    public Optional<String> getLakeFormationPartnerTagName()
+    {
+        return lakeFormationPartnerTagName;
+    }
+
+    @Config("hive.metastore.glue.lakeformation.partner-tag-name")
+    @ConfigDescription("Name of the partner tag in AWS Lake Formation")
+    public GlueHiveMetastoreConfig setLakeFormationPartnerTagName(String lakeFormationPartnerTagName)
+    {
+        this.lakeFormationPartnerTagName = Optional.ofNullable(lakeFormationPartnerTagName);
+        return this;
+    }
+
+    public Optional<String> getLakeFormationPartnerTagValue()
+    {
+        return lakeFormationPartnerTagValue;
+    }
+
+    @Config("hive.metastore.glue.lakeformation.partner-tag-value")
+    @ConfigDescription("Value of the partner tag in AWS Lake Formation's authorized partner list")
+    public GlueHiveMetastoreConfig setLakeFormationPartnerTagValue(String lakeFormationPartnerTagValue)
+    {
+        this.lakeFormationPartnerTagValue = Optional.ofNullable(lakeFormationPartnerTagValue);
         return this;
     }
 

@@ -74,10 +74,10 @@ public class TestHiveClientGlueMetastore
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
         GlueHiveMetastoreConfig glueConfig = new GlueHiveMetastoreConfig();
         glueConfig.setDefaultWarehouseDir(tempDir.toURI().toString());
-        GlueSecurityMappingConfig glueSecurityMappingConfig = new GlueSecurityMappingConfig();
+        GlueSecurityMappingsSupplier glueSecurityMappingsSupplier = new GlueSecurityMappingsSupplier(Optional.empty(), Optional.empty());
 
         Executor executor = new BoundedExecutor(this.executor, 10);
-        return new GlueHiveMetastore(hdfsEnvironment, glueConfig, glueSecurityMappingConfig, executor);
+        return new GlueHiveMetastore(hdfsEnvironment, glueConfig, glueSecurityMappingsSupplier, executor);
     }
 
     @Override

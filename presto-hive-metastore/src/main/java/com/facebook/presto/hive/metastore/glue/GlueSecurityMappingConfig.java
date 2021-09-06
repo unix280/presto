@@ -16,17 +16,24 @@ package com.facebook.presto.hive.metastore.glue;
 import com.facebook.airlift.configuration.Config;
 import com.facebook.airlift.configuration.ConfigDescription;
 import io.airlift.units.Duration;
+import io.airlift.units.MinDuration;
 
 import java.io.File;
 import java.util.Optional;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 public class GlueSecurityMappingConfig
 {
     private File configFile;
-    private Duration refreshPeriod;
+    private Duration refreshPeriod = new Duration(30, SECONDS);
 
     public Optional<File> getConfigFile()
     {
+        if (configFile != null) {
+            checkArgument(configFile.exists() && configFile.isFile(), "Glue Security Mapping config file does not exist: %s", configFile);
+        }
         return Optional.ofNullable(configFile);
     }
 
@@ -43,6 +50,7 @@ public class GlueSecurityMappingConfig
         return Optional.ofNullable(refreshPeriod);
     }
 
+    @MinDuration("0ms")
     @Config("hive.metastore.glue.security-mapping.refresh-period")
     @ConfigDescription("Time interval after which securing mapping configuration will be refreshed")
     public GlueSecurityMappingConfig setRefreshPeriod(Duration refreshPeriod)

@@ -17,7 +17,9 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.units.Duration;
 import org.testng.annotations.Test;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
 import static com.facebook.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
@@ -31,20 +33,23 @@ public class TestGlueSecurityMappingConfig
     {
         assertRecordedDefaults(recordDefaults(GlueSecurityMappingConfig.class)
                 .setConfigFile(null)
-                .setRefreshPeriod(null));
+                .setRefreshPeriod(Duration.valueOf("30s")));
     }
 
     @Test
     public void testExplicitPropertyMappings()
+            throws IOException
     {
+        Path securityMappingConfigFile = Files.createTempFile(null, null);
+
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("hive.metastore.glue.security-mapping.config-file", "/test/glue-security-mapping.json")
-                .put("hive.metastore.glue.security-mapping.refresh-period", "30s")
+                .put("hive.metastore.glue.security-mapping.config-file", securityMappingConfigFile.toString())
+                .put("hive.metastore.glue.security-mapping.refresh-period", "60s")
                 .build();
 
         GlueSecurityMappingConfig expected = new GlueSecurityMappingConfig()
-                .setConfigFile(new File("/test/glue-security-mapping.json"))
-                .setRefreshPeriod(Duration.valueOf("30s"));
+                .setConfigFile(securityMappingConfigFile.toFile())
+                .setRefreshPeriod(Duration.valueOf("60s"));
 
         assertFullMapping(properties, expected);
     }

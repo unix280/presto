@@ -36,6 +36,8 @@ public class TestGlueHiveMetastoreConfig
                 .setPartitionSegments(5)
                 .setGetPartitionThreads(20)
                 .setIamRole(null)
+                .setLakeFormationPartnerTagName(null)
+                .setLakeFormationPartnerTagValue(null)
                 .setImpersonationEnabled(false));
     }
 
@@ -51,6 +53,8 @@ public class TestGlueHiveMetastoreConfig
                 .put("hive.metastore.glue.partitions-segments", "10")
                 .put("hive.metastore.glue.get-partition-threads", "42")
                 .put("hive.metastore.glue.iam-role", "role")
+                .put("hive.metastore.glue.lakeformation.partner-tag-name", "partner-tag-name")
+                .put("hive.metastore.glue.lakeformation.partner-tag-value", "partner-tag-value")
                 .put("hive.metastore.glue.impersonation.enabled", "true")
                 .build();
 
@@ -63,6 +67,8 @@ public class TestGlueHiveMetastoreConfig
                 .setPartitionSegments(10)
                 .setGetPartitionThreads(42)
                 .setIamRole("role")
+                .setLakeFormationPartnerTagName("partner-tag-name")
+                .setLakeFormationPartnerTagValue("partner-tag-value")
                 .setImpersonationEnabled(true);
 
         assertFullMapping(properties, expected);

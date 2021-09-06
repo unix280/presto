@@ -75,9 +75,10 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         glueConfig.setImpersonationEnabled(true);
         GlueSecurityMappingConfig glueSecurityMappingConfig = new GlueSecurityMappingConfig()
                 .setConfigFile(new File(getResource("com.facebook.presto.hive.metastore.glue/glue-security-mapping.json").getPath()));
+        GlueSecurityMappingsSupplier glueSecurityMappingsSupplier = new GlueSecurityMappingsSupplier(glueSecurityMappingConfig.getConfigFile(), glueSecurityMappingConfig.getRefreshPeriod());
 
         Executor executor = new BoundedExecutor(this.executor, 10);
-        return new GlueHiveMetastore(hdfsEnvironment, glueConfig, glueSecurityMappingConfig, executor);
+        return new GlueHiveMetastore(hdfsEnvironment, glueConfig, glueSecurityMappingsSupplier, executor);
     }
 
     @Override
