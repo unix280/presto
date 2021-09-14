@@ -59,6 +59,7 @@ public class GlueMetastoreModule
 
     @Provides
     @Singleton
+    @ForGlueHiveMetastore
     public GlueSecurityMappingsSupplier provideGlueSecurityMappingsSupplier(GlueSecurityMappingConfig config)
     {
         return new GlueSecurityMappingsSupplier(config.getConfigFile(), config.getRefreshPeriod());

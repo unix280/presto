@@ -178,7 +178,7 @@ public class GlueHiveMetastore
     public GlueHiveMetastore(
             HdfsEnvironment hdfsEnvironment,
             GlueHiveMetastoreConfig glueConfig,
-            GlueSecurityMappingsSupplier glueSecurityMappingsSupplier,
+            @ForGlueHiveMetastore GlueSecurityMappingsSupplier glueSecurityMappingsSupplier,
             @ForGlueHiveMetastore Executor executor)
     {
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
