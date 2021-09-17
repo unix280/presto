@@ -44,6 +44,7 @@ import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import org.jetbrains.annotations.TestOnly;
 import org.weakref.jmx.Flatten;
 import org.weakref.jmx.Managed;
 
@@ -78,15 +79,44 @@ public class LakeFormationAccessControl
     private static final String INFORMATION_SCHEMA_NAME = "information_schema";
 
     private final GlueMetastoreStats stats = new GlueMetastoreStats();
-    private final AWSGlueAsync glueClient;
-    private final String catalogId;
-    private final String catalogIamRole;
-    private final String lakeFormationPartnerTagName;
-    private final String lakeFormationPartnerTagValue;
-    private final boolean impersonationEnabled;
-    private final Supplier<GlueSecurityMappings> mappings;
-    private final LoadingCache<String, AWSCredentialsProvider> awsCredentialsProviderLoadingCache;
-    private final LoadingCache<LFPolicyCacheKey, Optional<GetUnfilteredTableResult>> lakeFormationPolicyCache;
+    private AWSGlueAsync glueClient;
+    private String catalogId;
+    private String catalogIamRole;
+    private String lakeFormationPartnerTagName;
+    private String lakeFormationPartnerTagValue;
+    private boolean impersonationEnabled;
+    private Supplier<GlueSecurityMappings> mappings;
+    private LoadingCache<String, AWSCredentialsProvider> awsCredentialsProviderLoadingCache;
+    private LoadingCache<LFPolicyCacheKey, Optional<GetUnfilteredTableResult>> lakeFormationPolicyCache;
+
+    @TestOnly
+    public LakeFormationAccessControl()
+    {
+    }
+
+    @TestOnly
+    public void setCatalogIamRole(String catalogIamRole)
+    {
+        this.catalogIamRole = catalogIamRole;
+    }
+
+    @TestOnly
+    public void setImpersonationEnabled(boolean impersonationEnabled)
+    {
+        this.impersonationEnabled = impersonationEnabled;
+    }
+
+    @TestOnly
+    public void setMappings(Supplier<GlueSecurityMappings> mappings)
+    {
+        this.mappings = mappings;
+    }
+
+    @TestOnly
+    public void setLakeFormationPolicyCache(LoadingCache<LFPolicyCacheKey, Optional<GetUnfilteredTableResult>> lakeFormationPolicyCache)
+    {
+        this.lakeFormationPolicyCache = lakeFormationPolicyCache;
+    }
 
     @Inject
     public LakeFormationAccessControl(
@@ -168,6 +198,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanCreateSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
+        // allow
     }
 
     /**
@@ -178,6 +209,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanDropSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
+        // allow
     }
 
     /**
@@ -188,6 +220,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanRenameSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName, String newSchemaName)
     {
+        // allow
     }
 
     /**
@@ -202,6 +235,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanShowSchemas(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context)
     {
+        // allow
     }
 
     /**
@@ -221,6 +255,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanCreateTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
+        // allow
     }
 
     /**
@@ -231,6 +266,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanDropTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
+        // allow
     }
 
     /**
@@ -241,6 +277,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanRenameTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, SchemaTableName newTableName)
     {
+        // allow
     }
 
     /**
@@ -255,6 +292,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanShowTablesMetadata(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
+        // allow
     }
 
     /**
@@ -274,6 +312,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanAddColumn(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
+        // allow
     }
 
     /**
@@ -284,6 +323,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanDropColumn(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
+        // allow
     }
 
     /**
@@ -294,6 +334,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanRenameColumn(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
+        // allow
     }
 
     /**
@@ -337,6 +378,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanInsertIntoTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
+        // allow
     }
 
     /**
@@ -347,6 +389,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanDeleteFromTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
+        // allow
     }
 
     /**
@@ -357,6 +400,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanCreateView(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName viewName)
     {
+        // allow
     }
 
     /**
@@ -367,6 +411,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanDropView(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName viewName)
     {
+        // allow
     }
 
     /**
@@ -410,6 +455,7 @@ public class LakeFormationAccessControl
     @Override
     public void checkCanSetCatalogSessionProperty(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String propertyName)
     {
+        // allow
     }
 
     private AWSCredentialsProvider createAssumeRoleCredentialsProvider(String iamRole)
@@ -476,12 +522,12 @@ public class LakeFormationAccessControl
         return lfPolicyCacheKey;
     }
 
-    private static final class LFPolicyCacheKey
+    protected static final class LFPolicyCacheKey
     {
         private final SchemaTableName schemaTableName;
         private final String iamRole;
 
-        private LFPolicyCacheKey(SchemaTableName schemaTableName, String iamRole)
+        LFPolicyCacheKey(SchemaTableName schemaTableName, String iamRole)
         {
             this.schemaTableName = schemaTableName;
             this.iamRole = iamRole;

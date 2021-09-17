@@ -34,12 +34,12 @@ public class LakeFormationSecurityConfig
     private int maxRefreshThreads = 1;
 
     @NotNull
+    @MinDuration("60s")
     public Duration getCacheTTL()
     {
         return cacheTTL;
     }
 
-    @MinDuration("0ms")
     @Config(LAKEFORMATION_POLICY_CACHE_TTL)
     public LakeFormationSecurityConfig setCacheTTL(Duration cacheTTL)
     {
@@ -48,12 +48,12 @@ public class LakeFormationSecurityConfig
     }
 
     @NotNull
+    @MinDuration("30s")
     public Duration getRefreshPeriod()
     {
         return refreshPeriod;
     }
 
-    @MinDuration("1ms")
     @Config(LAKE_FORMATION_POLICY_REFRESH_PERIOD)
     public LakeFormationSecurityConfig setRefreshPeriod(Duration refreshPeriod)
     {
