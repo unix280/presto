@@ -2755,7 +2755,8 @@ public class HiveMetadata
                 tablePartitioning,
                 Optional.empty(),
                 discretePredicates,
-                ImmutableList.of());
+                ImmutableList.of(),
+                Optional.of(hiveLayoutHandle.getRemainingPredicate()));
     }
 
     @Override
