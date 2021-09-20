@@ -21,6 +21,7 @@ import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.spi.plan.TableScanNode;
 import com.facebook.presto.spi.plan.ValuesNode;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import com.facebook.presto.sql.planner.assertions.BasePlanTest;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
@@ -49,6 +50,8 @@ import java.util.function.Predicate;
 import static com.facebook.presto.SystemSessionProperties.DISTRIBUTED_SORT;
 import static com.facebook.presto.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static com.facebook.presto.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
+import static com.facebook.presto.SystemSessionProperties.JOIN_MAX_BROADCAST_TABLE_SIZE;
+import static com.facebook.presto.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static com.facebook.presto.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
 import static com.facebook.presto.SystemSessionProperties.OPTIMIZE_NULLS_IN_JOINS;
 import static com.facebook.presto.common.block.SortOrder.ASC_NULLS_LAST;
@@ -1142,5 +1145,74 @@ public class TestLogicalPlanner
                                                 "region",
                                                 ImmutableMap.of(
                                                         "REGION_REGIONKEY", "regionkey"))))));
+    }
+
+    @Test
+    public void testSizeBasedJoin()
+    {
+        // both local.sf100000.nation and local.sf100000.orders don't provide stats, therefore no reordering happens
+        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".nation, local.\"sf42.5\".orders WHERE nation.nationkey = orders.custkey",
+                automaticJoinDistribution(),
+                output(
+                        anyTree(
+                                join(INNER, ImmutableList.of(equiJoinClause("NATIONKEY", "CUSTKEY")),
+                                        anyTree(
+                                                tableScan("nation", ImmutableMap.of("NATIONKEY", "nationkey"))),
+                                        anyTree(
+                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey")))))));
+
+        // values node provides stats
+        assertDistributedPlan("SELECT custkey FROM (VALUES CAST(1 AS BIGINT), CAST(2 AS BIGINT)) t(a), local.\"sf42.5\".orders WHERE t.a = orders.custkey",
+                automaticJoinDistribution(),
+                output(
+                        anyTree(
+                                join(INNER, ImmutableList.of(equiJoinClause("CUSTKEY", "T_A")), Optional.empty(), Optional.of(REPLICATED),
+                                        anyTree(
+                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
+                                        anyTree(
+                                                values("T_A"))))));
+    }
+
+    @Test
+    public void testSizeBasedSemiJoin()
+    {
+        // both local.sf100000.nation and local.sf100000.orders don't provide stats, therefore no reordering happens
+        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".orders WHERE orders.custkey IN (SELECT nationkey FROM local.\"sf42.5\".nation)",
+                automaticJoinDistribution(),
+                output(
+                        anyTree(
+                                semiJoin("CUSTKEY", "NATIONKEY", "OUT", Optional.of(SemiJoinNode.DistributionType.PARTITIONED),
+                                        anyTree(
+                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
+                                        anyTree(
+                                                tableScan("nation", ImmutableMap.of("NATIONKEY", "nationkey")))))));
+
+        // values node provides stats
+        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".orders WHERE orders.custkey IN (SELECT t.a FROM (VALUES CAST(1 AS BIGINT), CAST(2 AS BIGINT)) t(a))",
+                automaticJoinDistribution(),
+                output(
+                        anyTree(
+                                semiJoin("CUSTKEY", "T_A", "OUT", Optional.of(SemiJoinNode.DistributionType.REPLICATED),
+                                        anyTree(
+                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
+                                        anyTree(
+                                                values("T_A"))))));
+    }
+
+    private Session noJoinReordering()
+    {
+        return Session.builder(getQueryRunner().getDefaultSession())
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, FeaturesConfig.JoinReorderingStrategy.NONE.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
+                .build();
+    }
+
+    private Session automaticJoinDistribution()
+    {
+        return Session.builder(getQueryRunner().getDefaultSession())
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, FeaturesConfig.JoinReorderingStrategy.AUTOMATIC.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100MB")
+                .build();
     }
 }

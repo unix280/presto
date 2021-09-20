@@ -27,6 +27,7 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
+import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.TaskCountEstimator;
@@ -36,6 +37,7 @@ import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import com.facebook.presto.sql.planner.iterative.rule.test.RuleAssert;
 import com.facebook.presto.sql.planner.iterative.rule.test.RuleTester;
+import com.facebook.presto.sql.relational.OriginalExpressionUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.AfterClass;
@@ -47,11 +49,14 @@ import java.util.Optional;
 import static com.facebook.presto.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static com.facebook.presto.SystemSessionProperties.JOIN_MAX_BROADCAST_TABLE_SIZE;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
+import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
+import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.filter;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.semiJoin;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
 import static com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
 import static com.facebook.presto.sql.planner.plan.SemiJoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.planner.plan.SemiJoinNode.DistributionType.REPLICATED;
+import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 
 @Test(singleThreaded = true)
 public class TestDetermineSemiJoinDistributionType
@@ -303,6 +308,59 @@ public class TestDetermineSemiJoinDistributionType
                         Optional.of(PARTITIONED),
                         values(ImmutableMap.of("A1", 0)),
                         values(ImmutableMap.of("B1", 0))));
+    }
+
+    @Test
+    public void testReplicatesWhenSourceIsSmall()
+    {
+        VarcharType symbolType = createUnboundedVarcharType(); // variable width so that average row size is respected
+        int aRows = 10_000;
+        int bRows = 10;
+
+        PlanNodeStatsEstimate probeSideStatsEstimate = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(aRows)
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("A1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
+                .build();
+        PlanNodeStatsEstimate buildSideStatsEstimate = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(bRows)
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("B1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
+                .build();
+        PlanNodeStatsEstimate buildSideSourceStatsEstimate = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(bRows)
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("B1", symbolType), new VariableStatsEstimate(0, 100, 0, 64, 10)))
+                .build();
+
+        // build side exceeds AUTOMATIC_RESTRICTED limit but source plan nodes are small
+        // therefore replicated distribution type is chosen
+        assertDetermineSemiJoinDistributionType()
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100MB")
+                .overrideStats("valuesA", probeSideStatsEstimate)
+                .overrideStats("filterB", buildSideStatsEstimate)
+                .overrideStats("valuesB", buildSideSourceStatsEstimate)
+                .on(p -> {
+                    VariableReferenceExpression a1 = p.variable("A1", symbolType);
+                    VariableReferenceExpression b1 = p.variable("B1", symbolType);
+                    return p.semiJoin(
+                            p.values(new PlanNodeId("valuesA"), aRows, a1),
+                            p.filter(
+                                    new PlanNodeId("filterB"),
+                                    p.values(new PlanNodeId("valuesB"), bRows, b1),
+                                    OriginalExpressionUtils.castToRowExpression(TRUE_LITERAL)),
+                            a1,
+                            b1,
+                            p.variable("output"),
+                            Optional.empty(),
+                            Optional.empty(),
+                            Optional.empty());
+                })
+                .matches(semiJoin(
+                        "A1",
+                        "B1",
+                        "output",
+                        Optional.of(REPLICATED),
+                        values(ImmutableMap.of("A1", 0)),
+                        filter("true", values(ImmutableMap.of("B1", 0)))));
     }
 
     private RuleAssert assertDetermineSemiJoinDistributionType()

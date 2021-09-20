@@ -283,6 +283,11 @@ public class PlanBuilder
         return new FilterNode(idAllocator.getNextId(), source, predicate);
     }
 
+    public FilterNode filter(PlanNodeId planNodeId, PlanNode source, RowExpression predicate)
+    {
+        return new FilterNode(planNodeId, source, predicate);
+    }
+
     public AggregationNode aggregation(Consumer<AggregationBuilder> aggregationBuilderConsumer)
     {
         AggregationBuilder aggregationBuilder = new AggregationBuilder(getTypes());
@@ -719,6 +724,22 @@ public class PlanBuilder
     public JoinNode join(JoinNode.Type type, PlanNode left, PlanNode right, List<JoinNode.EquiJoinClause> criteria, List<VariableReferenceExpression> outputVariables, Optional<RowExpression> filter)
     {
         return join(type, left, right, criteria, outputVariables, filter, Optional.empty(), Optional.empty());
+    }
+
+    public JoinNode join(JoinNode.Type type, PlanNode left, PlanNode right, List<JoinNode.EquiJoinClause> criteria, List<VariableReferenceExpression> leftOutputSymbols, List<VariableReferenceExpression> rightOutputSymbols, Optional<RowExpression> filter)
+    {
+        return join(
+                type,
+                left,
+                right,
+                criteria,
+                ImmutableList.<VariableReferenceExpression>builder()
+                        .addAll(leftOutputSymbols)
+                        .addAll(rightOutputSymbols)
+                        .build(),
+                filter,
+                Optional.empty(),
+                Optional.empty());
     }
 
     public JoinNode join(

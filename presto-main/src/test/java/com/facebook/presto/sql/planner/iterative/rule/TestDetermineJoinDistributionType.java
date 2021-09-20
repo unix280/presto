@@ -13,19 +13,27 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
+import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.TaskCountEstimator;
 import com.facebook.presto.cost.VariableStatsEstimate;
+import com.facebook.presto.spi.TestingColumnHandle;
 import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.TableScanNode;
+import com.facebook.presto.spi.plan.ValuesNode;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType;
+import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.iterative.rule.test.RuleAssert;
 import com.facebook.presto.sql.planner.iterative.rule.test.RuleTester;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.JoinNode.DistributionType;
 import com.facebook.presto.sql.planner.plan.JoinNode.Type;
+import com.facebook.presto.sql.relational.OriginalExpressionUtils;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -33,13 +41,18 @@ import org.testng.annotations.Test;
 
 import java.util.Optional;
 
+import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static com.facebook.presto.SystemSessionProperties.JOIN_MAX_BROADCAST_TABLE_SIZE;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
+import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.enforceSingleRow;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
+import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.filter;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
+import static com.facebook.presto.sql.planner.iterative.Lookup.noLookup;
+import static com.facebook.presto.sql.planner.iterative.rule.DetermineJoinDistributionType.getSourceTablesSizeInBytes;
 import static com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder.castToRowExpression;
 import static com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder.constantExpressions;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
@@ -48,6 +61,9 @@ import static com.facebook.presto.sql.planner.plan.JoinNode.Type.FULL;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.LEFT;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.RIGHT;
+import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
+import static com.facebook.presto.testing.assertions.Assert.assertEquals;
+import static java.lang.Double.NaN;
 
 @Test(singleThreaded = true)
 public class TestDetermineJoinDistributionType
@@ -592,6 +608,27 @@ public class TestDetermineJoinDistributionType
                         values(ImmutableMap.of("A1", 0)),
                         values(ImmutableMap.of("B1", 0))));
 
+        assertDetermineJoinDistributionType()
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100B")
+                .overrideStats("valuesA", probeSideStatsEstimate)
+                .overrideStats("valuesB", buildSideStatsEstimate)
+                .on(p ->
+                        p.join(
+                                INNER,
+                                p.values(new PlanNodeId("valuesA"), aRows, p.variable("A1", BIGINT)),
+                                p.values(new PlanNodeId("valuesB"), bRows, p.variable("B1", BIGINT)),
+                                ImmutableList.of(new JoinNode.EquiJoinClause(p.variable("A1", BIGINT), p.variable("B1", BIGINT))),
+                                ImmutableList.of(p.variable("A1", BIGINT), p.variable("B1", BIGINT)),
+                                Optional.empty()))
+                .matches(join(
+                        INNER,
+                        ImmutableList.of(equiJoinClause("A1", "B1")),
+                        Optional.empty(),
+                        Optional.of(PARTITIONED),
+                        values(ImmutableMap.of("A1", 0)),
+                        values(ImmutableMap.of("B1", 0))));
+
         probeSideStatsEstimate = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(aRows)
                 .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("A1", BIGINT), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
@@ -604,7 +641,28 @@ public class TestDetermineJoinDistributionType
         // B table exceeds AUTOMATIC_RESTRICTED limit therefore it is partitioned
         assertDetermineJoinDistributionType()
                 .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
-                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100MB")
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "1000TB")
+                .overrideStats("valuesA", probeSideStatsEstimate)
+                .overrideStats("valuesB", buildSideStatsEstimate)
+                .on(p ->
+                        p.join(
+                                INNER,
+                                p.values(new PlanNodeId("valuesA"), aRows, p.variable("A1", BIGINT)),
+                                p.values(new PlanNodeId("valuesB"), bRows, p.variable("B1", BIGINT)),
+                                ImmutableList.of(new JoinNode.EquiJoinClause(p.variable("A1", BIGINT), p.variable("B1", BIGINT))),
+                                ImmutableList.of(p.variable("A1", BIGINT), p.variable("B1", BIGINT)),
+                                Optional.empty()))
+                .matches(join(
+                        INNER,
+                        ImmutableList.of(equiJoinClause("A1", "B1")),
+                        Optional.empty(),
+                        Optional.of(REPLICATED),
+                        values(ImmutableMap.of("A1", 0)),
+                        values(ImmutableMap.of("B1", 0))));
+
+        assertDetermineJoinDistributionType()
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100B")
                 .overrideStats("valuesA", probeSideStatsEstimate)
                 .overrideStats("valuesB", buildSideStatsEstimate)
                 .on(p ->
@@ -688,6 +746,185 @@ public class TestDetermineJoinDistributionType
                         Optional.of(PARTITIONED),
                         values(ImmutableMap.of("B1", 0)),
                         values(ImmutableMap.of("A1", 0))));
+    }
+
+    @Test
+    public void testReplicatesWhenSourceIsSmall()
+    {
+        VarcharType symbolType = createUnboundedVarcharType(); // variable width so that average row size is respected
+        int aRows = 10_000;
+        int bRows = 10;
+
+        // output size exceeds AUTOMATIC_RESTRICTED limit
+        PlanNodeStatsEstimate aStatsEstimate = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(aRows)
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("A1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
+                .build();
+        // output size exceeds AUTOMATIC_RESTRICTED limit
+        PlanNodeStatsEstimate bStatsEstimate = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(bRows)
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("B1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
+                .build();
+        // output size does not  exceed AUTOMATIC_RESTRICTED limit
+        PlanNodeStatsEstimate bSourceStatsEstimate = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(bRows)
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("B1", symbolType), new VariableStatsEstimate(0, 100, 0, 64, 10)))
+                .build();
+
+        // immediate join sources exceeds AUTOMATIC_RESTRICTED limit but build tables are small
+        // therefore replicated distribution type is chosen
+        assertDetermineJoinDistributionType()
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100MB")
+                .overrideStats("valuesA", aStatsEstimate)
+                .overrideStats("filterB", bStatsEstimate)
+                .overrideStats("valuesB", bSourceStatsEstimate)
+                .on(p -> {
+                    VariableReferenceExpression a1 = p.variable("A1", symbolType);
+                    VariableReferenceExpression b1 = p.variable("B1", symbolType);
+                    return p.join(
+                            INNER,
+                            p.values(new PlanNodeId("valuesA"), aRows, a1),
+                            p.filter(
+                                    new PlanNodeId("filterB"),
+                                    p.values(new PlanNodeId("valuesB"), bRows, b1),
+                                    OriginalExpressionUtils.castToRowExpression(TRUE_LITERAL)),
+                            ImmutableList.of(new JoinNode.EquiJoinClause(a1, b1)),
+                            ImmutableList.of(a1),
+                            ImmutableList.of(b1),
+                            Optional.empty());
+                })
+                .matches(join(
+                        INNER,
+                        ImmutableList.of(equiJoinClause("A1", "B1")),
+                        Optional.empty(),
+                        Optional.of(REPLICATED),
+                        values(ImmutableMap.of("A1", 0)),
+                        filter("true", values(ImmutableMap.of("B1", 0)))));
+
+        // same but with join sides reversed
+        assertDetermineJoinDistributionType()
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100MB")
+                .overrideStats("valuesA", aStatsEstimate)
+                .overrideStats("filterB", bStatsEstimate)
+                .overrideStats("valuesB", bSourceStatsEstimate)
+                .on(p -> {
+                    VariableReferenceExpression a1 = p.variable("A1", symbolType);
+                    VariableReferenceExpression b1 = p.variable("B1", symbolType);
+                    return p.join(
+                            INNER,
+                            p.filter(
+                                    new PlanNodeId("filterB"),
+                                    p.values(new PlanNodeId("valuesB"), bRows, b1),
+                                    OriginalExpressionUtils.castToRowExpression(TRUE_LITERAL)),
+                            p.values(new PlanNodeId("valuesA"), aRows, a1),
+                            ImmutableList.of(new JoinNode.EquiJoinClause(b1, a1)),
+                            ImmutableList.of(b1),
+                            ImmutableList.of(a1),
+                            Optional.empty());
+                })
+                .matches(join(
+                        INNER,
+                        ImmutableList.of(equiJoinClause("A1", "B1")),
+                        Optional.empty(),
+                        Optional.of(REPLICATED),
+                        values(ImmutableMap.of("A1", 0)),
+                        filter("true", values(ImmutableMap.of("B1", 0)))));
+
+        // only probe side (with small tables) source stats are available, join sides should be flipped
+        assertDetermineJoinDistributionType()
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, "100MB")
+                .overrideStats("valuesA", PlanNodeStatsEstimate.unknown())
+                .overrideStats("filterB", PlanNodeStatsEstimate.unknown())
+                .overrideStats("valuesB", bSourceStatsEstimate)
+                .on(p -> {
+                    VariableReferenceExpression a1 = p.variable("A1", symbolType);
+                    VariableReferenceExpression b1 = p.variable("B1", symbolType);
+                    return p.join(
+                            LEFT,
+                            p.filter(
+                                    new PlanNodeId("filterB"),
+                                    p.values(new PlanNodeId("valuesB"), bRows, b1),
+                                    OriginalExpressionUtils.castToRowExpression(TRUE_LITERAL)),
+                            p.values(new PlanNodeId("valuesA"), aRows, a1),
+                            ImmutableList.of(new JoinNode.EquiJoinClause(b1, a1)),
+                            ImmutableList.of(b1),
+                            ImmutableList.of(a1),
+                            Optional.empty());
+                })
+                .matches(join(
+                        RIGHT,
+                        ImmutableList.of(equiJoinClause("A1", "B1")),
+                        Optional.empty(),
+                        Optional.of(PARTITIONED),
+                        values(ImmutableMap.of("A1", 0)),
+                        filter("true", values(ImmutableMap.of("B1", 0)))));
+    }
+
+    @Test
+    public void testGetSourceTablesSizeInBytes()
+    {
+        PlanBuilder planBuilder = new PlanBuilder(TEST_SESSION, new PlanNodeIdAllocator(), tester.getMetadata());
+        VariableReferenceExpression symbol = planBuilder.variable("col");
+        VariableReferenceExpression sourceSymbol1 = planBuilder.variable("source1");
+        VariableReferenceExpression sourceSymbol2 = planBuilder.variable("soruce2");
+
+        // missing source stats
+        assertEquals(
+                getSourceTablesSizeInBytes(
+                        planBuilder.values(symbol),
+                        noLookup(),
+                        node -> PlanNodeStatsEstimate.unknown(),
+                        planBuilder.getTypes()),
+                NaN);
+
+        // two source plan nodes
+        PlanNodeStatsEstimate sourceStatsEstimate1 = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(10)
+                .build();
+        PlanNodeStatsEstimate sourceStatsEstimate2 = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(20)
+                .build();
+        assertEquals(
+                getSourceTablesSizeInBytes(
+                        planBuilder.union(
+                                ImmutableListMultimap.<VariableReferenceExpression, VariableReferenceExpression>builder()
+                                        .put(symbol, sourceSymbol1)
+                                        .put(symbol, sourceSymbol2)
+                                        .build(),
+                                ImmutableList.of(
+                                        planBuilder.tableScan(
+                                                ImmutableList.of(sourceSymbol1),
+                                                ImmutableMap.of(sourceSymbol1, new TestingColumnHandle("col"))),
+                                        planBuilder.values(new PlanNodeId("valuesNode"), sourceSymbol2))),
+                        noLookup(),
+                        node -> {
+                            if (node instanceof TableScanNode) {
+                                return sourceStatsEstimate1;
+                            }
+
+                            if (node instanceof ValuesNode) {
+                                return sourceStatsEstimate2;
+                            }
+
+                            return PlanNodeStatsEstimate.unknown();
+                        },
+                        planBuilder.getTypes()),
+                270.0);
+
+        // join node
+        assertEquals(
+                getSourceTablesSizeInBytes(
+                        planBuilder.join(
+                                INNER,
+                                planBuilder.values(sourceSymbol1),
+                                planBuilder.values(sourceSymbol2)),
+                        noLookup(),
+                        node -> sourceStatsEstimate1,
+                        planBuilder.getTypes()),
+                NaN);
     }
 
     private RuleAssert assertDetermineJoinDistributionType()
