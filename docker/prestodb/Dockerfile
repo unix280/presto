@@ -10,7 +10,7 @@ ENV PRESTO_HOME="/opt/presto-server"
 COPY build-artifacts/$PRESTO_PKG .
 COPY build-artifacts/$PRESTO_CLI_JAR /opt/presto-cli
 
-RUN yum install tar gzip java-1.8.0-openjdk.x86_64 less -y \
+RUN yum install tar gzip java-11-amazon-corretto less -y \
 	# Download Presto and move \
 	&& tar -zxf $PRESTO_PKG \
 	&& mv ./presto-server-$PRESTO_VERSION $PRESTO_HOME \
