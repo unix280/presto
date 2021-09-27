@@ -78,7 +78,7 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         GlueSecurityMappingsSupplier glueSecurityMappingsSupplier = new GlueSecurityMappingsSupplier(glueSecurityMappingConfig.getConfigFile(), glueSecurityMappingConfig.getRefreshPeriod());
 
         Executor executor = new BoundedExecutor(this.executor, 10);
-        return new GlueHiveMetastore(hdfsEnvironment, glueConfig, glueSecurityMappingsSupplier, executor);
+        return new GlueHiveMetastore(hdfsEnvironment, glueConfig, new DisabledGlueColumnStatisticsProvider(), glueSecurityMappingsSupplier, executor);
     }
 
     @Override

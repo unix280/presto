@@ -22,6 +22,7 @@ import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
 import com.google.inject.Singleton;
+import com.google.inject.multibindings.OptionalBinder;
 
 import java.util.concurrent.Executor;
 
@@ -47,6 +48,8 @@ public class GlueMetastoreModule
     public void configure(Binder binder)
     {
         configBinder(binder).bindConfig(GlueHiveMetastoreConfig.class);
+        OptionalBinder.newOptionalBinder(binder, GlueColumnStatisticsProvider.class)
+                .setDefault().to(DisabledGlueColumnStatisticsProvider.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(GlueSecurityMappingConfig.class);
         binder.bind(GlueHiveMetastore.class).in(Scopes.SINGLETON);
         binder.bind(ExtendedHiveMetastore.class).annotatedWith(ForCachingHiveMetastore.class).to(GlueHiveMetastore.class).in(Scopes.SINGLETON);
