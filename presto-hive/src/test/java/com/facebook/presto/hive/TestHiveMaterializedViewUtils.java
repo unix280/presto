@@ -57,7 +57,7 @@ public class TestHiveMaterializedViewUtils
     private static final String QUERY_ID = "queryId";
 
     private final LiteralEncoder literalEncoder = new LiteralEncoder(new TestingBlockEncodingSerde());
-    private final MetastoreContext metastoreContext = new MetastoreContext(USER_NAME, QUERY_ID, Optional.empty(), Optional.empty(), false);
+    private final MetastoreContext metastoreContext = new MetastoreContext(USER_NAME, QUERY_ID, Optional.empty(), Optional.empty(), false, Optional.empty());
 
     @Test
     public void testMaterializedDataPredicates()

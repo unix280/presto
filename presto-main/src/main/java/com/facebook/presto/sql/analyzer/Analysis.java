@@ -68,6 +68,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.SystemSessionProperties.isCheckAccessControlOnUtilizedColumnsOnly;
+import static com.facebook.presto.metadata.MetadataUtil.toSchemaTableName;
 import static com.facebook.presto.sql.analyzer.Analysis.MaterializedViewAnalysisState.NOT_VISITED;
 import static com.facebook.presto.sql.analyzer.Analysis.MaterializedViewAnalysisState.VISITED;
 import static com.facebook.presto.sql.analyzer.Analysis.MaterializedViewAnalysisState.VISITING;

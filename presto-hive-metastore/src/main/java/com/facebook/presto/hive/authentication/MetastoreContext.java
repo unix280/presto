@@ -24,47 +24,49 @@ import static java.util.Objects.requireNonNull;
 
 public final class MetastoreContext
 {
-    private final Optional<String> username;
-    private final Optional<String> queryId;
+    private final String username;
+    private final String queryId;
     private final Optional<String> clientInfo;
     private final Optional<String> source;
     private final boolean impersonationEnabled;
+    private final Optional<String> metastoreHeaders;
 
-    public MetastoreContext(ConnectorSession session)
+    public MetastoreContext(ConnectorSession session, Optional<String> metastoreHeaders)
     {
-        this(requireNonNull(session, "session is null").getIdentity(), session.getQueryId());
+        this(requireNonNull(session, "session is null").getIdentity(), session.getQueryId(), metastoreHeaders);
     }
 
-    public MetastoreContext(ConnectorIdentity identity, String queryId)
+    public MetastoreContext(ConnectorIdentity identity, String queryId, Optional<String> metastoreHeaders)
     {
-        this(requireNonNull(identity, "identity is null"), queryId, Optional.empty(), Optional.empty());
+        this(requireNonNull(identity, "identity is null"), queryId, Optional.empty(), Optional.empty(), metastoreHeaders);
     }
 
-    public MetastoreContext(ConnectorIdentity identity, String queryId, Optional<String> clientInfo, Optional<String> source)
+    public MetastoreContext(ConnectorIdentity identity, String queryId, Optional<String> clientInfo, Optional<String> source, Optional<String> metastoreHeaders)
     {
-        this(requireNonNull(identity, "identity is null").getUser(), queryId, clientInfo, source, false);
+        this(requireNonNull(identity, "identity is null").getUser(), queryId, clientInfo, source, metastoreHeaders);
     }
 
-    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source)
+    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, Optional<String> metastoreHeaders)
     {
-        this(username, queryId, clientInfo, source, false);
+        this(username, queryId, clientInfo, source, false, metastoreHeaders);
     }
 
-    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, boolean impersonationEnabled)
+    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, boolean impersonationEnabled, Optional<String> metastoreHeaders)
     {
-        this.username = requireNonNull(Optional.of(username), "username is null");
-        this.queryId = requireNonNull(Optional.of(queryId), "queryId is null");
+        this.username = requireNonNull(username, "username is null");
+        this.queryId = requireNonNull(queryId, "queryId is null");
         this.clientInfo = requireNonNull(clientInfo, "clientInfo is null");
         this.source = requireNonNull(source, "source is null");
         this.impersonationEnabled = impersonationEnabled;
+        this.metastoreHeaders = requireNonNull(metastoreHeaders, "metastoreHeaders is null");
     }
 
-    public Optional<String> getUsername()
+    public String getUsername()
     {
         return username;
     }
 
-    public Optional<String> getQueryId()
+    public String getQueryId()
     {
         return queryId;
     }
@@ -82,6 +84,11 @@ public final class MetastoreContext
     public boolean isImpersonationEnabled()
     {
         return impersonationEnabled;
+    }
+
+    public Optional<String> getMetastoreHeaders()
+    {
+        return metastoreHeaders;
     }
 
     @Override

@@ -981,7 +981,7 @@ public class CachingHiveMetastore
 
     private <T> KeyAndContext<T> getCachingKey(MetastoreContext context, T key)
     {
-        MetastoreContext metastoreContext = metastoreImpersonationEnabled ? context : new MetastoreContext(NO_IMPERSONATION_USER, context.getQueryId().orElse(""), Optional.empty(), Optional.empty(), false);
+        MetastoreContext metastoreContext = metastoreImpersonationEnabled ? context : new MetastoreContext(NO_IMPERSONATION_USER, context.getQueryId(), Optional.empty(), Optional.empty(), false, Optional.empty());
         return new KeyAndContext<>(metastoreContext, key);
     }
 
@@ -1016,7 +1016,7 @@ public class CachingHiveMetastore
 
         public KeyAndContext(MetastoreContext context, T key)
         {
-            this.context = requireNonNull(context, "identity is null");
+            this.context = requireNonNull(context, "context is null");
             this.key = requireNonNull(key, "key is null");
         }
 
@@ -1072,6 +1072,6 @@ public class CachingHiveMetastore
     private MetastoreContext updateIdentity(MetastoreContext metastoreContext)
     {
         // remove metastoreContext if not doing impersonation
-        return delegate.isImpersonationEnabled() ? metastoreContext : new MetastoreContext(NO_IMPERSONATION_USER, metastoreContext.getQueryId().orElse(""), Optional.empty(), Optional.empty(), false);
+        return delegate.isImpersonationEnabled() ? metastoreContext : new MetastoreContext(NO_IMPERSONATION_USER, metastoreContext.getQueryId(), Optional.empty(), Optional.empty(), false, Optional.empty());
     }
 }
