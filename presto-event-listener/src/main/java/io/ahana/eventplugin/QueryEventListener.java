@@ -139,7 +139,7 @@ public final class QueryEventListener
             String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, queryCompletedEvent1,
                     null, flatten(queryCompletedEvent.getMetadata().getPlan().orElse("null")), getTimeValue(queryCompletedEvent.getStatistics().getCpuTime()),
                     getTimeValue(queryCompletedEvent.getStatistics().getRetriedCpuTime()), getTimeValue(queryCompletedEvent.getStatistics().getWallTime()), getTimeValue(queryCompletedEvent.getStatistics().getQueuedTime()),
-                    getTimeValue(queryCompletedEvent.getStatistics().getAnalysisTime().get())));
+                    getTimeValue(queryCompletedEvent.getStatistics().getAnalysisTime().orElse(null))));
             logger.info(eventPayload);
             if (sendToWebSocketServer) {
                 this.webSocketCollectorChannel.sendMessage(eventPayload);
