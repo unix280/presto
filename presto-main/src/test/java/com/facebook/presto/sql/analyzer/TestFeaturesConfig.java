@@ -180,7 +180,6 @@ public class TestFeaturesConfig
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
                 .setMaterializedViewDataConsistencyEnabled(true)
                 .setQueryOptimizationWithMaterializedViewEnabled(false)
-                .setAggregationIfToFilterRewriteStrategy(AggregationIfToFilterRewriteStrategy.DISABLED)
                 .setQueryOptimizationWithMaterializedViewEnabled(false)
                 .setMaterializedViewDataConsistencyEnabled(true)
                 .setPartialResultsMaxExecutionTimeMultiplier(2.0)
@@ -189,7 +188,9 @@ public class TestFeaturesConfig
                 .setSpoolingOutputBufferTempStorage("local")
                 .setEmptyJoinOptimization(false)
                 .setEnforceFixedDistributionForOutputOperator(false)
-                .setHideUnauthorizedColumns(false));
+                .setHideUnauthorizedColumns(false)
+                .setVerboseRuntimeStatsEnabled(false)
+                .setAggregationIfToFilterRewriteStrategy(AggregationIfToFilterRewriteStrategy.DISABLED));
     }
 
     @Test
@@ -320,6 +321,7 @@ public class TestFeaturesConfig
                 .put("offset-clause-enabled", "true")
                 .put("materialized-view-data-consistency-enabled", "false")
                 .put("query-optimization-with-materialized-view-enabled", "true")
+                .put("verbose-runtime-stats-enabled", "true")
                 .put("optimizer.aggregation-if-to-filter-rewrite-strategy", "filter_with_if")
                 .put("hide-unauthorized-columns", "true")
                 .build();
@@ -459,7 +461,8 @@ public class TestFeaturesConfig
                 .setSpoolingOutputBufferTempStorage("tempfs")
                 .setEmptyJoinOptimization(true)
                 .setEnforceFixedDistributionForOutputOperator(true)
-                .setHideUnauthorizedColumns(true);
+                .setHideUnauthorizedColumns(true)
+                .setVerboseRuntimeStatsEnabled(true);
         assertFullMapping(properties, expected);
     }
 
