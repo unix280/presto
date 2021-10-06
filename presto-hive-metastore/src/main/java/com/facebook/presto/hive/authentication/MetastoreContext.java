@@ -22,32 +22,32 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
-public final class HiveIdentity
+public final class MetastoreContext
 {
-    private static final HiveIdentity NONE_IDENTITY = new HiveIdentity();
+    private static final MetastoreContext NONE_CONTEXT = new MetastoreContext();
 
     private final Optional<String> username;
 
-    private HiveIdentity()
+    private MetastoreContext()
     {
         this.username = Optional.empty();
     }
 
-    public HiveIdentity(ConnectorSession session)
+    public MetastoreContext(ConnectorSession session)
     {
         this(requireNonNull(session, "session is null").getIdentity());
     }
 
-    public HiveIdentity(ConnectorIdentity identity)
+    public MetastoreContext(ConnectorIdentity identity)
     {
         requireNonNull(identity, "identity is null");
         this.username = Optional.of(requireNonNull(identity.getUser(), "identity.getUser() is null"));
     }
 
     // this should be called only by CachingHiveMetastore
-    public static HiveIdentity none()
+    public static MetastoreContext none()
     {
-        return NONE_IDENTITY;
+        return NONE_CONTEXT;
     }
 
     public Optional<String> getUsername()
@@ -73,7 +73,7 @@ public final class HiveIdentity
             return false;
         }
 
-        HiveIdentity other = (HiveIdentity) o;
+        MetastoreContext other = (MetastoreContext) o;
         return Objects.equals(username, other.username);
     }
 

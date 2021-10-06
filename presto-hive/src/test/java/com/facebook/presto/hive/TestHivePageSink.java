@@ -20,7 +20,7 @@ import com.facebook.presto.common.PageBuilder;
 import com.facebook.presto.common.block.BlockBuilder;
 import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.common.type.Type;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.HivePageSinkMetadata;
@@ -286,14 +286,14 @@ public class TestHivePageSink
     private static ConnectorPageSink createPageSink(HiveTransactionHandle transaction, HiveClientConfig config, MetastoreClientConfig metastoreClientConfig, ExtendedHiveMetastore metastore, Path outputPath, HiveWriterStats stats)
     {
         ConnectorSession session = getSession(config);
-        HiveIdentity hiveIdentity = new HiveIdentity(session);
+        MetastoreContext metastoreContext = new MetastoreContext(session);
         LocationHandle locationHandle = new LocationHandle(outputPath, outputPath, Optional.empty(), NEW, DIRECT_TO_TARGET_NEW_DIRECTORY);
         HiveOutputTableHandle handle = new HiveOutputTableHandle(
                 SCHEMA_NAME,
                 TABLE_NAME,
                 getColumnHandles(),
                 "test",
-                new HivePageSinkMetadata(new SchemaTableName(SCHEMA_NAME, TABLE_NAME), metastore.getTable(hiveIdentity, SCHEMA_NAME, TABLE_NAME), ImmutableMap.of()),
+                new HivePageSinkMetadata(new SchemaTableName(SCHEMA_NAME, TABLE_NAME), metastore.getTable(metastoreContext, SCHEMA_NAME, TABLE_NAME), ImmutableMap.of()),
                 locationHandle,
                 config.getHiveStorageFormat(),
                 config.getHiveStorageFormat(),

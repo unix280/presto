@@ -22,7 +22,7 @@ import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.HiveStorageFormat;
 import com.facebook.presto.hive.MetastoreClientConfig;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.spi.security.ConnectorIdentity;
@@ -129,7 +129,7 @@ public class TestHiveClientGlueMetastoreWithImpersonation
     {
         try {
             createDummyPartitionedTable(tablePartitionFormat, CREATE_TABLE_COLUMNS_PARTITIONED);
-            Optional<List<String>> partitionNames = getMetastoreClient().getPartitionNames(getHiveIdentity(ADMIN), tablePartitionFormat.getSchemaName(), tablePartitionFormat.getTableName());
+            Optional<List<String>> partitionNames = getMetastoreClient().getPartitionNames(getMetastoreContext(ADMIN), tablePartitionFormat.getSchemaName(), tablePartitionFormat.getTableName());
             assertTrue(partitionNames.isPresent());
             assertEquals(partitionNames.get(), ImmutableList.of("ds=2016-01-01", "ds=2016-01-02"));
         }
@@ -145,7 +145,7 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         GlueMetastoreStats stats = metastore.getStats();
         double initialCallCount = stats.getGetDatabases().getTime().getAllTime().getCount();
         long initialFailureCount = stats.getGetDatabases().getTotalFailures().getTotalCount();
-        getMetastoreClient().getAllDatabases(getHiveIdentity(ANALYST));
+        getMetastoreClient().getAllDatabases(getMetastoreContext(ANALYST));
         assertEquals(stats.getGetDatabases().getTime().getAllTime().getCount(), initialCallCount + 1.0);
         assertTrue(stats.getGetDatabases().getTime().getAllTime().getAvg() > 0.0);
         assertEquals(stats.getGetDatabases().getTotalFailures().getTotalCount(), initialFailureCount);
@@ -157,15 +157,15 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         GlueHiveMetastore metastore = (GlueHiveMetastore) getMetastoreClient();
         GlueMetastoreStats stats = metastore.getStats();
         long initialFailureCount = stats.getGetDatabase().getTotalFailures().getTotalCount();
-        assertThrows(() -> getMetastoreClient().getDatabase(getHiveIdentity(ADMIN), null));
+        assertThrows(() -> getMetastoreClient().getDatabase(getMetastoreContext(ADMIN), null));
         assertEquals(stats.getGetDatabase().getTotalFailures().getTotalCount(), initialFailureCount + 1);
     }
 
-    private HiveIdentity getHiveIdentity(String user)
+    private MetastoreContext getMetastoreContext(String user)
     {
         ConnectorIdentity connectorIdentity = new ConnectorIdentity(
                 user, Optional.empty(), Optional.empty(), emptyMap(), emptyMap());
 
-        return new HiveIdentity(connectorIdentity);
+        return new MetastoreContext(connectorIdentity);
     }
 }

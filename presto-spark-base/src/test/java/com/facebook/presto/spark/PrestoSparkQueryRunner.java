@@ -27,7 +27,7 @@ import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.TestingHivePlugin;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
@@ -150,9 +150,9 @@ public class PrestoSparkQueryRunner
     {
         PrestoSparkQueryRunner queryRunner = new PrestoSparkQueryRunner("hive");
         ExtendedHiveMetastore metastore = queryRunner.getMetastore();
-        HiveIdentity hiveIdentity = new HiveIdentity(SESSION);
-        if (!metastore.getDatabase(hiveIdentity, "tpch").isPresent()) {
-            metastore.createDatabase(hiveIdentity, createDatabaseMetastoreObject("tpch"));
+        MetastoreContext metastoreContext = new MetastoreContext(SESSION);
+        if (!metastore.getDatabase(metastoreContext, "tpch").isPresent()) {
+            metastore.createDatabase(metastoreContext, createDatabaseMetastoreObject("tpch"));
             copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, queryRunner.getDefaultSession(), tables);
             copyTpchTablesBucketed(queryRunner, "tpch", TINY_SCHEMA_NAME, queryRunner.getDefaultSession(), tables);
         }
@@ -255,8 +255,8 @@ public class PrestoSparkQueryRunner
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
 
         this.metastore = new FileHiveMetastore(hdfsEnvironment, baseDir.toURI().toString(), "test");
-        HiveIdentity hiveIdentity = new HiveIdentity(SESSION);
-        metastore.createDatabase(hiveIdentity, createDatabaseMetastoreObject("hive_test"));
+        MetastoreContext metastoreContext = new MetastoreContext(SESSION);
+        metastore.createDatabase(metastoreContext, createDatabaseMetastoreObject("hive_test"));
         Plugin hiveplugin = new TestingHivePlugin(metastore);
         pluginManager.installPlugin(hiveplugin, hiveplugin.getClass()::getClassLoader);
 

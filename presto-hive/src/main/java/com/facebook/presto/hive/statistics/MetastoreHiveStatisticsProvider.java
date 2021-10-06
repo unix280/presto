@@ -22,7 +22,7 @@ import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveBasicStatistics;
 import com.facebook.presto.hive.HiveColumnHandle;
 import com.facebook.presto.hive.HivePartition;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.DateStatistics;
 import com.facebook.presto.hive.metastore.DecimalStatistics;
 import com.facebook.presto.hive.metastore.DoubleStatistics;
@@ -111,19 +111,19 @@ public class MetastoreHiveStatisticsProvider
 
     private static Map<String, PartitionStatistics> getPartitionsStatistics(ConnectorSession session, SemiTransactionalHiveMetastore metastore, SchemaTableName table, List<HivePartition> hivePartitions)
     {
-        HiveIdentity hiveIdentity = new HiveIdentity(session);
+        MetastoreContext metastoreContext = new MetastoreContext(session);
         if (hivePartitions.isEmpty()) {
             return ImmutableMap.of();
         }
         boolean unpartitioned = hivePartitions.stream().anyMatch(partition -> partition.getPartitionId().equals(UNPARTITIONED_ID));
         if (unpartitioned) {
             checkArgument(hivePartitions.size() == 1, "expected only one hive partition");
-            return ImmutableMap.of(UNPARTITIONED_ID, metastore.getTableStatistics(hiveIdentity, table.getSchemaName(), table.getTableName()));
+            return ImmutableMap.of(UNPARTITIONED_ID, metastore.getTableStatistics(metastoreContext, table.getSchemaName(), table.getTableName()));
         }
         Set<String> partitionNames = hivePartitions.stream()
                 .map(HivePartition::getPartitionId)
                 .collect(toImmutableSet());
-        return metastore.getPartitionStatistics(hiveIdentity, table.getSchemaName(), table.getTableName(), partitionNames);
+        return metastore.getPartitionStatistics(metastoreContext, table.getSchemaName(), table.getTableName(), partitionNames);
     }
 
     @Override

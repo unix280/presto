@@ -27,7 +27,7 @@ import com.amazonaws.services.glue.model.GetUnfilteredTableRequest;
 import com.amazonaws.services.glue.model.GetUnfilteredTableResult;
 import com.amazonaws.services.securitytoken.model.Tag;
 import com.facebook.airlift.log.Logger;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.MetastoreConfig;
 import com.facebook.presto.hive.metastore.glue.GlueHiveMetastoreConfig;
 import com.facebook.presto.hive.metastore.glue.GlueMetastoreStats;
@@ -470,9 +470,9 @@ public class LakeFormationAccessControl
                 .build();
     }
 
-    private String getGlueIamRole(HiveIdentity hiveIdentity)
+    private String getGlueIamRole(MetastoreContext metastoreContext)
     {
-        GlueSecurityMapping mapping = mappings.get().getMapping(hiveIdentity)
+        GlueSecurityMapping mapping = mappings.get().getMapping(metastoreContext)
                 .orElseThrow(() -> new AccessDeniedException("No matching Glue Security Mapping or Glue Security Mapping has no role"));
 
         return mapping.getIamRole();
@@ -513,7 +513,7 @@ public class LakeFormationAccessControl
         LFPolicyCacheKey lfPolicyCacheKey;
 
         if (impersonationEnabled) {
-            String iamRole = getGlueIamRole(new HiveIdentity(identity));
+            String iamRole = getGlueIamRole(new MetastoreContext(identity));
             lfPolicyCacheKey = new LFPolicyCacheKey(tableName, iamRole);
         }
         else {

@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.glue;
 
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import org.testng.annotations.Test;
 
@@ -38,11 +38,11 @@ public class TestGlueSecurityMappings
         GlueSecurityMappings mappings = parseJson(new File(glueSecurityMappingConfigPath).toPath(), GlueSecurityMappings.class);
 
         assertEquals(MappingResult.role("arn:aws:iam::123456789101:role/admin_role").getIamRole(),
-                mappings.getMapping(empty().withUser("admin").getHiveIdentity()).get().getIamRole());
+                mappings.getMapping(empty().withUser("admin").getMetastoreContext()).get().getIamRole());
         assertEquals(MappingResult.role("arn:aws:iam::123456789101:role/analyst_role").getIamRole(),
-                mappings.getMapping(empty().withUser("analyst").getHiveIdentity()).get().getIamRole());
+                mappings.getMapping(empty().withUser("analyst").getMetastoreContext()).get().getIamRole());
         assertEquals(MappingResult.role("arn:aws:iam::123456789101:role/default_role").getIamRole(),
-                mappings.getMapping(empty().getHiveIdentity()).get().getIamRole());
+                mappings.getMapping(empty().getMetastoreContext()).get().getIamRole());
     }
 
     public static class MappingSelector
@@ -64,9 +64,9 @@ public class TestGlueSecurityMappings
             return new MappingSelector(user);
         }
 
-        public HiveIdentity getHiveIdentity()
+        public MetastoreContext getMetastoreContext()
         {
-            return new HiveIdentity(new ConnectorIdentity(
+            return new MetastoreContext(new ConnectorIdentity(
                     user, Optional.empty(), Optional.empty(), Collections.emptyMap(), Collections.emptyMap()));
         }
     }

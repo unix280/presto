@@ -29,7 +29,7 @@ import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.VarbinaryType;
 import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.hive.RecordFileWriter.ExtendedRecordWriter;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.PrestoTableType;
@@ -372,7 +372,7 @@ public final class HiveWriteUtils
 
     private static Database getDatabase(SemiTransactionalHiveMetastore metastore, ConnectorSession session, String database)
     {
-        return metastore.getDatabase(new HiveIdentity(session), database).orElseThrow(() -> new SchemaNotFoundException(database));
+        return metastore.getDatabase(new MetastoreContext(session), database).orElseThrow(() -> new SchemaNotFoundException(database));
     }
 
     public static boolean isS3FileSystem(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path)

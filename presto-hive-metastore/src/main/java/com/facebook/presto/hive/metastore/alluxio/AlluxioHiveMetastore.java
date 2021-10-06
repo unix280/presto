@@ -22,7 +22,7 @@ import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveBasicStatistics;
 import com.facebook.presto.hive.HiveType;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
@@ -77,7 +77,7 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Optional<Database> getDatabase(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<Database> getDatabase(MetastoreContext metastoreContext, String databaseName)
     {
         try {
             return Optional.of(AlluxioProtoUtils.fromProto(client.getDatabase(databaseName)));
@@ -88,7 +88,7 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public List<String> getAllDatabases(HiveIdentity hiveIdentity)
+    public List<String> getAllDatabases(MetastoreContext metastoreContext)
     {
         try {
             return client.getAllDatabases();
@@ -99,7 +99,7 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Optional<Table> getTable(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         try {
             return Optional.of(AlluxioProtoUtils.fromProto(client.getTable(databaseName, tableName)));
@@ -125,10 +125,10 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public PartitionStatistics getTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public PartitionStatistics getTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         try {
-            Table table = getTable(hiveIdentity, databaseName, tableName).orElseThrow(
+            Table table = getTable(metastoreContext, databaseName, tableName).orElseThrow(
                     () -> new PrestoException(HIVE_METASTORE_ERROR, String.format("Could not retrieve table %s.%s", databaseName, tableName)));
             HiveBasicStatistics basicStatistics = getHiveBasicStatistics(table.getParameters());
             List<Column> columns = table.getPartitionColumns();
@@ -142,11 +142,11 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Set<String> partitionNames)
+    public Map<String, PartitionStatistics> getPartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Set<String> partitionNames)
     {
-        Table table = getTable(hiveIdentity, databaseName, tableName).orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
+        Table table = getTable(metastoreContext, databaseName, tableName).orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
 
-        Map<String, HiveBasicStatistics> partitionBasicStatistics = getPartitionsByNames(hiveIdentity, databaseName, tableName, ImmutableList.copyOf(partitionNames)).entrySet().stream()
+        Map<String, HiveBasicStatistics> partitionBasicStatistics = getPartitionsByNames(metastoreContext, databaseName, tableName, ImmutableList.copyOf(partitionNames)).entrySet().stream()
                 .filter(entry -> entry.getValue().isPresent())
                 .collect(toImmutableMap(
                         entry -> MetastoreUtil.makePartName(table.getPartitionColumns(), entry.getValue().get().getValues()),
@@ -186,19 +186,19 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public void updateTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updateTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
     {
         throw new UnsupportedOperationException("updateTableStatistics is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void updatePartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
     {
         throw new UnsupportedOperationException("updatePartitionStatistics is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public Optional<List<String>> getAllTables(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<List<String>> getAllTables(MetastoreContext metastoreContext, String databaseName)
     {
         try {
             return Optional.of(client.getAllTables(databaseName));
@@ -209,80 +209,80 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getAllViews(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {
         // TODO: Add views on the server side
         return Optional.of(Collections.emptyList());
     }
 
     @Override
-    public void createDatabase(HiveIdentity hiveIdentity, Database database)
+    public void createDatabase(MetastoreContext metastoreContext, Database database)
     {
         throw new UnsupportedOperationException("createDatabase is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void dropDatabase(HiveIdentity hiveIdentity, String databaseName)
+    public void dropDatabase(MetastoreContext metastoreContext, String databaseName)
     {
         throw new UnsupportedOperationException("dropDatabase is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void renameDatabase(HiveIdentity hiveIdentity, String databaseName, String newDatabaseName)
+    public void renameDatabase(MetastoreContext metastoreContext, String databaseName, String newDatabaseName)
     {
         throw new UnsupportedOperationException("renameDatabase is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void createTable(HiveIdentity hiveIdentity, Table table, PrincipalPrivileges principalPrivileges)
+    public void createTable(MetastoreContext metastoreContext, Table table, PrincipalPrivileges principalPrivileges)
     {
         throw new UnsupportedOperationException("createTable is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void dropTable(HiveIdentity hiveIdentity, String databaseName, String tableName, boolean deleteData)
+    public void dropTable(MetastoreContext metastoreContext, String databaseName, String tableName, boolean deleteData)
     {
         throw new UnsupportedOperationException("dropTable is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void replaceTable(HiveIdentity hiveIdentity, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
+    public void replaceTable(MetastoreContext metastoreContext, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
     {
         throw new UnsupportedOperationException("replaceTable is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void renameTable(HiveIdentity hiveIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName)
+    public void renameTable(MetastoreContext metastoreContext, String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
         throw new UnsupportedOperationException("renameTable is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void addColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
+    public void addColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
     {
         throw new UnsupportedOperationException("addColumn is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void renameColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String oldColumnName, String newColumnName)
+    public void renameColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String oldColumnName, String newColumnName)
     {
         throw new UnsupportedOperationException("renameColumn is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void dropColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName)
+    public void dropColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName)
     {
         throw new UnsupportedOperationException("dropColumn is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public Optional<Partition> getPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionValues)
+    public Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues)
     {
         throw new UnsupportedOperationException("getPartition is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         try {
             List<PartitionInfo> partitionInfos = AlluxioProtoUtils.toPartitionInfoList(client.readTable(databaseName, tableName, Constraint.getDefaultInstance()));
@@ -294,7 +294,7 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public List<String> getPartitionNamesByFilter(HiveIdentity hiveIdentity, String databaseName, String tableName, Map<Column, Domain> partitionPredicates)
+    public List<String> getPartitionNamesByFilter(MetastoreContext metastoreContext, String databaseName, String tableName, Map<Column, Domain> partitionPredicates)
     {
         List<String> parts = convertPredicateToParts(partitionPredicates);
         return getPartitionNamesByParts(databaseName, tableName, parts).orElse(ImmutableList.of());
@@ -302,7 +302,7 @@ public class AlluxioHiveMetastore
 
     @Override
     public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(
-            HiveIdentity hiveIdentity, String databaseName,
+            MetastoreContext metastoreContext, String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
@@ -349,7 +349,7 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames)
+    public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
     {
         if (partitionNames.isEmpty()) {
             return ImmutableMap.of();
@@ -371,19 +371,19 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public void addPartitions(HiveIdentity hiveIdentity, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
+    public void addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
     {
         throw new UnsupportedOperationException("addPartitions is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void dropPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> parts, boolean deleteData)
+    public void dropPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> parts, boolean deleteData)
     {
         throw new UnsupportedOperationException("dropPartition is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public void alterPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, PartitionWithStatistics partition)
+    public void alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partition)
     {
         throw new UnsupportedOperationException("alterPartition is not supported in AlluxioHiveMetastore");
     }

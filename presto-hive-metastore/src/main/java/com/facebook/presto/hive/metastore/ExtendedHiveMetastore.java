@@ -16,7 +16,7 @@ package com.facebook.presto.hive.metastore;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveType;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
@@ -29,74 +29,74 @@ import java.util.function.Function;
 
 public interface ExtendedHiveMetastore
 {
-    Optional<Database> getDatabase(HiveIdentity hiveIdentity, String databaseName);
+    Optional<Database> getDatabase(MetastoreContext metastoreContext, String databaseName);
 
-    List<String> getAllDatabases(HiveIdentity hiveIdentity);
+    List<String> getAllDatabases(MetastoreContext metastoreContext);
 
-    Optional<Table> getTable(HiveIdentity hiveIdentity, String databaseName, String tableName);
+    Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName);
 
     Set<ColumnStatisticType> getSupportedColumnStatistics(Type type);
 
-    PartitionStatistics getTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName);
+    PartitionStatistics getTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName);
 
-    Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Set<String> partitionNames);
+    Map<String, PartitionStatistics> getPartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Set<String> partitionNames);
 
-    void updateTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update);
+    void updateTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update);
 
-    void updatePartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update);
+    void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update);
 
-    Optional<List<String>> getAllTables(HiveIdentity hiveIdentity, String databaseName);
+    Optional<List<String>> getAllTables(MetastoreContext metastoreContext, String databaseName);
 
-    Optional<List<String>> getAllViews(HiveIdentity hiveIdentity, String databaseName);
+    Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName);
 
-    void createDatabase(HiveIdentity hiveIdentity, Database database);
+    void createDatabase(MetastoreContext metastoreContext, Database database);
 
-    void dropDatabase(HiveIdentity hiveIdentity, String databaseName);
+    void dropDatabase(MetastoreContext metastoreContext, String databaseName);
 
-    void renameDatabase(HiveIdentity hiveIdentity, String databaseName, String newDatabaseName);
+    void renameDatabase(MetastoreContext metastoreContext, String databaseName, String newDatabaseName);
 
-    void createTable(HiveIdentity hiveIdentity, Table table, PrincipalPrivileges principalPrivileges);
+    void createTable(MetastoreContext metastoreContext, Table table, PrincipalPrivileges principalPrivileges);
 
-    void dropTable(HiveIdentity hiveIdentity, String databaseName, String tableName, boolean deleteData);
+    void dropTable(MetastoreContext metastoreContext, String databaseName, String tableName, boolean deleteData);
 
     /**
      * This should only be used if the semantic here is drop and add. Trying to
      * alter one field of a table object previously acquired from getTable is
      * probably not what you want.
      */
-    void replaceTable(HiveIdentity hiveIdentity, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges);
+    void replaceTable(MetastoreContext metastoreContext, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges);
 
-    void renameTable(HiveIdentity hiveIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName);
+    void renameTable(MetastoreContext metastoreContext, String databaseName, String tableName, String newDatabaseName, String newTableName);
 
-    void addColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment);
+    void addColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment);
 
-    void renameColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String oldColumnName, String newColumnName);
+    void renameColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String oldColumnName, String newColumnName);
 
-    void dropColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName);
+    void dropColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName);
 
-    Optional<Partition> getPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionValues);
+    Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues);
 
-    Optional<List<String>> getPartitionNames(HiveIdentity hiveIdentity, String databaseName, String tableName);
+    Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName);
 
     List<String> getPartitionNamesByFilter(
-            HiveIdentity hiveIdentity,
+            MetastoreContext metastoreContext,
             String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates);
 
     List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(
-            HiveIdentity hiveIdentity,
+            MetastoreContext metastoreContext,
             String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates);
 
-    Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames);
+    Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames);
 
-    void addPartitions(HiveIdentity hiveIdentity, String databaseName, String tableName, List<PartitionWithStatistics> partitions);
+    void addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitions);
 
-    void dropPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> parts, boolean deleteData);
+    void dropPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> parts, boolean deleteData);
 
-    void alterPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, PartitionWithStatistics partition);
+    void alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partition);
 
     void createRole(String role, String grantor);
 

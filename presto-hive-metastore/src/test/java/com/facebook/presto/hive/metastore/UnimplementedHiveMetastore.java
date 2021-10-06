@@ -16,7 +16,7 @@ package com.facebook.presto.hive.metastore;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveType;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
@@ -31,19 +31,19 @@ public class UnimplementedHiveMetastore
         implements ExtendedHiveMetastore
 {
     @Override
-    public Optional<Database> getDatabase(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<Database> getDatabase(MetastoreContext metastoreContext, String databaseName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public List<String> getAllDatabases(HiveIdentity hiveIdentity)
+    public List<String> getAllDatabases(MetastoreContext metastoreContext)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Optional<Table> getTable(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         throw new UnsupportedOperationException();
     }
@@ -55,116 +55,116 @@ public class UnimplementedHiveMetastore
     }
 
     @Override
-    public PartitionStatistics getTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public PartitionStatistics getTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Set<String> partitionNames)
+    public Map<String, PartitionStatistics> getPartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Set<String> partitionNames)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updateTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updateTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updatePartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Optional<List<String>> getAllTables(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<List<String>> getAllTables(MetastoreContext metastoreContext, String databaseName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Optional<List<String>> getAllViews(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void createDatabase(HiveIdentity hiveIdentity, Database database)
+    public void createDatabase(MetastoreContext metastoreContext, Database database)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void dropDatabase(HiveIdentity hiveIdentity, String databaseName)
+    public void dropDatabase(MetastoreContext metastoreContext, String databaseName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void renameDatabase(HiveIdentity hiveIdentity, String databaseName, String newDatabaseName)
+    public void renameDatabase(MetastoreContext metastoreContext, String databaseName, String newDatabaseName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void createTable(HiveIdentity hiveIdentity, Table table, PrincipalPrivileges principalPrivileges)
+    public void createTable(MetastoreContext metastoreContext, Table table, PrincipalPrivileges principalPrivileges)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void dropTable(HiveIdentity hiveIdentity, String databaseName, String tableName, boolean deleteData)
+    public void dropTable(MetastoreContext metastoreContext, String databaseName, String tableName, boolean deleteData)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void replaceTable(HiveIdentity hiveIdentity, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
+    public void replaceTable(MetastoreContext metastoreContext, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void renameTable(HiveIdentity hiveIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName)
+    public void renameTable(MetastoreContext metastoreContext, String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void addColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
+    public void addColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void renameColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String oldColumnName, String newColumnName)
+    public void renameColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String oldColumnName, String newColumnName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void dropColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName)
+    public void dropColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Optional<Partition> getPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionValues)
+    public Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
     public List<String> getPartitionNamesByFilter(
-            HiveIdentity hiveIdentity, String databaseName,
+            MetastoreContext metastoreContext, String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
@@ -173,7 +173,7 @@ public class UnimplementedHiveMetastore
 
     @Override
     public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(
-            HiveIdentity hiveIdentity, String databaseName,
+            MetastoreContext metastoreContext, String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
@@ -181,25 +181,25 @@ public class UnimplementedHiveMetastore
     }
 
     @Override
-    public Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames)
+    public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void addPartitions(HiveIdentity hiveIdentity, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
+    public void addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void dropPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> parts, boolean deleteData)
+    public void dropPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> parts, boolean deleteData)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void alterPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, PartitionWithStatistics partition)
+    public void alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partition)
     {
         throw new UnsupportedOperationException();
     }

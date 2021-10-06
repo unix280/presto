@@ -65,7 +65,7 @@ import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.PartitionNotFoundException;
 import com.facebook.presto.hive.SchemaAlreadyExistsException;
 import com.facebook.presto.hive.TableAlreadyExistsException;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
@@ -239,13 +239,13 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<Database> getDatabase(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<Database> getDatabase(MetastoreContext metastoreContext, String databaseName)
     {
         return stats.getGetDatabase().record(() -> {
             try {
                 GetDatabaseResult result;
                 if (impersonationEnabled) {
-                    AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                    AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                     result = glueClient.getDatabase(new GetDatabaseRequest()
                             .withCatalogId(catalogId)
@@ -267,13 +267,13 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public List<String> getAllDatabases(HiveIdentity hiveIdentity)
+    public List<String> getAllDatabases(MetastoreContext metastoreContext)
     {
         try {
             GetDatabasesRequest request;
             List<String> databaseNames = new ArrayList<>();
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new GetDatabasesRequest().withCatalogId(catalogId).withRequestCredentialsProvider(credentialsProvider);
             }
@@ -295,23 +295,23 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<Table> getTable(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        return getGlueTable(hiveIdentity, databaseName, tableName).map(table -> GlueToPrestoConverter.convertTable(table, databaseName));
+        return getGlueTable(metastoreContext, databaseName, tableName).map(table -> GlueToPrestoConverter.convertTable(table, databaseName));
     }
 
-    private com.amazonaws.services.glue.model.Table getGlueTableOrElseThrow(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    private com.amazonaws.services.glue.model.Table getGlueTableOrElseThrow(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        return getGlueTable(hiveIdentity, databaseName, tableName)
+        return getGlueTable(metastoreContext, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
     }
 
-    private Optional<com.amazonaws.services.glue.model.Table> getGlueTable(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    private Optional<com.amazonaws.services.glue.model.Table> getGlueTable(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         return stats.getGetTable().record(() -> {
             try {
                 if (impersonationEnabled) {
-                    AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                    AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                     GetTableResult getTableResult;
                     getTableResult = glueClient.getTable(new GetTableRequest()
@@ -347,25 +347,25 @@ public class GlueHiveMetastore
         return columnStatisticsProvider.getSupportedColumnStatistics(type);
     }
 
-    private Table getTableOrElseThrow(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    private Table getTableOrElseThrow(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        return getTable(hiveIdentity, databaseName, tableName)
+        return getTable(metastoreContext, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
     }
 
     @Override
-    public PartitionStatistics getTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public PartitionStatistics getTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        Table table = getTable(hiveIdentity, databaseName, tableName)
+        Table table = getTable(metastoreContext, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
         return new PartitionStatistics(getHiveBasicStatistics(table.getParameters()), columnStatisticsProvider.getTableColumnStatistics(table));
     }
 
     @Override
-    public Map<String, PartitionStatistics> getPartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Set<String> partitionNames)
+    public Map<String, PartitionStatistics> getPartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Set<String> partitionNames)
     {
         ImmutableMap.Builder<String, PartitionStatistics> result = ImmutableMap.builder();
-        getPartitionsByNames(hiveIdentity, databaseName, tableName, ImmutableList.copyOf(partitionNames)).forEach((partitionName, optionalPartition) -> {
+        getPartitionsByNames(metastoreContext, databaseName, tableName, ImmutableList.copyOf(partitionNames)).forEach((partitionName, optionalPartition) -> {
             Partition partition = optionalPartition.orElseThrow(() ->
                     new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), toPartitionValues(partitionName)));
             PartitionStatistics partitionStatistics = new PartitionStatistics(getHiveBasicStatistics(partition.getParameters()), columnStatisticsProvider.getPartitionColumnStatistics(partition));
@@ -375,19 +375,19 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void updateTableStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updateTableStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
     {
-        PartitionStatistics currentStatistics = getTableStatistics(hiveIdentity, databaseName, tableName);
+        PartitionStatistics currentStatistics = getTableStatistics(metastoreContext, databaseName, tableName);
         PartitionStatistics updatedStatistics = update.apply(currentStatistics);
 
-        Table table = getTableOrElseThrow(hiveIdentity, databaseName, tableName);
+        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
 
         try {
             TableInput tableInput = GlueInputConverter.convertTable(table);
             tableInput.setParameters(updateStatisticsParameters(table.getParameters(), updatedStatistics.getBasicStatistics()));
             UpdateTableRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new UpdateTableRequest()
                         .withCatalogId(catalogId)
@@ -413,16 +413,16 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void updatePartitionStatistics(HiveIdentity hiveIdentity, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
     {
-        PartitionStatistics currentStatistics = getPartitionStatistics(hiveIdentity, databaseName, tableName, ImmutableSet.of(partitionName)).get(partitionName);
+        PartitionStatistics currentStatistics = getPartitionStatistics(metastoreContext, databaseName, tableName, ImmutableSet.of(partitionName)).get(partitionName);
         if (currentStatistics == null) {
             throw new PrestoException(HIVE_PARTITION_DROPPED_DURING_QUERY, "Statistics result does not contain entry for partition: " + partitionName);
         }
         PartitionStatistics updatedStatistics = update.apply(currentStatistics);
 
         List<String> partitionValues = toPartitionValues(partitionName);
-        Partition partition = getPartition(hiveIdentity, databaseName, tableName, partitionValues)
+        Partition partition = getPartition(metastoreContext, databaseName, tableName, partitionValues)
                 .orElseThrow(() -> new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), partitionValues));
         try {
             PartitionInput partitionInput = GlueInputConverter.convertPartition(partition);
@@ -430,7 +430,7 @@ public class GlueHiveMetastore
 
             UpdatePartitionRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new UpdatePartitionRequest()
                         .withCatalogId(catalogId)
@@ -461,14 +461,14 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getAllTables(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<List<String>> getAllTables(MetastoreContext metastoreContext, String databaseName)
     {
         try {
             List<String> tableNames = new ArrayList<>();
 
             GetTablesRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new GetTablesRequest()
                         .withCatalogId(catalogId)
@@ -498,14 +498,14 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getAllViews(HiveIdentity hiveIdentity, String databaseName)
+    public Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {
         try {
             List<String> views = new ArrayList<>();
 
             GetTablesRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new GetTablesRequest()
                         .withCatalogId(catalogId)
@@ -537,7 +537,7 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void createDatabase(HiveIdentity hiveIdentity, Database database)
+    public void createDatabase(MetastoreContext metastoreContext, Database database)
     {
         if (!database.getLocation().isPresent() && defaultDir.isPresent()) {
             String databaseLocation = new Path(defaultDir.get(), database.getDatabaseName()).toString();
@@ -551,7 +551,7 @@ public class GlueHiveMetastore
 
             CreateDatabaseRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new CreateDatabaseRequest()
                         .withCatalogId(catalogId)
@@ -576,12 +576,12 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void dropDatabase(HiveIdentity hiveIdentity, String databaseName)
+    public void dropDatabase(MetastoreContext metastoreContext, String databaseName)
     {
         try {
             DeleteDatabaseRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new DeleteDatabaseRequest()
                         .withCatalogId(catalogId)
@@ -603,15 +603,15 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void renameDatabase(HiveIdentity hiveIdentity, String databaseName, String newDatabaseName)
+    public void renameDatabase(MetastoreContext metastoreContext, String databaseName, String newDatabaseName)
     {
         try {
-            Database database = getDatabase(hiveIdentity, databaseName).orElseThrow(() -> new SchemaNotFoundException(databaseName));
+            Database database = getDatabase(metastoreContext, databaseName).orElseThrow(() -> new SchemaNotFoundException(databaseName));
             DatabaseInput renamedDatabase = GlueInputConverter.convertDatabase(database).withName(newDatabaseName);
 
             UpdateDatabaseRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new UpdateDatabaseRequest()
                         .withCatalogId(catalogId)
@@ -634,14 +634,14 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void createTable(HiveIdentity hiveIdentity, Table table, PrincipalPrivileges principalPrivileges)
+    public void createTable(MetastoreContext metastoreContext, Table table, PrincipalPrivileges principalPrivileges)
     {
         try {
             TableInput input = GlueInputConverter.convertTable(table);
 
             CreateTableRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new CreateTableRequest()
                         .withCatalogId(catalogId)
@@ -670,14 +670,14 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void dropTable(HiveIdentity hiveIdentity, String databaseName, String tableName, boolean deleteData)
+    public void dropTable(MetastoreContext metastoreContext, String databaseName, String tableName, boolean deleteData)
     {
-        Table table = getTableOrElseThrow(hiveIdentity, databaseName, tableName);
+        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
 
         try {
             DeleteTableRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new DeleteTableRequest()
                         .withCatalogId(catalogId)
@@ -721,14 +721,14 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void replaceTable(HiveIdentity hiveIdentity, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
+    public void replaceTable(MetastoreContext metastoreContext, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
     {
         try {
             TableInput newTableInput = GlueInputConverter.convertTable(newTable);
 
             UpdateTableRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new UpdateTableRequest()
                         .withCatalogId(catalogId)
@@ -754,26 +754,26 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void renameTable(HiveIdentity hiveIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName)
+    public void renameTable(MetastoreContext metastoreContext, String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
         throw new PrestoException(NOT_SUPPORTED, "Table rename is not yet supported by Glue service");
     }
 
     @Override
-    public void addColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
+    public void addColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
     {
-        com.amazonaws.services.glue.model.Table table = getGlueTableOrElseThrow(hiveIdentity, databaseName, tableName);
+        com.amazonaws.services.glue.model.Table table = getGlueTableOrElseThrow(metastoreContext, databaseName, tableName);
         ImmutableList.Builder<com.amazonaws.services.glue.model.Column> newDataColumns = ImmutableList.builder();
         newDataColumns.addAll(table.getStorageDescriptor().getColumns());
         newDataColumns.add(convertColumn(new Column(columnName, columnType, Optional.ofNullable(columnComment))));
         table.getStorageDescriptor().setColumns(newDataColumns.build());
-        replaceGlueTable(hiveIdentity, databaseName, tableName, table);
+        replaceGlueTable(metastoreContext, databaseName, tableName, table);
     }
 
     @Override
-    public void renameColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String oldColumnName, String newColumnName)
+    public void renameColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String oldColumnName, String newColumnName)
     {
-        com.amazonaws.services.glue.model.Table table = getGlueTableOrElseThrow(hiveIdentity, databaseName, tableName);
+        com.amazonaws.services.glue.model.Table table = getGlueTableOrElseThrow(metastoreContext, databaseName, tableName);
         if (table.getPartitionKeys() != null && table.getPartitionKeys().stream().anyMatch(c -> c.getName().equals(oldColumnName))) {
             throw new PrestoException(NOT_SUPPORTED, "Renaming partition columns is not supported");
         }
@@ -790,14 +790,14 @@ public class GlueHiveMetastore
             }
         }
         table.getStorageDescriptor().setColumns(newDataColumns.build());
-        replaceGlueTable(hiveIdentity, databaseName, tableName, table);
+        replaceGlueTable(metastoreContext, databaseName, tableName, table);
     }
 
     @Override
-    public void dropColumn(HiveIdentity hiveIdentity, String databaseName, String tableName, String columnName)
+    public void dropColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName)
     {
-        verifyCanDropColumn(this, hiveIdentity, databaseName, tableName, columnName);
-        com.amazonaws.services.glue.model.Table table = getGlueTableOrElseThrow(hiveIdentity, databaseName, tableName);
+        verifyCanDropColumn(this, metastoreContext, databaseName, tableName, columnName);
+        com.amazonaws.services.glue.model.Table table = getGlueTableOrElseThrow(metastoreContext, databaseName, tableName);
 
         ImmutableList.Builder<com.amazonaws.services.glue.model.Column> newDataColumns = ImmutableList.builder();
         boolean found = false;
@@ -816,15 +816,15 @@ public class GlueHiveMetastore
         }
 
         table.getStorageDescriptor().setColumns(newDataColumns.build());
-        replaceGlueTable(hiveIdentity, databaseName, tableName, table);
+        replaceGlueTable(metastoreContext, databaseName, tableName, table);
     }
 
-    private void replaceGlueTable(HiveIdentity hiveIdentity, String databaseName, String tableName, com.amazonaws.services.glue.model.Table newTable)
+    private void replaceGlueTable(MetastoreContext metastoreContext, String databaseName, String tableName, com.amazonaws.services.glue.model.Table newTable)
     {
         try {
             UpdateTableRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new UpdateTableRequest()
                         .withCatalogId(catalogId)
@@ -850,11 +850,11 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<Partition> getPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionValues)
+    public Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues)
     {
         GetPartitionRequest request;
         if (impersonationEnabled) {
-            AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+            AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
             request = new GetPartitionRequest()
                     .withCatalogId(catalogId)
@@ -886,10 +886,10 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(HiveIdentity hiveIdentity, String databaseName, String tableName)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        Table table = getTableOrElseThrow(hiveIdentity, databaseName, tableName);
-        List<Partition> partitions = getPartitions(hiveIdentity, databaseName, tableName, WILDCARD_EXPRESSION);
+        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
+        List<Partition> partitions = getPartitions(metastoreContext, databaseName, tableName, WILDCARD_EXPRESSION);
         return Optional.of(buildPartitionNames(table.getPartitionColumns(), partitions));
     }
 
@@ -902,27 +902,27 @@ public class GlueHiveMetastore
      * </pre>
      *
      *
-     * @param hiveIdentity
+     * @param metastoreContext
      * @param partitionPredicates Full or partial list of partition values to filter on. Keys without filter will be empty strings.
      * @return a list of partition names.
      */
     @Override
     public List<String> getPartitionNamesByFilter(
-            HiveIdentity hiveIdentity,
+            MetastoreContext metastoreContext,
             String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
     {
-        Table table = getTableOrElseThrow(hiveIdentity, databaseName, tableName);
+        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
         List<String> parts = convertPredicateToParts(partitionPredicates);
         String expression = buildGlueExpression(table.getPartitionColumns(), parts);
-        List<Partition> partitions = getPartitions(hiveIdentity, databaseName, tableName, expression);
+        List<Partition> partitions = getPartitions(metastoreContext, databaseName, tableName, expression);
         return buildPartitionNames(table.getPartitionColumns(), partitions);
     }
 
     @Override
     public List<PartitionNameWithVersion> getPartitionNamesWithVersionByFilter(
-            HiveIdentity hiveIdentity,
+            MetastoreContext metastoreContext,
             String databaseName,
             String tableName,
             Map<Column, Domain> partitionPredicates)
@@ -930,17 +930,17 @@ public class GlueHiveMetastore
         throw new UnsupportedOperationException();
     }
 
-    private List<Partition> getPartitions(HiveIdentity hiveIdentity, String databaseName, String tableName, String expression)
+    private List<Partition> getPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, String expression)
     {
         if (partitionSegments == 1) {
-            return getPartitions(hiveIdentity, databaseName, tableName, expression, null);
+            return getPartitions(metastoreContext, databaseName, tableName, expression, null);
         }
 
         // Do parallel partition fetch.
         CompletionService<List<Partition>> completionService = new ExecutorCompletionService<>(executor);
         for (int i = 0; i < partitionSegments; i++) {
             Segment segment = new Segment().withSegmentNumber(i).withTotalSegments(partitionSegments);
-            completionService.submit(() -> getPartitions(hiveIdentity, databaseName, tableName, expression, segment));
+            completionService.submit(() -> getPartitions(metastoreContext, databaseName, tableName, expression, segment));
         }
 
         List<Partition> partitions = new ArrayList<>();
@@ -961,7 +961,7 @@ public class GlueHiveMetastore
         return partitions;
     }
 
-    private List<Partition> getPartitions(HiveIdentity hiveIdentity, String databaseName, String tableName, String expression, @Nullable Segment segment)
+    private List<Partition> getPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, String expression, @Nullable Segment segment)
     {
         try {
             GluePartitionConverter converter = new GluePartitionConverter(databaseName, tableName);
@@ -969,7 +969,7 @@ public class GlueHiveMetastore
 
             GetPartitionsRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new GetPartitionsRequest()
                         .withCatalogId(catalogId)
@@ -1017,19 +1017,19 @@ public class GlueHiveMetastore
      * </pre>
      *
      *
-     * @param hiveIdentity
+     * @param metastoreContext
      * @param partitionNames List of full partition names
      * @return Mapping of partition name to partition object
      */
     @Override
-    public Map<String, Optional<Partition>> getPartitionsByNames(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames)
+    public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
     {
         requireNonNull(partitionNames, "partitionNames is null");
         if (partitionNames.isEmpty()) {
             return ImmutableMap.of();
         }
 
-        List<Partition> partitions = batchGetPartition(hiveIdentity, databaseName, tableName, partitionNames);
+        List<Partition> partitions = batchGetPartition(metastoreContext, databaseName, tableName, partitionNames);
 
         Map<String, List<String>> partitionNameToPartitionValuesMap = partitionNames.stream()
                 .collect(toMap(identity(), MetastoreUtil::toPartitionValues));
@@ -1044,7 +1044,7 @@ public class GlueHiveMetastore
         return resultBuilder.build();
     }
 
-    private List<Partition> batchGetPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> partitionNames)
+    private List<Partition> batchGetPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
     {
         try {
             List<Future<BatchGetPartitionResult>> batchGetPartitionFutures = new ArrayList<>();
@@ -1052,7 +1052,7 @@ public class GlueHiveMetastore
             BatchGetPartitionRequest request;
             AWSCredentialsProvider credentialsProvider = null;
             if (impersonationEnabled) {
-                credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                credentialsProvider = getAwsCredentialsProvider(metastoreContext);
             }
 
             for (List<String> partitionNamesBatch : Lists.partition(partitionNames, BATCH_GET_PARTITION_MAX_PAGE_SIZE)) {
@@ -1096,7 +1096,7 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void addPartitions(HiveIdentity hiveIdentity, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
+    public void addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitions)
     {
         try {
             List<Future<BatchCreatePartitionResult>> futures = new ArrayList<>();
@@ -1104,7 +1104,7 @@ public class GlueHiveMetastore
             BatchCreatePartitionRequest request;
             AWSCredentialsProvider credentialsProvider = null;
             if (impersonationEnabled) {
-                credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                credentialsProvider = getAwsCredentialsProvider(metastoreContext);
             }
 
             for (List<PartitionWithStatistics> partitionBatch : Lists.partition(partitions, BATCH_CREATE_PARTITION_MAX_PAGE_SIZE)) {
@@ -1160,16 +1160,16 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void dropPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, List<String> parts, boolean deleteData)
+    public void dropPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> parts, boolean deleteData)
     {
-        Table table = getTableOrElseThrow(hiveIdentity, databaseName, tableName);
-        Partition partition = getPartition(hiveIdentity, databaseName, tableName, parts)
+        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
+        Partition partition = getPartition(metastoreContext, databaseName, tableName, parts)
                 .orElseThrow(() -> new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), parts));
 
         try {
             DeletePartitionRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new DeletePartitionRequest()
                         .withCatalogId(catalogId)
@@ -1199,14 +1199,14 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void alterPartition(HiveIdentity hiveIdentity, String databaseName, String tableName, PartitionWithStatistics partition)
+    public void alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partition)
     {
         try {
             PartitionInput newPartition = GlueInputConverter.convertPartition(partition, columnStatisticsProvider);
 
             UpdatePartitionRequest request;
             if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(hiveIdentity);
+                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
 
                 request = new UpdatePartitionRequest()
                         .withCatalogId(catalogId)
@@ -1298,9 +1298,9 @@ public class GlueHiveMetastore
         return impersonationEnabled;
     }
 
-    private AWSCredentialsProvider getAwsCredentialsProvider(HiveIdentity hiveIdentity)
+    private AWSCredentialsProvider getAwsCredentialsProvider(MetastoreContext metastoreContext)
     {
-        String iamRole = getGlueIamRole(hiveIdentity);
+        String iamRole = getGlueIamRole(metastoreContext);
         return awsCredentialsProviderLoadingCache.getUnchecked(iamRole);
     }
 
@@ -1316,9 +1316,9 @@ public class GlueHiveMetastore
                 .build();
     }
 
-    private String getGlueIamRole(HiveIdentity hiveIdentity)
+    private String getGlueIamRole(MetastoreContext metastoreContext)
     {
-        GlueSecurityMapping mapping = mappings.get().getMapping(hiveIdentity)
+        GlueSecurityMapping mapping = mappings.get().getMapping(metastoreContext)
                 .orElseThrow(() -> new AccessDeniedException("No matching Glue Security Mapping or Glue Security Mapping has no role"));
 
         return mapping.getIamRole();

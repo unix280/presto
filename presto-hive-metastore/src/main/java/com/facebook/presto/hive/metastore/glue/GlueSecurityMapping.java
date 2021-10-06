@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.glue;
 
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -44,9 +44,9 @@ public class GlueSecurityMapping
         checkArgument(iamRole.isPresent(), "must provide iam role");
     }
 
-    public boolean matches(HiveIdentity identity)
+    public boolean matches(MetastoreContext metastoreContext)
     {
-        return user.test(identity.getUsername()
+        return user.test(metastoreContext.getUsername()
                 .orElseThrow(() -> new IllegalStateException("End-user name should exist when metastore impersonation is enabled")));
     }
 

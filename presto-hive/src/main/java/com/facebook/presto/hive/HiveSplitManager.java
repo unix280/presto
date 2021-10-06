@@ -23,7 +23,7 @@ import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.common.predicate.ValueSet;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveBucketing.HiveBucketFilter;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.DateStatistics;
 import com.facebook.presto.hive.metastore.DecimalStatistics;
@@ -226,8 +226,8 @@ public class HiveSplitManager
             throw new PrestoException(HIVE_TRANSACTION_NOT_FOUND, format("Transaction not found: %s", transaction));
         }
         SemiTransactionalHiveMetastore metastore = metadata.getMetastore();
-        HiveIdentity hiveIdentity = new HiveIdentity(session);
-        Table table = metastore.getTable(hiveIdentity, tableName.getSchemaName(), tableName.getTableName())
+        MetastoreContext metastoreContext = new MetastoreContext(session);
+        Table table = metastore.getTable(metastoreContext, tableName.getSchemaName(), tableName.getTableName())
                 .orElseThrow(() -> new TableNotFoundException(tableName));
 
         if (!isOfflineDataDebugModeEnabled(session)) {
@@ -522,16 +522,16 @@ public class HiveSplitManager
             Map<String, HiveColumnHandle> predicateColumns,
             Optional<Map<Subfield, Domain>> domains)
     {
-        HiveIdentity hiveIdentity = new HiveIdentity(session);
+        MetastoreContext metastoreContext = new MetastoreContext(session);
         Map<String, Optional<Partition>> partitions = metastore.getPartitionsByNames(
-                hiveIdentity,
+                metastoreContext,
                 tableName.getSchemaName(),
                 tableName.getTableName(),
                 Lists.transform(partitionBatch, HivePartition::getPartitionId));
         Map<String, PartitionStatistics> partitionStatistics = ImmutableMap.of();
         if (domains.isPresent() && isPartitionStatisticsBasedOptimizationEnabled(session)) {
             partitionStatistics = metastore.getPartitionStatistics(
-                    hiveIdentity,
+                    metastoreContext,
                     tableName.getSchemaName(),
                     tableName.getTableName(),
                     partitionBatch.stream()

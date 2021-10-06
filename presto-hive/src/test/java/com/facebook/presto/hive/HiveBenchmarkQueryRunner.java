@@ -15,7 +15,7 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.benchmark.BenchmarkSuite;
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.spi.security.PrincipalType;
@@ -69,9 +69,9 @@ public final class HiveBenchmarkQueryRunner
         // add hive
         File hiveDir = new File(tempDir, "hive_data");
         ExtendedHiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
-        HiveIdentity hiveIdentity = new HiveIdentity(SESSION);
+        MetastoreContext metastoreContext = new MetastoreContext(SESSION);
         metastore.createDatabase(
-                hiveIdentity,
+                metastoreContext,
                 Database.builder()
                         .setDatabaseName("tpch")
                         .setOwnerName("public")

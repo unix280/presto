@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.glue;
 
-import com.facebook.presto.hive.authentication.HiveIdentity;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -33,10 +33,10 @@ public class GlueSecurityMappings
         this.mappings = ImmutableList.copyOf(requireNonNull(mappings, "mappings is null"));
     }
 
-    public Optional<GlueSecurityMapping> getMapping(HiveIdentity identity)
+    public Optional<GlueSecurityMapping> getMapping(MetastoreContext metastoreContext)
     {
         return mappings.stream()
-                .filter(mapping -> (mapping.matches(identity) && !mapping.getIamRole().isEmpty()))
+                .filter(mapping -> (mapping.matches(metastoreContext) && !mapping.getIamRole().isEmpty()))
                 .findFirst();
     }
 }
