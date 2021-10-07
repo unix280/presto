@@ -928,7 +928,7 @@ public class GlueHiveMetastore
             BatchCreatePartitionRequest request;
 
             for (List<PartitionWithStatistics> partitionBatch : Lists.partition(partitions, BATCH_CREATE_PARTITION_MAX_PAGE_SIZE)) {
-                List<PartitionInput> partitionInputs = mappedCopy(partitionBatch, partition -> GlueInputConverter.convertPartition(metastoreContext, partition, columnStatisticsProvider));
+                List<PartitionInput> partitionInputs = mappedCopy(partitionBatch, partition -> GlueInputConverter.convertPartition(partition));
 
                 request = (BatchCreatePartitionRequest) updateAWSRequest(
                         metastoreContext,
@@ -943,6 +943,9 @@ public class GlueHiveMetastore
             for (Future<BatchCreatePartitionResult> future : futures) {
                 BatchCreatePartitionResult result = future.get();
                 propagatePartitionErrorToPrestoException(databaseName, tableName, result.getErrors());
+            }
+            for (PartitionWithStatistics partition : partitions) {
+                columnStatisticsProvider.updatePartitionStatistics(metastoreContext, partition.getPartition(), partition.getStatistics().getColumnStatistics());
             }
         }
         catch (AmazonServiceException | InterruptedException | ExecutionException e) {
@@ -1001,7 +1004,7 @@ public class GlueHiveMetastore
     public void alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partition)
     {
         try {
-            PartitionInput newPartition = GlueInputConverter.convertPartition(metastoreContext, partition, columnStatisticsProvider);
+            PartitionInput newPartition = GlueInputConverter.convertPartition(partition);
 
             UpdatePartitionRequest request = (UpdatePartitionRequest) updateAWSRequest(
                     metastoreContext,
@@ -1012,6 +1015,10 @@ public class GlueHiveMetastore
                             .withPartitionInput(newPartition)
                             .withPartitionValueList(partition.getPartition().getValues()));
             stats.getUpdatePartition().record(() -> glueClient.updatePartition(request));
+            columnStatisticsProvider.updatePartitionStatistics(
+                    metastoreContext,
+                    partition.getPartition(),
+                    partition.getStatistics().getColumnStatistics());
         }
         catch (EntityNotFoundException e) {
             throw new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), partition.getPartition().getValues());
