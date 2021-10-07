@@ -34,6 +34,7 @@ public class GlueHiveMetastoreConfig
     private Optional<String> lakeFormationPartnerTagValue = Optional.empty();
     private Optional<String> lakeFormationPartnerTagName = Optional.empty();
     private boolean impersonationEnabled;
+    private boolean columnStatisticsEnabled = true;
 
     public Optional<String> getGlueRegion()
     {
@@ -179,6 +180,19 @@ public class GlueHiveMetastoreConfig
     public GlueHiveMetastoreConfig setImpersonationEnabled(boolean impersonationEnabled)
     {
         this.impersonationEnabled = impersonationEnabled;
+        return this;
+    }
+
+    public boolean isColumnStatisticsEnabled()
+    {
+        return columnStatisticsEnabled;
+    }
+
+    @Config("hive.metastore.glue.column-statistics-enabled")
+    @ConfigDescription("Enable use of column statistics")
+    public GlueHiveMetastoreConfig setColumnStatisticsEnabled(boolean columnStatisticsEnabled)
+    {
+        this.columnStatisticsEnabled = columnStatisticsEnabled;
         return this;
     }
 }
