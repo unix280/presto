@@ -48,8 +48,7 @@ public class GlueMetastoreModule
     public void configure(Binder binder)
     {
         configBinder(binder).bindConfig(GlueHiveMetastoreConfig.class);
-        OptionalBinder.newOptionalBinder(binder, GlueColumnStatisticsProvider.class)
-                .setDefault().to(DisabledGlueColumnStatisticsProvider.class).in(Scopes.SINGLETON);
+        OptionalBinder.newOptionalBinder(binder, GlueColumnStatisticsProvider.class).setDefault().to(DisabledGlueColumnStatisticsProvider.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(GlueSecurityMappingConfig.class);
         binder.bind(GlueHiveMetastore.class).in(Scopes.SINGLETON);
         binder.bind(ExtendedHiveMetastore.class).annotatedWith(ForCachingHiveMetastore.class).to(GlueHiveMetastore.class).in(Scopes.SINGLETON);
@@ -73,11 +72,32 @@ public class GlueMetastoreModule
     @ForGlueHiveMetastore
     public Executor createExecutor(GlueHiveMetastoreConfig hiveConfig)
     {
-        if (hiveConfig.getGetPartitionThreads() == 1) {
+        return createExecutor("hive-glue-partitions-%s", hiveConfig.getWriteStatisticsThreads());
+    }
+
+    @Provides
+    @Singleton
+    @ForGlueColumnStatisticsRead
+    public Executor createStatisticsReadExecutor(GlueHiveMetastoreConfig hiveConfig)
+    {
+        return createExecutor("hive-glue-statistics-read-%s", hiveConfig.getReadStatisticsThreads());
+    }
+
+    @Provides
+    @Singleton
+    @ForGlueColumnStatisticsWrite
+    public Executor createStatisticsWriteExecutor(GlueHiveMetastoreConfig hiveConfig)
+    {
+        return createExecutor("hive-glue-statistics-write-%s", hiveConfig.getWriteStatisticsThreads());
+    }
+
+    private Executor createExecutor(String nameTemplate, int threads)
+    {
+        if (threads == 1) {
             return directExecutor();
         }
         return new BoundedExecutor(
-            newCachedThreadPool(daemonThreadsNamed("hive-glue-%s")),
-            hiveConfig.getGetPartitionThreads());
+                newCachedThreadPool(daemonThreadsNamed(nameTemplate)),
+                threads);
     }
 }

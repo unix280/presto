@@ -18,6 +18,7 @@ import com.amazonaws.services.glue.model.PartitionInput;
 import com.amazonaws.services.glue.model.SerDeInfo;
 import com.amazonaws.services.glue.model.StorageDescriptor;
 import com.amazonaws.services.glue.model.TableInput;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.Partition;
@@ -83,11 +84,11 @@ public final class GlueInputConverter
         return input;
     }
 
-    public static PartitionInput convertPartition(PartitionWithStatistics partitionWithStatistics, GlueColumnStatisticsProvider columnStatisticsProvider)
+    public static PartitionInput convertPartition(MetastoreContext metastoreContext, PartitionWithStatistics partitionWithStatistics, GlueColumnStatisticsProvider columnStatisticsProvider)
     {
         PartitionInput input = convertPartition(partitionWithStatistics.getPartition());
         PartitionStatistics statistics = partitionWithStatistics.getStatistics();
-        columnStatisticsProvider.updatePartitionStatistics(input, statistics.getColumnStatistics());
+        columnStatisticsProvider.updatePartitionStatistics(metastoreContext, partitionWithStatistics.getPartition(), statistics.getColumnStatistics());
         if (!statistics.getColumnStatistics().isEmpty()) {
             throw new PrestoException(NOT_SUPPORTED, "Glue metastore does not support column level statistics");
         }

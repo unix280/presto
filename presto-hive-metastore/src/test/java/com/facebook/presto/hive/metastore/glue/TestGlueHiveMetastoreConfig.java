@@ -38,7 +38,10 @@ public class TestGlueHiveMetastoreConfig
                 .setIamRole(null)
                 .setLakeFormationPartnerTagName(null)
                 .setLakeFormationPartnerTagValue(null)
-                .setImpersonationEnabled(false));
+                .setImpersonationEnabled(false)
+                .setColumnStatisticsEnabled(false)
+                .setReadStatisticsThreads(1)
+                .setWriteStatisticsThreads(1));
     }
 
     @Test
@@ -56,6 +59,9 @@ public class TestGlueHiveMetastoreConfig
                 .put("hive.metastore.glue.lakeformation.partner-tag-name", "partner-tag-name")
                 .put("hive.metastore.glue.lakeformation.partner-tag-value", "partner-tag-value")
                 .put("hive.metastore.glue.impersonation.enabled", "true")
+                .put("hive.metastore.glue.read-statistics-threads", "42")
+                .put("hive.metastore.glue.write-statistics-threads", "43")
+                .put("hive.metastore.glue.column-statistics-enabled", "true")
                 .build();
 
         GlueHiveMetastoreConfig expected = new GlueHiveMetastoreConfig()
@@ -69,7 +75,10 @@ public class TestGlueHiveMetastoreConfig
                 .setIamRole("role")
                 .setLakeFormationPartnerTagName("partner-tag-name")
                 .setLakeFormationPartnerTagValue("partner-tag-value")
-                .setImpersonationEnabled(true);
+                .setImpersonationEnabled(true)
+                .setReadStatisticsThreads(42)
+                .setWriteStatisticsThreads(43)
+                .setColumnStatisticsEnabled(true);
 
         assertFullMapping(properties, expected);
     }

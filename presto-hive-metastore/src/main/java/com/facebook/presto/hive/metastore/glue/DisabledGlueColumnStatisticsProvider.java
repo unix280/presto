@@ -14,9 +14,8 @@
 
 package com.facebook.presto.hive.metastore.glue;
 
-import com.amazonaws.services.glue.model.PartitionInput;
-import com.amazonaws.services.glue.model.TableInput;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.Table;
@@ -40,19 +39,19 @@ public class DisabledGlueColumnStatisticsProvider
     }
 
     @Override
-    public Map<String, HiveColumnStatistics> getTableColumnStatistics(Table table)
+    public Map<String, HiveColumnStatistics> getTableColumnStatistics(MetastoreContext metastoreContext, Table table)
     {
         return ImmutableMap.of();
     }
 
     @Override
-    public Map<String, HiveColumnStatistics> getPartitionColumnStatistics(Partition partition)
+    public Map<String, HiveColumnStatistics> getPartitionColumnStatistics(MetastoreContext metastoreContext, Partition partition)
     {
         return ImmutableMap.of();
     }
 
     @Override
-    public void updateTableColumnStatistics(TableInput table, Map<String, HiveColumnStatistics> columnStatistics)
+    public void updateTableColumnStatistics(MetastoreContext metastoreContext, Table table, Map<String, HiveColumnStatistics> columnStatistics)
     {
         if (!columnStatistics.isEmpty()) {
             throw new PrestoException(NOT_SUPPORTED, "Glue metastore column level statistics are disabled");
@@ -60,7 +59,7 @@ public class DisabledGlueColumnStatisticsProvider
     }
 
     @Override
-    public void updatePartitionStatistics(PartitionInput partition, Map<String, HiveColumnStatistics> columnStatistics)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, Partition partition, Map<String, HiveColumnStatistics> columnStatistics)
     {
         if (!columnStatistics.isEmpty()) {
             throw new PrestoException(NOT_SUPPORTED, "Glue metastore column level statistics are disabled");
