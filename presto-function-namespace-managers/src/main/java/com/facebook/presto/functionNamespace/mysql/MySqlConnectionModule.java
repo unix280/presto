@@ -14,6 +14,7 @@
 package com.facebook.presto.functionNamespace.mysql;
 
 import com.facebook.airlift.configuration.AbstractConfigurationAwareModule;
+import com.facebook.airlift.log.Logger;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
@@ -31,11 +32,19 @@ import static com.facebook.airlift.configuration.ConfigBinder.configBinder;
 public class MySqlConnectionModule
         extends AbstractConfigurationAwareModule
 {
+    private static final Logger log = Logger.get(MySqlConnectionModule.class);
+
     @Override
     protected void setup(Binder binder)
     {
         configBinder(binder).bindConfig(MySqlConnectionConfig.class);
 
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+        }
+        catch (ClassNotFoundException e) {
+            log.error(e, "Failed to load Mysql Driver ");
+        }
         String databaseUrl = buildConfigObject(MySqlConnectionConfig.class).getDatabaseUrl();
         Jdbi jdbi = createJdbi(
                 () -> DriverManager.getConnection(databaseUrl),
