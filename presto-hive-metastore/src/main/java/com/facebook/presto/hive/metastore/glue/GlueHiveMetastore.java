@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.metastore.glue;
 
 import com.amazonaws.AmazonServiceException;
+import com.amazonaws.AmazonWebServiceRequest;
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
@@ -36,7 +37,6 @@ import com.amazonaws.services.glue.model.DeleteTableRequest;
 import com.amazonaws.services.glue.model.EntityNotFoundException;
 import com.amazonaws.services.glue.model.ErrorDetail;
 import com.amazonaws.services.glue.model.GetDatabaseRequest;
-import com.amazonaws.services.glue.model.GetDatabaseResult;
 import com.amazonaws.services.glue.model.GetDatabasesRequest;
 import com.amazonaws.services.glue.model.GetDatabasesResult;
 import com.amazonaws.services.glue.model.GetPartitionRequest;
@@ -44,9 +44,9 @@ import com.amazonaws.services.glue.model.GetPartitionResult;
 import com.amazonaws.services.glue.model.GetPartitionsRequest;
 import com.amazonaws.services.glue.model.GetPartitionsResult;
 import com.amazonaws.services.glue.model.GetTableRequest;
-import com.amazonaws.services.glue.model.GetTableResult;
 import com.amazonaws.services.glue.model.GetTablesRequest;
 import com.amazonaws.services.glue.model.GetTablesResult;
+import com.amazonaws.services.glue.model.GetUnfilteredTableRequest;
 import com.amazonaws.services.glue.model.PartitionError;
 import com.amazonaws.services.glue.model.PartitionInput;
 import com.amazonaws.services.glue.model.PartitionValueList;
@@ -243,19 +243,10 @@ public class GlueHiveMetastore
     {
         return stats.getGetDatabase().record(() -> {
             try {
-                GetDatabaseResult result;
-                if (impersonationEnabled) {
-                    AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                    result = glueClient.getDatabase(new GetDatabaseRequest()
-                            .withCatalogId(catalogId)
-                            .withName(databaseName)
-                            .withRequestCredentialsProvider(credentialsProvider));
-                }
-                else {
-                    result = glueClient.getDatabase(new GetDatabaseRequest().withCatalogId(catalogId).withName(databaseName));
-                }
-                return Optional.of(GlueToPrestoConverter.convertDatabase(result.getDatabase()));
+                GetDatabaseRequest request = (GetDatabaseRequest) updateAWSRequest(
+                        metastoreContext,
+                        new GetDatabaseRequest().withCatalogId(catalogId).withName(databaseName));
+                return Optional.of(GlueToPrestoConverter.convertDatabase(glueClient.getDatabase(request).getDatabase()));
             }
             catch (EntityNotFoundException e) {
                 return Optional.empty();
@@ -270,16 +261,10 @@ public class GlueHiveMetastore
     public List<String> getAllDatabases(MetastoreContext metastoreContext)
     {
         try {
-            GetDatabasesRequest request;
             List<String> databaseNames = new ArrayList<>();
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new GetDatabasesRequest().withCatalogId(catalogId).withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new GetDatabasesRequest().withCatalogId(catalogId);
-            }
+            GetDatabasesRequest request = (GetDatabasesRequest) updateAWSRequest(
+                    metastoreContext,
+                    new GetDatabasesRequest().withCatalogId(catalogId));
             do {
                 GetDatabasesResult result = stats.getGetDatabases().record(() -> glueClient.getDatabases(request));
                 request.setNextToken(result.getNextToken());
@@ -311,25 +296,17 @@ public class GlueHiveMetastore
         return stats.getGetTable().record(() -> {
             try {
                 if (impersonationEnabled) {
-                    AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                    GetTableResult getTableResult;
-                    getTableResult = glueClient.getTable(new GetTableRequest()
+                    return Optional.of(glueClient.getUnfilteredTable(new GetUnfilteredTableRequest()
                             .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withName(tableName)
-                            .withRequestCredentialsProvider(credentialsProvider));
-
-                    return Optional.of(getTableResult.getTable());
+                            .withRequestCredentialsProvider(getAwsCredentialsProvider(metastoreContext))).getTable());
                 }
                 else {
-                    GetTableResult getTableResult;
-                    getTableResult = glueClient.getTable(new GetTableRequest()
+                    return Optional.of(glueClient.getTable(new GetTableRequest()
                             .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
-                            .withName(tableName));
-
-                    return Optional.of(getTableResult.getTable());
+                            .withName(tableName)).getTable());
                 }
             }
             catch (EntityNotFoundException e) {
@@ -385,22 +362,9 @@ public class GlueHiveMetastore
         try {
             TableInput tableInput = GlueInputConverter.convertTable(table);
             tableInput.setParameters(updateStatisticsParameters(table.getParameters(), updatedStatistics.getBasicStatistics()));
-            UpdateTableRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new UpdateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableInput(tableInput)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new UpdateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableInput(tableInput);
-            }
+            UpdateTableRequest request = (UpdateTableRequest) updateAWSRequest(
+                    metastoreContext,
+                    new UpdateTableRequest().withCatalogId(catalogId).withDatabaseName(databaseName).withTableInput(tableInput));
             stats.getUpdateTable().record(() -> glueClient.updateTable(request));
             columnStatisticsProvider.updateTableColumnStatistics(tableInput, updatedStatistics.getColumnStatistics());
         }
@@ -428,26 +392,14 @@ public class GlueHiveMetastore
             PartitionInput partitionInput = GlueInputConverter.convertPartition(partition);
             partitionInput.setParameters(updateStatisticsParameters(partition.getParameters(), updatedStatistics.getBasicStatistics()));
 
-            UpdatePartitionRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new UpdatePartitionRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withPartitionValueList(partition.getValues())
-                        .withPartitionInput(partitionInput)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new UpdatePartitionRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withPartitionValueList(partition.getValues())
-                        .withPartitionInput(partitionInput);
-            }
+            UpdatePartitionRequest request = (UpdatePartitionRequest) updateAWSRequest(
+                    metastoreContext,
+                    new UpdatePartitionRequest()
+                            .withCatalogId(catalogId)
+                            .withDatabaseName(databaseName)
+                            .withTableName(tableName)
+                            .withPartitionValueList(partition.getValues())
+                            .withPartitionInput(partitionInput));
 
             stats.getUpdatePartition().record(() -> glueClient.updatePartition(request));
             columnStatisticsProvider.updatePartitionStatistics(partitionInput, updatedStatistics.getColumnStatistics());
@@ -466,18 +418,9 @@ public class GlueHiveMetastore
         try {
             List<String> tableNames = new ArrayList<>();
 
-            GetTablesRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new GetTablesRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new GetTablesRequest().withCatalogId(catalogId).withDatabaseName(databaseName);
-            }
+            GetTablesRequest request = (GetTablesRequest) updateAWSRequest(
+                    metastoreContext,
+                    new GetTablesRequest().withCatalogId(catalogId).withDatabaseName(databaseName));
 
             do {
                 GetTablesResult result = stats.getGetTables().record(() -> glueClient.getTables(request));
@@ -503,18 +446,9 @@ public class GlueHiveMetastore
         try {
             List<String> views = new ArrayList<>();
 
-            GetTablesRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new GetTablesRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new GetTablesRequest().withCatalogId(catalogId).withDatabaseName(databaseName);
-            }
+            GetTablesRequest request = (GetTablesRequest) updateAWSRequest(
+                    metastoreContext,
+                    new GetTablesRequest().withCatalogId(catalogId).withDatabaseName(databaseName));
 
             do {
                 GetTablesResult result = stats.getGetTables().record(() -> glueClient.getTables(request));
@@ -549,18 +483,9 @@ public class GlueHiveMetastore
         try {
             DatabaseInput databaseInput = GlueInputConverter.convertDatabase(database);
 
-            CreateDatabaseRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new CreateDatabaseRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseInput(databaseInput)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new CreateDatabaseRequest().withCatalogId(catalogId).withDatabaseInput(databaseInput);
-            }
+            CreateDatabaseRequest request = (CreateDatabaseRequest) updateAWSRequest(
+                    metastoreContext,
+                    new CreateDatabaseRequest().withCatalogId(catalogId).withDatabaseInput(databaseInput));
             stats.getCreateDatabase().record(() -> glueClient.createDatabase(request));
         }
         catch (AlreadyExistsException e) {
@@ -579,19 +504,9 @@ public class GlueHiveMetastore
     public void dropDatabase(MetastoreContext metastoreContext, String databaseName)
     {
         try {
-            DeleteDatabaseRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new DeleteDatabaseRequest()
-                        .withCatalogId(catalogId)
-                        .withName(databaseName)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new DeleteDatabaseRequest().withCatalogId(catalogId).withName(databaseName);
-            }
-
+            DeleteDatabaseRequest request = (DeleteDatabaseRequest) updateAWSRequest(
+                    metastoreContext,
+                    new DeleteDatabaseRequest().withCatalogId(catalogId).withName(databaseName));
             stats.getDeleteDatabase().record(() -> glueClient.deleteDatabase(request));
         }
         catch (EntityNotFoundException e) {
@@ -609,23 +524,9 @@ public class GlueHiveMetastore
             Database database = getDatabase(metastoreContext, databaseName).orElseThrow(() -> new SchemaNotFoundException(databaseName));
             DatabaseInput renamedDatabase = GlueInputConverter.convertDatabase(database).withName(newDatabaseName);
 
-            UpdateDatabaseRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new UpdateDatabaseRequest()
-                        .withCatalogId(catalogId)
-                        .withName(databaseName)
-                        .withDatabaseInput(renamedDatabase)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new UpdateDatabaseRequest()
-                        .withCatalogId(catalogId)
-                        .withName(databaseName)
-                        .withDatabaseInput(renamedDatabase);
-            }
-
+            UpdateDatabaseRequest request = (UpdateDatabaseRequest) updateAWSRequest(
+                    metastoreContext,
+                    new UpdateDatabaseRequest().withCatalogId(catalogId).withName(databaseName).withDatabaseInput(renamedDatabase));
             stats.getUpdateDatabase().record(() -> glueClient.updateDatabase(request));
         }
         catch (AmazonServiceException e) {
@@ -639,23 +540,9 @@ public class GlueHiveMetastore
         try {
             TableInput input = GlueInputConverter.convertTable(table);
 
-            CreateTableRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new CreateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(table.getDatabaseName())
-                        .withTableInput(input)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new CreateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(table.getDatabaseName())
-                        .withTableInput(input);
-            }
-
+            CreateTableRequest request = (CreateTableRequest) updateAWSRequest(
+                    metastoreContext,
+                    new CreateTableRequest().withCatalogId(catalogId).withDatabaseName(table.getDatabaseName()).withTableInput(input));
             stats.getCreateTable().record(() -> glueClient.createTable(request));
         }
         catch (AlreadyExistsException e) {
@@ -675,23 +562,9 @@ public class GlueHiveMetastore
         Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
 
         try {
-            DeleteTableRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new DeleteTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withName(tableName)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new DeleteTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withName(tableName);
-            }
-
+            DeleteTableRequest request = (DeleteTableRequest) updateAWSRequest(
+                    metastoreContext,
+                    new DeleteTableRequest().withCatalogId(catalogId).withDatabaseName(databaseName).withName(tableName));
             stats.getDeleteTable().record(() -> glueClient.deleteTable(request));
         }
         catch (AmazonServiceException e) {
@@ -726,23 +599,9 @@ public class GlueHiveMetastore
         try {
             TableInput newTableInput = GlueInputConverter.convertTable(newTable);
 
-            UpdateTableRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new UpdateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableInput(newTableInput)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new UpdateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableInput(newTableInput);
-            }
-
+            UpdateTableRequest request = (UpdateTableRequest) updateAWSRequest(
+                    metastoreContext,
+                    new UpdateTableRequest().withCatalogId(catalogId).withDatabaseName(databaseName).withTableInput(newTableInput));
             stats.getUpdateTable().record(() -> glueClient.updateTable(request));
         }
         catch (EntityNotFoundException e) {
@@ -822,23 +681,9 @@ public class GlueHiveMetastore
     private void replaceGlueTable(MetastoreContext metastoreContext, String databaseName, String tableName, com.amazonaws.services.glue.model.Table newTable)
     {
         try {
-            UpdateTableRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new UpdateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableInput(toTableInput(newTable))
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new UpdateTableRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableInput(toTableInput(newTable));
-            }
-
+            UpdateTableRequest request = (UpdateTableRequest) updateAWSRequest(
+                    metastoreContext,
+                    new UpdateTableRequest().withCatalogId(catalogId).withDatabaseName(databaseName).withTableInput(toTableInput(newTable)));
             stats.getUpdateTable().record(() -> glueClient.updateTable(request));
         }
         catch (EntityNotFoundException e) {
@@ -852,24 +697,13 @@ public class GlueHiveMetastore
     @Override
     public Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues)
     {
-        GetPartitionRequest request;
-        if (impersonationEnabled) {
-            AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-            request = new GetPartitionRequest()
-                    .withCatalogId(catalogId)
-                    .withDatabaseName(databaseName)
-                    .withTableName(tableName)
-                    .withPartitionValues(partitionValues)
-                    .withRequestCredentialsProvider(credentialsProvider);
-        }
-        else {
-            request = new GetPartitionRequest()
-                    .withCatalogId(catalogId)
-                    .withDatabaseName(databaseName)
-                    .withTableName(tableName)
-                    .withPartitionValues(partitionValues);
-        }
+        GetPartitionRequest request = (GetPartitionRequest) updateAWSRequest(
+                metastoreContext,
+                new GetPartitionRequest()
+                        .withCatalogId(catalogId)
+                        .withDatabaseName(databaseName)
+                        .withTableName(tableName)
+                        .withPartitionValues(partitionValues));
 
         return stats.getGetPartition().record(() -> {
             try {
@@ -967,26 +801,14 @@ public class GlueHiveMetastore
             GluePartitionConverter converter = new GluePartitionConverter(databaseName, tableName);
             ArrayList<Partition> partitions = new ArrayList<>();
 
-            GetPartitionsRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new GetPartitionsRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withExpression(expression)
-                        .withSegment(segment)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new GetPartitionsRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withExpression(expression)
-                        .withSegment(segment);
-            }
+            GetPartitionsRequest request = (GetPartitionsRequest) updateAWSRequest(
+                    metastoreContext,
+                    new GetPartitionsRequest()
+                            .withCatalogId(catalogId)
+                            .withDatabaseName(databaseName)
+                            .withTableName(tableName)
+                            .withExpression(expression)
+                            .withSegment(segment));
 
             do {
                 GetPartitionsResult result = stats.getGetPartitions().record(() -> glueClient.getPartitions(request));
@@ -1050,29 +872,16 @@ public class GlueHiveMetastore
             List<Future<BatchGetPartitionResult>> batchGetPartitionFutures = new ArrayList<>();
 
             BatchGetPartitionRequest request;
-            AWSCredentialsProvider credentialsProvider = null;
-            if (impersonationEnabled) {
-                credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-            }
 
             for (List<String> partitionNamesBatch : Lists.partition(partitionNames, BATCH_GET_PARTITION_MAX_PAGE_SIZE)) {
                 List<PartitionValueList> partitionValuesBatch = mappedCopy(partitionNamesBatch, partitionName -> new PartitionValueList().withValues(toPartitionValues(partitionName)));
-
-                if (impersonationEnabled) {
-                    request = new BatchGetPartitionRequest()
-                            .withCatalogId(catalogId)
-                            .withDatabaseName(databaseName)
-                            .withTableName(tableName)
-                            .withPartitionsToGet(partitionValuesBatch)
-                            .withRequestCredentialsProvider(credentialsProvider);
-                }
-                else {
-                    request = new BatchGetPartitionRequest()
-                            .withCatalogId(catalogId)
-                            .withDatabaseName(databaseName)
-                            .withTableName(tableName)
-                            .withPartitionsToGet(partitionValuesBatch);
-                }
+                request = (BatchGetPartitionRequest) updateAWSRequest(
+                        metastoreContext,
+                        new BatchGetPartitionRequest()
+                                .withCatalogId(catalogId)
+                                .withDatabaseName(databaseName)
+                                .withTableName(tableName)
+                                .withPartitionsToGet(partitionValuesBatch));
 
                 batchGetPartitionFutures.add(glueClient.batchGetPartitionAsync(request, stats.getBatchGetPartitions().metricsAsyncHandler()));
             }
@@ -1102,30 +911,16 @@ public class GlueHiveMetastore
             List<Future<BatchCreatePartitionResult>> futures = new ArrayList<>();
 
             BatchCreatePartitionRequest request;
-            AWSCredentialsProvider credentialsProvider = null;
-            if (impersonationEnabled) {
-                credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-            }
 
             for (List<PartitionWithStatistics> partitionBatch : Lists.partition(partitions, BATCH_CREATE_PARTITION_MAX_PAGE_SIZE)) {
                 List<PartitionInput> partitionInputs = mappedCopy(partitionBatch, partition -> GlueInputConverter.convertPartition(partition, columnStatisticsProvider));
-
-                if (impersonationEnabled) {
-                    request = new BatchCreatePartitionRequest()
-                            .withCatalogId(catalogId)
-                            .withDatabaseName(databaseName)
-                            .withTableName(tableName)
-                            .withPartitionInputList(partitionInputs)
-                            .withRequestCredentialsProvider(credentialsProvider);
-                }
-                else {
-                    request = new BatchCreatePartitionRequest()
-                            .withCatalogId(catalogId)
-                            .withDatabaseName(databaseName)
-                            .withTableName(tableName)
-                            .withPartitionInputList(partitionInputs);
-                }
-
+                request = (BatchCreatePartitionRequest) updateAWSRequest(
+                        metastoreContext,
+                        new BatchCreatePartitionRequest()
+                                .withCatalogId(catalogId)
+                                .withDatabaseName(databaseName)
+                                .withTableName(tableName)
+                                .withPartitionInputList(partitionInputs));
                 futures.add(glueClient.batchCreatePartitionAsync(request, stats.getBatchCreatePartitions().metricsAsyncHandler()));
             }
 
@@ -1167,25 +962,13 @@ public class GlueHiveMetastore
                 .orElseThrow(() -> new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), parts));
 
         try {
-            DeletePartitionRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new DeletePartitionRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withPartitionValues(parts)
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new DeletePartitionRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withPartitionValues(parts);
-            }
-
+            DeletePartitionRequest request = (DeletePartitionRequest) updateAWSRequest(
+                    metastoreContext,
+                    new DeletePartitionRequest()
+                            .withCatalogId(catalogId)
+                            .withDatabaseName(databaseName)
+                            .withTableName(tableName)
+                            .withPartitionValues(parts));
             stats.getDeletePartition().record(() -> glueClient.deletePartition(request));
         }
         catch (AmazonServiceException e) {
@@ -1204,27 +987,14 @@ public class GlueHiveMetastore
         try {
             PartitionInput newPartition = GlueInputConverter.convertPartition(partition, columnStatisticsProvider);
 
-            UpdatePartitionRequest request;
-            if (impersonationEnabled) {
-                AWSCredentialsProvider credentialsProvider = getAwsCredentialsProvider(metastoreContext);
-
-                request = new UpdatePartitionRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withPartitionInput(newPartition)
-                        .withPartitionValueList(partition.getPartition().getValues())
-                        .withRequestCredentialsProvider(credentialsProvider);
-            }
-            else {
-                request = new UpdatePartitionRequest()
-                        .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
-                        .withPartitionInput(newPartition)
-                        .withPartitionValueList(partition.getPartition().getValues());
-            }
-
+            UpdatePartitionRequest request = (UpdatePartitionRequest) updateAWSRequest(
+                    metastoreContext,
+                    new UpdatePartitionRequest()
+                            .withCatalogId(catalogId)
+                            .withDatabaseName(databaseName)
+                            .withTableName(tableName)
+                            .withPartitionInput(newPartition)
+                            .withPartitionValueList(partition.getPartition().getValues()));
             stats.getUpdatePartition().record(() -> glueClient.updatePartition(request));
         }
         catch (EntityNotFoundException e) {
@@ -1296,6 +1066,11 @@ public class GlueHiveMetastore
     public boolean isImpersonationEnabled()
     {
         return impersonationEnabled;
+    }
+
+    private AmazonWebServiceRequest updateAWSRequest(MetastoreContext metastoreContext, AmazonWebServiceRequest request)
+    {
+        return impersonationEnabled ? request.withRequestCredentialsProvider(getAwsCredentialsProvider(metastoreContext)) : request;
     }
 
     private AWSCredentialsProvider getAwsCredentialsProvider(MetastoreContext metastoreContext)
