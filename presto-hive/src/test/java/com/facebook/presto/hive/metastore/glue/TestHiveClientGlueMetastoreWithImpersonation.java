@@ -70,7 +70,7 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         MetastoreClientConfig metastoreClientConfig = new MetastoreClientConfig();
         HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveClientConfig, metastoreClientConfig), ImmutableSet.of());
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
-        GlueHiveMetastoreConfig glueConfig = new GlueHiveMetastoreConfig();
+        GlueHiveMetastoreConfig glueConfig = new GlueHiveMetastoreConfig().setColumnStatisticsEnabled(true);
         glueConfig.setDefaultWarehouseDir(tempDir.toURI().toString());
         glueConfig.setImpersonationEnabled(true);
         GlueSecurityMappingConfig glueSecurityMappingConfig = new GlueSecurityMappingConfig()
@@ -88,33 +88,19 @@ public class TestHiveClientGlueMetastoreWithImpersonation
     }
 
     @Override
-    public void testPartitionStatisticsSampling()
-    {
-        // Glue metastore does not support column level statistics
-    }
-
-    @Override
-    public void testUpdateTableColumnStatistics()
-    {
-        // column statistics are not supported by Glue
-    }
-
-    @Override
     public void testUpdateTableColumnStatisticsEmptyOptionalFields()
     {
-        // column statistics are not supported by Glue
-    }
-
-    @Override
-    public void testUpdatePartitionColumnStatistics()
-    {
-        // column statistics are not supported by Glue
+        // this test expects consistency between written and read stats but this is not provided by glue at the moment
+        // when writing empty min/max statistics glue will return 0 to the readers
+        // in order to avoid incorrect data we skip writes for statistics with min/max = null
     }
 
     @Override
     public void testUpdatePartitionColumnStatisticsEmptyOptionalFields()
     {
-        // column statistics are not supported by Glue
+        // this test expects consistency between written and read stats but this is not provided by glue at the moment
+        // when writing empty min/max statistics glue will return 0 to the readers
+        // in order to avoid incorrect data we skip writes for statistics with min/max = null
     }
 
     @Override
