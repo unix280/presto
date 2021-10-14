@@ -92,7 +92,6 @@
     <modules>
         <module>presto-atop</module>
         <module>presto-spi</module>
-        <module>presto-array</module>
         <module>presto-cache</module>
         <module>presto-jmx</module>
         <module>presto-record-decoder</module>
