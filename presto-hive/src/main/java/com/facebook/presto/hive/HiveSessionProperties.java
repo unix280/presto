@@ -126,6 +126,8 @@ public final class HiveSessionProperties
     public static final String VERBOSE_RUNTIME_STATS_ENABLED = "verbose_runtime_stats_enabled";
     public static final String SIZE_BASED_SPLIT_WEIGHTS_ENABLED = "size_based_split_weights_enabled";
     public static final String MINIMUM_ASSIGNED_SPLIT_WEIGHT = "minimum_assigned_split_weight";
+    private static final String DWRF_WRITER_STRIPE_CACHE_ENABLED = "dwrf_writer_stripe_cache_enabled";
+    private static final String DWRF_WRITER_STRIPE_CACHE_SIZE = "dwrf_writer_stripe_cache_size";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -606,6 +608,16 @@ public final class HiveSessionProperties
                         null,
                         false),
                 booleanProperty(
+                        DWRF_WRITER_STRIPE_CACHE_ENABLED,
+                        "Write stripe cache for the DWRF files.",
+                        orcFileWriterConfig.isDwrfStripeCacheEnabled(),
+                        false),
+                dataSizeSessionProperty(
+                        DWRF_WRITER_STRIPE_CACHE_SIZE,
+                        "Maximum size of DWRF stripe cache to be held in memory",
+                        orcFileWriterConfig.getDwrfStripeCacheMaxSize(),
+                        false),
+                booleanProperty(
                         SIZE_BASED_SPLIT_WEIGHTS_ENABLED,
                         "Enable estimating split weights based on size in bytes",
                         hiveClientConfig.isSizeBasedSplitWeightsEnabled(),
@@ -1074,5 +1086,15 @@ public final class HiveSessionProperties
     public static double getMinimumAssignedSplitWeight(ConnectorSession session)
     {
         return session.getProperty(MINIMUM_ASSIGNED_SPLIT_WEIGHT, Double.class);
+    }
+
+    public static boolean isDwrfWriterStripeCacheEnabled(ConnectorSession session)
+    {
+        return session.getProperty(DWRF_WRITER_STRIPE_CACHE_ENABLED, Boolean.class);
+    }
+
+    public static DataSize getDwrfWriterStripeCacheeMaxSize(ConnectorSession session)
+    {
+        return session.getProperty(DWRF_WRITER_STRIPE_CACHE_SIZE, DataSize.class);
     }
 }
