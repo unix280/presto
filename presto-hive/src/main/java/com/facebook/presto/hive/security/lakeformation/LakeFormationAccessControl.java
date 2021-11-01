@@ -23,8 +23,8 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.glue.AWSGlueAsync;
 import com.amazonaws.services.glue.AWSGlueAsyncClientBuilder;
 import com.amazonaws.services.glue.model.EntityNotFoundException;
-import com.amazonaws.services.glue.model.GetUnfilteredTableRequest;
-import com.amazonaws.services.glue.model.GetUnfilteredTableResult;
+import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataRequest;
+import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
 import com.amazonaws.services.securitytoken.model.Tag;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.hive.authentication.MetastoreContext;
@@ -84,10 +84,11 @@ public class LakeFormationAccessControl
     private String catalogIamRole;
     private String lakeFormationPartnerTagName;
     private String lakeFormationPartnerTagValue;
+    private Optional<String> supportedPermissionType;
     private boolean impersonationEnabled;
     private Supplier<GlueSecurityMappings> mappings;
     private LoadingCache<String, AWSCredentialsProvider> awsCredentialsProviderLoadingCache;
-    private LoadingCache<LFPolicyCacheKey, Optional<GetUnfilteredTableResult>> lakeFormationPolicyCache;
+    private LoadingCache<LFPolicyCacheKey, Optional<GetUnfilteredTableMetadataResult>> lakeFormationPolicyCache;
 
     @TestOnly
     public LakeFormationAccessControl()
@@ -113,7 +114,7 @@ public class LakeFormationAccessControl
     }
 
     @TestOnly
-    public void setLakeFormationPolicyCache(LoadingCache<LFPolicyCacheKey, Optional<GetUnfilteredTableResult>> lakeFormationPolicyCache)
+    public void setLakeFormationPolicyCache(LoadingCache<LFPolicyCacheKey, Optional<GetUnfilteredTableMetadataResult>> lakeFormationPolicyCache)
     {
         this.lakeFormationPolicyCache = lakeFormationPolicyCache;
     }
@@ -133,6 +134,7 @@ public class LakeFormationAccessControl
         this.catalogIamRole = glueHiveMetastoreConfig.getIamRole().orElse("defaultIAMRole");
         this.lakeFormationPartnerTagName = glueHiveMetastoreConfig.getLakeFormationPartnerTagName().orElse(LAKE_FORMATION_AUTHORIZED_CALLER);
         this.lakeFormationPartnerTagValue = glueHiveMetastoreConfig.getLakeFormationPartnerTagValue().orElse(AHANA);
+        this.supportedPermissionType = glueHiveMetastoreConfig.getSupportedPermissionType();
         this.impersonationEnabled = glueHiveMetastoreConfig.isImpersonationEnabled();
         this.mappings = requireNonNull(glueSecurityMappingsSupplier, "glueSecurityMappingsSupplier is null").getMappingsSupplier();
 
@@ -351,7 +353,7 @@ public class LakeFormationAccessControl
 
         LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, tableName);
 
-        Optional<GetUnfilteredTableResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
+        Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
         if (!result.isPresent()) {
             denySelectTable(tableName.getTableName(), format("Access Denied: " +
                     "Error fetching table [%s/%s] or table does not exist", tableName.getSchemaName(), tableName.getTableName()));
@@ -428,7 +430,7 @@ public class LakeFormationAccessControl
 
         LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, tableName);
 
-        Optional<GetUnfilteredTableResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
+        Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
         if (!result.isPresent()) {
             denyCreateViewWithSelect(tableName.getTableName(), identity, format("Access Denied: " +
                     "Error fetching table [%s/%s] or table does not exist", tableName.getSchemaName(), tableName.getTableName()));
@@ -478,25 +480,30 @@ public class LakeFormationAccessControl
         return mapping.getIamRole();
     }
 
-    private Optional<GetUnfilteredTableResult> getUnfilteredTableResult(LFPolicyCacheKey lfPolicyCacheKey)
+    private Optional<GetUnfilteredTableMetadataResult> getUnfilteredTableResult(LFPolicyCacheKey lfPolicyCacheKey)
     {
-        GetUnfilteredTableRequest request;
+        GetUnfilteredTableMetadataRequest request;
+        List<String> supportedPermissionTypes = new ArrayList<>();
+        supportedPermissionType.ifPresent(supportedPermissionTypes::add);
+
         if (impersonationEnabled) {
-            request = new GetUnfilteredTableRequest()
+            request = new GetUnfilteredTableMetadataRequest()
                     .withCatalogId(catalogId)
                     .withDatabaseName(lfPolicyCacheKey.getSchemaTableName().getSchemaName())
                     .withName(lfPolicyCacheKey.getSchemaTableName().getTableName())
+                    .withSupportedPermissionTypes(supportedPermissionTypes)
                     .withRequestCredentialsProvider(awsCredentialsProviderLoadingCache.getUnchecked(lfPolicyCacheKey.getIamRole()));
         }
         else {
-            request = new GetUnfilteredTableRequest()
+            request = new GetUnfilteredTableMetadataRequest()
                     .withCatalogId(catalogId)
                     .withDatabaseName(lfPolicyCacheKey.getSchemaTableName().getSchemaName())
-                    .withName(lfPolicyCacheKey.getSchemaTableName().getTableName());
+                    .withName(lfPolicyCacheKey.getSchemaTableName().getTableName())
+                    .withSupportedPermissionTypes(supportedPermissionTypes);
         }
 
         try {
-            return Optional.of(glueClient.getUnfilteredTable(request));
+            return Optional.of(glueClient.getUnfilteredTableMetadata(request));
         }
         catch (EntityNotFoundException e) {
             log.error(e, "Table not found");

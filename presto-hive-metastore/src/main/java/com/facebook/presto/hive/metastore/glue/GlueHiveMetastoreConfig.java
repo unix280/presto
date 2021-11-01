@@ -23,6 +23,8 @@ import java.util.Optional;
 
 public class GlueHiveMetastoreConfig
 {
+    private static final String SUPPORTED_PERMISSION_TYPE = "COLUMN_PERMISSION";
+
     private Optional<String> glueRegion = Optional.empty();
     private boolean pinGlueClientToCurrentRegion;
     private int maxGlueConnections = 5;
@@ -35,6 +37,7 @@ public class GlueHiveMetastoreConfig
     private Optional<String> iamRole = Optional.empty();
     private Optional<String> lakeFormationPartnerTagValue = Optional.empty();
     private Optional<String> lakeFormationPartnerTagName = Optional.empty();
+    private Optional<String> supportedPermissionType = Optional.of(SUPPORTED_PERMISSION_TYPE);
     private boolean impersonationEnabled;
     private boolean columnStatisticsEnabled;
 
@@ -169,6 +172,19 @@ public class GlueHiveMetastoreConfig
     public GlueHiveMetastoreConfig setLakeFormationPartnerTagValue(String lakeFormationPartnerTagValue)
     {
         this.lakeFormationPartnerTagValue = Optional.ofNullable(lakeFormationPartnerTagValue);
+        return this;
+    }
+
+    public Optional<String> getSupportedPermissionType()
+    {
+        return supportedPermissionType;
+    }
+
+    @Config("hive.metastore.glue.lakeformation.supported-permission-type")
+    @ConfigDescription("Type of AWS Lake Formation permissions supported. COLUMN_PERMISSION or CELL_FILTER_PERMISSION")
+    public GlueHiveMetastoreConfig setSupportedPermissionType(String supportedPermissionType)
+    {
+        this.supportedPermissionType = Optional.ofNullable(supportedPermissionType);
         return this;
     }
 

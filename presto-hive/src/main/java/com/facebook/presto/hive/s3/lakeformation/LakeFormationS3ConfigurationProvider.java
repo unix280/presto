@@ -24,8 +24,8 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.glue.model.EntityNotFoundException;
 import com.amazonaws.services.lakeformation.AWSLakeFormationAsync;
 import com.amazonaws.services.lakeformation.AWSLakeFormationAsyncClientBuilder;
-import com.amazonaws.services.lakeformation.model.GetTemporaryTableCredentialsRequest;
-import com.amazonaws.services.lakeformation.model.GetTemporaryTableCredentialsResult;
+import com.amazonaws.services.lakeformation.model.GetTemporaryGlueTableCredentialsRequest;
+import com.amazonaws.services.lakeformation.model.GetTemporaryGlueTableCredentialsResult;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceAsync;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceAsyncClientBuilder;
 import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
@@ -51,6 +51,7 @@ import javax.inject.Inject;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -76,16 +77,17 @@ public class LakeFormationS3ConfigurationProvider
     private final String catalogIamRole;
     private final String lakeFormationPartnerTagName;
     private final String lakeFormationPartnerTagValue;
+    private final Optional<String> supportedPermissionType;
     private final boolean impersonationEnabled;
     private final Supplier<GlueSecurityMappings> mappings;
     private final LoadingCache<String, AWSCredentialsProvider> awsCredentialsProviderLoadingCache;
     private final LoadingCache<String, Optional<String>> accountIdLoadingCache;
-    private LoadingCache<TableCredentialsCacheKey, Optional<GetTemporaryTableCredentialsResult>> tableCredentialsLoadingCache;
+    private LoadingCache<TableCredentialsCacheKey, Optional<GetTemporaryGlueTableCredentialsResult>> tableCredentialsLoadingCache;
     private final AWSLakeFormationAsync lakeFormationClient;
     private final AWSSecurityTokenServiceAsync stsClient;
 
     @TestOnly
-    public LakeFormationS3ConfigurationProvider setTableCredentialsLoadingCache(LoadingCache<TableCredentialsCacheKey, Optional<GetTemporaryTableCredentialsResult>> tableCredentialsLoadingCache)
+    public LakeFormationS3ConfigurationProvider setTableCredentialsLoadingCache(LoadingCache<TableCredentialsCacheKey, Optional<GetTemporaryGlueTableCredentialsResult>> tableCredentialsLoadingCache)
     {
         this.tableCredentialsLoadingCache = tableCredentialsLoadingCache;
         return this;
@@ -106,6 +108,7 @@ public class LakeFormationS3ConfigurationProvider
         this.mappings = mappings;
         this.lakeFormationPartnerTagName = glueHiveMetastoreConfig.getLakeFormationPartnerTagName().orElse(LAKE_FORMATION_AUTHORIZED_CALLER);
         this.lakeFormationPartnerTagValue = glueHiveMetastoreConfig.getLakeFormationPartnerTagValue().orElse(AHANA);
+        this.supportedPermissionType = glueHiveMetastoreConfig.getSupportedPermissionType();
         this.impersonationEnabled = glueHiveMetastoreConfig.isImpersonationEnabled();
 
         verify(!impersonationEnabled || mappings != null, "Glue Security Mapping has to be configured if impersonation is enabled");
@@ -157,7 +160,7 @@ public class LakeFormationS3ConfigurationProvider
             region = glueRegion != null ? glueRegion : new DefaultAwsRegionProviderChain().getRegion();
         }
         catch (SdkClientException e) {
-            throw new SdkClientException(
+            throw new AccessDeniedException(
                     "Unable to find a region via the region provider chain. " +
                     "Must provide an explicit region in the builder or setup environment to supply a region.");
         }
@@ -168,11 +171,10 @@ public class LakeFormationS3ConfigurationProvider
         if (tableArn != null) {
             TableCredentialsCacheKey tableCredentialsCacheKey = new TableCredentialsCacheKey(tableArn, iamRole);
 
-            GetTemporaryTableCredentialsResult result;
-            result = tableCredentialsLoadingCache.getUnchecked(tableCredentialsCacheKey)
-                    .orElseThrow(() -> new AccessDeniedException(String.format("Error vending credentials or table [%s] does not exist", tableArn)));
+            GetTemporaryGlueTableCredentialsResult result;
+            result = tableCredentialsLoadingCache.getUnchecked(tableCredentialsCacheKey).orElse(null);
 
-            if (!(isNullOrEmpty(result.getAccessKeyId()) || isNullOrEmpty(result.getSecretAccessKey()) || isNullOrEmpty(result.getSessionToken()))) {
+            if (result != null && !(isNullOrEmpty(result.getAccessKeyId()) || isNullOrEmpty(result.getSecretAccessKey()) || isNullOrEmpty(result.getSessionToken()))) {
                 configuration.set(S3_ACCESS_KEY, result.getAccessKeyId());
                 configuration.set(S3_SECRET_KEY, result.getSecretAccessKey());
                 configuration.set(S3_SESSION_TOKEN, result.getSessionToken());
@@ -180,19 +182,24 @@ public class LakeFormationS3ConfigurationProvider
         }
     }
 
-    private Optional<GetTemporaryTableCredentialsResult> getTemporaryTableCredentials(TableCredentialsCacheKey tableCredentialsCacheKey)
+    private Optional<GetTemporaryGlueTableCredentialsResult> getTemporaryTableCredentials(TableCredentialsCacheKey tableCredentialsCacheKey)
     {
         try {
+            List<String> supportedPermissionTypes = new ArrayList<>();
+            supportedPermissionType.ifPresent(supportedPermissionTypes::add);
+
             if (impersonationEnabled) {
                 AWSCredentialsProvider credentialsProvider = awsCredentialsProviderLoadingCache.getUnchecked(tableCredentialsCacheKey.getIamRole());
 
-                return Optional.of(lakeFormationClient.getTemporaryTableCredentials(new GetTemporaryTableCredentialsRequest()
+                return Optional.of(lakeFormationClient.getTemporaryGlueTableCredentials(new GetTemporaryGlueTableCredentialsRequest()
                         .withTableArn(tableCredentialsCacheKey.getTableArn())
+                        .withSupportedPermissionTypes(supportedPermissionTypes)
                         .withRequestCredentialsProvider(credentialsProvider)));
             }
             else {
-                return Optional.of(lakeFormationClient.getTemporaryTableCredentials(new GetTemporaryTableCredentialsRequest()
-                        .withTableArn(tableCredentialsCacheKey.getTableArn())));
+                return Optional.of(lakeFormationClient.getTemporaryGlueTableCredentials(new GetTemporaryGlueTableCredentialsRequest()
+                        .withTableArn(tableCredentialsCacheKey.getTableArn())
+                        .withSupportedPermissionTypes(supportedPermissionTypes)));
             }
         }
         catch (EntityNotFoundException e) {

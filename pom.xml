@@ -1184,7 +1184,7 @@
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-glue</artifactId>
-                <version>preview</version>
+                <version>preview-latest</version>
                 <exclusions>
                     <exclusion>
                         <groupId>commons-logging</groupId>
@@ -1220,7 +1220,7 @@
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-lakeformation</artifactId>
-                <version>preview</version>
+                <version>preview-latest</version>
                 <exclusions>
                     <exclusion>
                         <groupId>commons-logging</groupId>

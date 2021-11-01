@@ -46,7 +46,7 @@ import com.amazonaws.services.glue.model.GetPartitionsResult;
 import com.amazonaws.services.glue.model.GetTableRequest;
 import com.amazonaws.services.glue.model.GetTablesRequest;
 import com.amazonaws.services.glue.model.GetTablesResult;
-import com.amazonaws.services.glue.model.GetUnfilteredTableRequest;
+import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataRequest;
 import com.amazonaws.services.glue.model.PartitionError;
 import com.amazonaws.services.glue.model.PartitionInput;
 import com.amazonaws.services.glue.model.PartitionValueList;
@@ -174,6 +174,7 @@ public class GlueHiveMetastore
     private final Executor partitionsReadExecutor;
     private final String lakeFormationPartnerTagName;
     private final String lakeFormationPartnerTagValue;
+    private final Optional<String> supportedPermissionType;
     private final boolean impersonationEnabled;
 
     @Inject
@@ -194,6 +195,7 @@ public class GlueHiveMetastore
         this.partitionsReadExecutor = requireNonNull(partitionsReadExecutor, "executor is null");
         this.lakeFormationPartnerTagName = glueConfig.getLakeFormationPartnerTagName().orElse(LAKE_FORMATION_AUTHORIZED_CALLER);
         this.lakeFormationPartnerTagValue = glueConfig.getLakeFormationPartnerTagValue().orElse(AHANA);
+        this.supportedPermissionType = glueConfig.getSupportedPermissionType();
         this.mappings = requireNonNull(glueSecurityMappingsSupplier, "glueSecurityMappingsSupplier is null").getMappingsSupplier();
         this.impersonationEnabled = glueConfig.isImpersonationEnabled();
 
@@ -304,10 +306,14 @@ public class GlueHiveMetastore
         return stats.getGetTable().record(() -> {
             try {
                 if (impersonationEnabled) {
-                    return Optional.of(glueClient.getUnfilteredTable(new GetUnfilteredTableRequest()
+                    List<String> supportedPermissionTypes = new ArrayList<>();
+                    supportedPermissionType.ifPresent(supportedPermissionTypes::add);
+
+                    return Optional.of(glueClient.getUnfilteredTableMetadata(new GetUnfilteredTableMetadataRequest()
                             .withCatalogId(catalogId)
                             .withDatabaseName(databaseName)
                             .withName(tableName)
+                            .withSupportedPermissionTypes(supportedPermissionTypes)
                             .withRequestCredentialsProvider(getAwsCredentialsProvider(metastoreContext))).getTable());
                 }
                 else {

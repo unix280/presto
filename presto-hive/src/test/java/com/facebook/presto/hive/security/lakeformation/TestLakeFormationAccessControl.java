@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.security.lakeformation;
 
-import com.amazonaws.services.glue.model.GetUnfilteredTableResult;
+import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingConfig;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.security.lakeformation.LakeFormationAccessControl.LFPolicyCacheKey;
@@ -53,7 +53,7 @@ public class TestLakeFormationAccessControl
     private static final String ANALYST_IAM_ROLE = "arn:aws:iam::789986721738:role/test_analyst_role";
     private static final String DEFAULT_IAM_ROLE = "arn:aws:iam::789986721738:role/test_default_role";
 
-    private final Map<LFPolicyCacheKey, Optional<GetUnfilteredTableResult>> mockGetUnfilteredTable = new HashMap<>();
+    private final Map<LFPolicyCacheKey, Optional<GetUnfilteredTableMetadataResult>> mockGetUnfilteredTable = new HashMap<>();
     private ConnectorAccessControl lakeFormationAccessControl;
 
     /*
@@ -69,8 +69,8 @@ public class TestLakeFormationAccessControl
 
         // User: admin, Database: test, Table: customer, Access: All columns
         LFPolicyCacheKey adminCustomerLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "customer"), ADMIN_IAM_ROLE);
-        GetUnfilteredTableResult adminCustomerGetUnfilteredTableResult =
-                new GetUnfilteredTableResult()
+        GetUnfilteredTableMetadataResult adminCustomerGetUnfilteredTableResult =
+                new GetUnfilteredTableMetadataResult()
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("custkey", "name", "address", "nation", "phone", "acctbal", "mktsegment");
 
@@ -78,8 +78,8 @@ public class TestLakeFormationAccessControl
 
         // User: admin, Database: test, Table: orders, Access: All columns
         LFPolicyCacheKey adminOrdersLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "orders"), ADMIN_IAM_ROLE);
-        GetUnfilteredTableResult adminOrdersGetUnfilteredTableResult =
-                new GetUnfilteredTableResult()
+        GetUnfilteredTableMetadataResult adminOrdersGetUnfilteredTableResult =
+                new GetUnfilteredTableMetadataResult()
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "totalprice", "orderdate", "order-priority");
 
@@ -87,8 +87,8 @@ public class TestLakeFormationAccessControl
 
         // User: analyst, Database: test, Table: customer, Access: Columns[custkey, name, nation, mktsegment]
         LFPolicyCacheKey analystCustomerLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "customer"), ANALYST_IAM_ROLE);
-        GetUnfilteredTableResult analystCustomerGetUnfilteredTableResult =
-                new GetUnfilteredTableResult()
+        GetUnfilteredTableMetadataResult analystCustomerGetUnfilteredTableResult =
+                new GetUnfilteredTableMetadataResult()
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("custkey", "name", "nation", "mktsegment");
 
@@ -96,8 +96,8 @@ public class TestLakeFormationAccessControl
 
         // User: analyst, Database: test, Table: orders, Access: Columns[orderkey, custkey, orderstatus, orderdate]
         LFPolicyCacheKey analystOrdersLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "orders"), ANALYST_IAM_ROLE);
-        GetUnfilteredTableResult analystOrdersGetUnfilteredTableResult =
-                new GetUnfilteredTableResult()
+        GetUnfilteredTableMetadataResult analystOrdersGetUnfilteredTableResult =
+                new GetUnfilteredTableMetadataResult()
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "orderdate");
 
@@ -107,8 +107,8 @@ public class TestLakeFormationAccessControl
         LFPolicyCacheKey anyUserCustomerLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "customer"), DEFAULT_IAM_ROLE);
         LFPolicyCacheKey anyUserOrdersLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "orders"), DEFAULT_IAM_ROLE);
 
-        GetUnfilteredTableResult anyUserGetUnfilteredTableResult =
-                new GetUnfilteredTableResult()
+        GetUnfilteredTableMetadataResult anyUserGetUnfilteredTableResult =
+                new GetUnfilteredTableMetadataResult()
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns(new ArrayList<>());
 
@@ -383,7 +383,7 @@ public class TestLakeFormationAccessControl
         return lakeFormationAccessControl;
     }
 
-    private Optional<GetUnfilteredTableResult> mockGetUnfilteredTableResult(LFPolicyCacheKey lfPolicyCacheKey)
+    private Optional<GetUnfilteredTableMetadataResult> mockGetUnfilteredTableResult(LFPolicyCacheKey lfPolicyCacheKey)
     {
         if (mockGetUnfilteredTable.containsKey(lfPolicyCacheKey)) {
             return mockGetUnfilteredTable.get(lfPolicyCacheKey);

@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.s3.lakeformation;
 
-import com.amazonaws.services.lakeformation.model.GetTemporaryTableCredentialsResult;
+import com.amazonaws.services.lakeformation.model.GetTemporaryGlueTableCredentialsResult;
 import com.facebook.presto.hive.DynamicConfigurationProvider;
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.HiveClientConfig;
@@ -25,7 +25,6 @@ import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingConfig;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.s3.lakeformation.LakeFormationS3ConfigurationProvider.TableCredentialsCacheKey;
 import com.facebook.presto.spi.ConnectorSession;
-import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.testing.TestingConnectorSession;
 import com.google.common.cache.CacheBuilder;
@@ -47,7 +46,6 @@ import static com.facebook.presto.hive.s3.lakeformation.TestLakeFormationS3Confi
 import static com.google.common.io.Resources.getResource;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
@@ -59,7 +57,7 @@ public class TestLakeFormationS3ConfigurationProvider
     private static final String ANALYST_IAM_ROLE = "arn:aws:iam::789986721738:role/test_analyst_role";
     private static final String DEFAULT_IAM_ROLE = "arn:aws:iam::789986721738:role/test_default_role";
 
-    private final Map<TableCredentialsCacheKey, Optional<GetTemporaryTableCredentialsResult>> mockGetTemporaryTableCredentialsResult = new HashMap<>();
+    private final Map<TableCredentialsCacheKey, Optional<GetTemporaryGlueTableCredentialsResult>> mockGetTemporaryTableCredentialsResult = new HashMap<>();
     private DynamicConfigurationProvider provider;
 
     /*
@@ -75,7 +73,7 @@ public class TestLakeFormationS3ConfigurationProvider
 
         // User: admin
         TableCredentialsCacheKey adminTableCredentialsCacheKey = new TableCredentialsCacheKey(TABLE_ARN, ADMIN_IAM_ROLE);
-        GetTemporaryTableCredentialsResult adminGetTemporaryTableCredentialsResult = new GetTemporaryTableCredentialsResult()
+        GetTemporaryGlueTableCredentialsResult adminGetTemporaryTableCredentialsResult = new GetTemporaryGlueTableCredentialsResult()
                 .withAccessKeyId("adminAccessKey")
                 .withSecretAccessKey("adminSecretKey")
                 .withSessionToken("adminSessionToken");
@@ -84,7 +82,7 @@ public class TestLakeFormationS3ConfigurationProvider
 
         // User: analyst
         TableCredentialsCacheKey analystTableCredentialsCacheKey = new TableCredentialsCacheKey(TABLE_ARN, ANALYST_IAM_ROLE);
-        GetTemporaryTableCredentialsResult analystGetTemporaryTableCredentialsResult = new GetTemporaryTableCredentialsResult()
+        GetTemporaryGlueTableCredentialsResult analystGetTemporaryTableCredentialsResult = new GetTemporaryGlueTableCredentialsResult()
                 .withAccessKeyId("analystAccessKey")
                 .withSecretAccessKey("analystSecretKey")
                 .withSessionToken("analystSessionToken");
@@ -137,9 +135,15 @@ public class TestLakeFormationS3ConfigurationProvider
     {
         Configuration configuration = new Configuration(false);
 
-        assertThatThrownBy(() -> applyMapping(provider, selector, configuration))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessage("Access Denied: " + message);
+        assertNull(configuration.get(S3_ACCESS_KEY));
+        assertNull(configuration.get(S3_SECRET_KEY));
+        assertNull(configuration.get(S3_SESSION_TOKEN));
+
+        applyMapping(provider, selector, configuration);
+
+        assertNull(configuration.get(S3_ACCESS_KEY));
+        assertNull(configuration.get(S3_SECRET_KEY));
+        assertNull(configuration.get(S3_SESSION_TOKEN));
     }
 
     private static void applyMapping(DynamicConfigurationProvider provider, MappingSelector selector, Configuration configuration)
@@ -162,7 +166,7 @@ public class TestLakeFormationS3ConfigurationProvider
                 .setTableCredentialsLoadingCache(CacheBuilder.newBuilder().build(CacheLoader.from(this::mockGetTemporaryTableCredentials)));
     }
 
-    private Optional<GetTemporaryTableCredentialsResult> mockGetTemporaryTableCredentials(TableCredentialsCacheKey tableCredentialsCacheKey)
+    private Optional<GetTemporaryGlueTableCredentialsResult> mockGetTemporaryTableCredentials(TableCredentialsCacheKey tableCredentialsCacheKey)
     {
         if (mockGetTemporaryTableCredentialsResult.containsKey(tableCredentialsCacheKey)) {
             return mockGetTemporaryTableCredentialsResult.get(tableCredentialsCacheKey);
