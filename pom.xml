@@ -179,6 +179,7 @@
         <module>presto-cluster-ttl-providers</module>
         <module>presto-delta</module>
         <module>presto-google-sheets</module>
+        <module>presto-hive-function-namespace</module>
     </modules>
 
     <dependencyManagement>
@@ -249,6 +250,12 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-cluster-ttl-providers</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-hive-function-namespace</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
