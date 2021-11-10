@@ -62,7 +62,7 @@ public class FileSessionPropertyManager
                 String message = format("Unknown property at line %s:%s: %s",
                         ex.getLocation().getLineNr(),
                         ex.getLocation().getColumnNr(),
-                        ex.getPropertyName());
+                         ex.getPropertyName());
                 throw new IllegalArgumentException(message, e);
             }
             if (cause instanceof JsonMappingException) {
