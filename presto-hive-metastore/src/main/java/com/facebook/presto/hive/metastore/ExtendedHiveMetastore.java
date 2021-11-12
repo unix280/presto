@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore;
 
+import com.facebook.presto.common.NotSupportedException;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveType;
@@ -126,4 +127,14 @@ public interface ExtendedHiveMetastore
     boolean isImpersonationEnabled();
 
     void setPartitionLeases(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, String> partitionNameToLocation, Duration leaseDuration);
+
+    default long lock(MetastoreContext metastoreContext, String databaseName, String tableName)
+    {
+        throw new NotSupportedException("Lock is not supported by default");
+    }
+
+    default void unlock(MetastoreContext metastoreContext, long lockId)
+    {
+        throw new NotSupportedException("Unlock is not supported by default");
+    }
 }
