@@ -493,7 +493,7 @@ public class CachingHiveMetastore
     protected void invalidateDatabase(String databaseName)
     {
         invalidateDatabaseCache(databaseName);
-        invalidateDatabaseNamesCache(databaseName);
+        databaseNamesCache.invalidateAll();
     }
 
     private void invalidateDatabaseCache(String databaseName)
@@ -501,13 +501,6 @@ public class CachingHiveMetastore
         databaseCache.asMap().keySet().stream()
                 .filter(database -> database.getKey().equals(databaseName))
                 .forEach(databaseCache::invalidate);
-    }
-
-    private void invalidateDatabaseNamesCache(String databaseName)
-    {
-        databaseNamesCache.asMap().keySet().stream()
-                .filter(dbName -> databaseNamesCache.getUnchecked(dbName).contains(databaseName))
-                .forEach(databaseNamesCache::invalidate);
     }
 
     @Override
