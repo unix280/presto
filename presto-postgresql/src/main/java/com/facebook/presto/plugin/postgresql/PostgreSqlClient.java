@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.plugin.postgresql;
 
+import com.esri.core.geometry.ogc.OGCGeometry;
 import com.facebook.airlift.json.ObjectMapperProvider;
 import com.facebook.presto.common.type.StandardTypes;
 import com.facebook.presto.common.type.Type;
@@ -51,9 +52,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Optional;
 
+import static com.esri.core.geometry.ogc.OGCGeometry.fromBinary;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
+import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.common.type.VarcharType.createVarcharType;
+import static com.facebook.presto.geospatial.GeometryUtils.wktFromJtsGeometry;
+import static com.facebook.presto.geospatial.serde.EsriGeometrySerde.serialize;
+import static com.facebook.presto.geospatial.serde.JtsGeometrySerde.deserialize;
+import static com.facebook.presto.operator.scalar.VarbinaryFunctions.fromHexVarbinary;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static com.facebook.presto.plugin.jdbc.StandardReadMappings.varcharReadMapping;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
@@ -63,6 +70,7 @@ import static com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTR
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 
 public class PostgreSqlClient
         extends BaseJdbcClient
@@ -125,6 +133,8 @@ public class PostgreSqlClient
                     return Optional.of(varcharReadMapping(createUnboundedVarcharType()));
                 }
                 return Optional.of(varcharReadMapping(createVarcharType(columnSize)));
+            case "geometry":
+                return Optional.of(geometryColumnMapping());
             case "jsonb":
             case "json":
                 return Optional.of(jsonColumnMapping());
@@ -191,5 +201,31 @@ public class PostgreSqlClient
         // Jackson tries to detect the character encoding automatically when using InputStream
         // so we pass an InputStreamReader instead.
         return factory.createParser(new InputStreamReader(json.getInput(), UTF_8));
+    }
+
+    private ReadMapping geometryColumnMapping()
+    {
+        return ReadMapping.sliceReadMapping(
+                VARCHAR,
+                (resultSet, columnIndex) -> getAsText(getGeomFromBinary(fromHexVarbinary(utf8Slice(resultSet.getString(columnIndex))))));
+    }
+
+    private static Slice getAsText(Slice input)
+    {
+        return utf8Slice(wktFromJtsGeometry(deserialize(input)));
+    }
+
+    private static Slice getGeomFromBinary(Slice input)
+    {
+        requireNonNull(input, "input is null");
+        OGCGeometry geometry;
+        try {
+            geometry = fromBinary(input.toByteBuffer().slice());
+        }
+        catch (IllegalArgumentException | IndexOutOfBoundsException e) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Invalid WKB", e);
+        }
+        geometry.setSpatialReference(null);
+        return serialize(geometry);
     }
 }
