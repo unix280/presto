@@ -199,6 +199,9 @@ public class HiveClientConfig
 
     private boolean verboseRuntimeStatsEnabled;
 
+    private boolean sizeBasedSplitWeightsEnabled = true;
+    private double minimumAssignedSplitWeight = 0.05;
+
     public int getMaxInitialSplits()
     {
         return maxInitialSplits;
@@ -1682,5 +1685,32 @@ public class HiveClientConfig
     public int getMaterializedViewMissingPartitionsThreshold()
     {
         return this.materializedViewMissingPartitionsThreshold;
+    }
+
+    @Config("hive.size-based-split-weights-enabled")
+    public HiveClientConfig setSizeBasedSplitWeightsEnabled(boolean sizeBasedSplitWeightsEnabled)
+    {
+        this.sizeBasedSplitWeightsEnabled = sizeBasedSplitWeightsEnabled;
+        return this;
+    }
+
+    public boolean isSizeBasedSplitWeightsEnabled()
+    {
+        return sizeBasedSplitWeightsEnabled;
+    }
+
+    @Config("hive.minimum-assigned-split-weight")
+    @ConfigDescription("Minimum weight that a split can be assigned when size based split weights are enabled")
+    public HiveClientConfig setMinimumAssignedSplitWeight(double minimumAssignedSplitWeight)
+    {
+        this.minimumAssignedSplitWeight = minimumAssignedSplitWeight;
+        return this;
+    }
+
+    @DecimalMax("1.0") // standard split weight
+    @DecimalMin(value = "0", inclusive = false)
+    public double getMinimumAssignedSplitWeight()
+    {
+        return minimumAssignedSplitWeight;
     }
 }

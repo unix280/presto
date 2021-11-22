@@ -127,6 +127,8 @@ public final class HiveSessionProperties
     public static final String ENABLE_LOOSE_MEMORY_BASED_ACCOUNTING = "enable_loose_memory_based_accounting";
     public static final String MATERIALIZED_VIEW_MISSING_PARTITIONS_THRESHOLD = "materialized_view_missing_partitions_threshold";
     public static final String VERBOSE_RUNTIME_STATS_ENABLED = "verbose_runtime_stats_enabled";
+    public static final String SIZE_BASED_SPLIT_WEIGHTS_ENABLED = "size_based_split_weights_enabled";
+    public static final String MINIMUM_ASSIGNED_SPLIT_WEIGHT = "minimum_assigned_split_weight";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -605,7 +607,27 @@ public final class HiveSessionProperties
                         METASTORE_HEADERS,
                         "The headers that will be sent in the calls to Metastore",
                         null,
-                        false));
+                        false),
+                booleanProperty(
+                        SIZE_BASED_SPLIT_WEIGHTS_ENABLED,
+                        "Enable estimating split weights based on size in bytes",
+                        hiveClientConfig.isSizeBasedSplitWeightsEnabled(),
+                        false),
+                new PropertyMetadata<>(
+                        MINIMUM_ASSIGNED_SPLIT_WEIGHT,
+                        "Minimum assigned split weight when size based split weighting is enabled",
+                        DOUBLE,
+                        Double.class,
+                        hiveClientConfig.getMinimumAssignedSplitWeight(),
+                        false,
+                        value -> {
+                            double doubleValue = ((Number) value).doubleValue();
+                            if (!Double.isFinite(doubleValue) || doubleValue <= 0 || doubleValue > 1) {
+                                throw new PrestoException(INVALID_SESSION_PROPERTY, format("%s must be > 0 and <= 1.0: %s", MINIMUM_ASSIGNED_SPLIT_WEIGHT, value));
+                            }
+                            return doubleValue;
+                        },
+                        value -> value));
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
@@ -1054,5 +1076,15 @@ public final class HiveSessionProperties
     public static boolean isVerboseRuntimeStatsEnabled(ConnectorSession session)
     {
         return session.getProperty(VERBOSE_RUNTIME_STATS_ENABLED, Boolean.class);
+    }
+
+    public static boolean isSizeBasedSplitWeightsEnabled(ConnectorSession session)
+    {
+        return session.getProperty(SIZE_BASED_SPLIT_WEIGHTS_ENABLED, Boolean.class);
+    }
+
+    public static double getMinimumAssignedSplitWeight(ConnectorSession session)
+    {
+        return session.getProperty(MINIMUM_ASSIGNED_SPLIT_WEIGHT, Double.class);
     }
 }

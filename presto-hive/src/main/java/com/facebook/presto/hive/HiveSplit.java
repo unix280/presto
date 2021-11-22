@@ -18,6 +18,7 @@ import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.SplitWeight;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -66,6 +67,7 @@ public class HiveSplit
     private final Optional<EncryptionInformation> encryptionInformation;
     private final Map<String, String> customSplitInfo;
     private final Set<ColumnHandle> redundantColumnDomains;
+    private final SplitWeight splitWeight;
 
     @JsonCreator
     public HiveSplit(
@@ -91,7 +93,8 @@ public class HiveSplit
             @JsonProperty("cacheQuota") CacheQuotaRequirement cacheQuotaRequirement,
             @JsonProperty("encryptionMetadata") Optional<EncryptionInformation> encryptionInformation,
             @JsonProperty("customSplitInfo") Map<String, String> customSplitInfo,
-            @JsonProperty("redundantColumnDomains") Set<ColumnHandle> redundantColumnDomains)
+            @JsonProperty("redundantColumnDomains") Set<ColumnHandle> redundantColumnDomains,
+            @JsonProperty("splitWeight") SplitWeight splitWeight)
     {
         checkArgument(start >= 0, "start must be positive");
         checkArgument(length >= 0, "length must be positive");
@@ -137,6 +140,7 @@ public class HiveSplit
         this.encryptionInformation = encryptionInformation;
         this.customSplitInfo = ImmutableMap.copyOf(requireNonNull(customSplitInfo, "customSplitInfo is null"));
         this.redundantColumnDomains = ImmutableSet.copyOf(redundantColumnDomains);
+        this.splitWeight = requireNonNull(splitWeight, "splitWeight is null");
     }
 
     @JsonProperty
@@ -301,6 +305,13 @@ public class HiveSplit
     public Set<ColumnHandle> getRedundantColumnDomains()
     {
         return redundantColumnDomains;
+    }
+
+    @JsonProperty
+    @Override
+    public SplitWeight getSplitWeight()
+    {
+        return splitWeight;
     }
 
     @Override
