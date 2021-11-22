@@ -22,6 +22,7 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.glue.AWSGlueAsync;
 import com.amazonaws.services.glue.AWSGlueAsyncClientBuilder;
+import com.amazonaws.services.glue.model.Column;
 import com.amazonaws.services.glue.model.EntityNotFoundException;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataRequest;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
@@ -59,6 +60,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.hive.metastore.glue.GlueHiveMetastore.AHANA;
 import static com.facebook.presto.hive.metastore.glue.GlueHiveMetastore.LAKE_FORMATION_AUTHORIZED_CALLER;
@@ -360,8 +362,19 @@ public class LakeFormationAccessControl
         }
         if (result.get().isRegisteredWithLakeFormation()) {
             List<String> authorizedColumns = result.get().getAuthorizedColumns();
+
+            if (authorizedColumns.isEmpty()) {
+                denySelectTable(tableName.getTableName(), format("Access Denied: User [ %s ] does not have [SELECT] " +
+                        "privilege on any column of [ %s/%s ]", identity.getUser(), tableName.getSchemaName(), tableName.getTableName()));
+            }
+
+            List<Column> allColumns = result.get().getTable().getStorageDescriptor().getColumns();
+            List<String> allColumnNames = allColumns.stream().map(Column::getName).collect(Collectors.toList());
             Set<String> deniedColumns = new HashSet<>();
+
+            // Allow access for presto special columns since they won't be part of LF Authorized columns list
             columnNames.stream()
+                    .filter(allColumnNames::contains)
                     .filter(columnName -> !authorizedColumns.contains(columnName))
                     .forEach(deniedColumns::add);
 
@@ -437,8 +450,19 @@ public class LakeFormationAccessControl
         }
         if (result.get().isRegisteredWithLakeFormation()) {
             List<String> authorizedColumns = result.get().getAuthorizedColumns();
+
+            if (authorizedColumns.isEmpty()) {
+                denySelectTable(tableName.getTableName(), format("Access Denied: User [ %s ] does not have [SELECT] " +
+                        "privilege on any column of [ %s/%s ]", identity.getUser(), tableName.getSchemaName(), tableName.getTableName()));
+            }
+
+            List<Column> allColumns = result.get().getTable().getStorageDescriptor().getColumns();
+            List<String> allColumnNames = allColumns.stream().map(Column::getName).collect(Collectors.toList());
             Set<String> deniedColumns = new HashSet<>();
+
+            // Allow access for presto special columns since they won't be part of LF Authorized columns list
             columnNames.stream()
+                    .filter(allColumnNames::contains)
                     .filter(columnName -> !authorizedColumns.contains(columnName))
                     .forEach(deniedColumns::add);
 

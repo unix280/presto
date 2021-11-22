@@ -13,7 +13,10 @@
  */
 package com.facebook.presto.hive.security.lakeformation;
 
+import com.amazonaws.services.glue.model.Column;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
+import com.amazonaws.services.glue.model.StorageDescriptor;
+import com.amazonaws.services.glue.model.Table;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingConfig;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.security.lakeformation.LakeFormationAccessControl.LFPolicyCacheKey;
@@ -36,6 +39,7 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -67,10 +71,38 @@ public class TestLakeFormationAccessControl
     {
         this.lakeFormationAccessControl = createLakeFormationAccessControl();
 
+        // Create table customer
+        Table customerTable = new Table();
+        StorageDescriptor customerSD = new StorageDescriptor();
+        List<Column> customerColumns = new ArrayList<>();
+        customerColumns.add(new Column().withName("custkey").withType("INTEGER"));
+        customerColumns.add(new Column().withName("name").withType("VARCHAR"));
+        customerColumns.add(new Column().withName("address").withType("VARCHAR"));
+        customerColumns.add(new Column().withName("nation").withType("VARCHAR"));
+        customerColumns.add(new Column().withName("phone").withType("BIGINT"));
+        customerColumns.add(new Column().withName("acctbal").withType("BIGINT"));
+        customerColumns.add(new Column().withName("mktsegment").withType("VARCHAR"));
+        customerSD.setColumns(customerColumns);
+        customerTable.setStorageDescriptor(customerSD);
+
+        // Create table orders
+        Table ordersTable = new Table();
+        StorageDescriptor ordersSD = new StorageDescriptor();
+        List<Column> ordersColumns = new ArrayList<>();
+        ordersColumns.add(new Column().withName("orderkey").withType("INTEGER"));
+        ordersColumns.add(new Column().withName("custkey").withType("INTEGER"));
+        ordersColumns.add(new Column().withName("orderstatus").withType("VARCHAR"));
+        ordersColumns.add(new Column().withName("totalprice").withType("INTEGER"));
+        ordersColumns.add(new Column().withName("orderdate").withType("DATE"));
+        ordersColumns.add(new Column().withName("order-priority").withType("VARCHAR"));
+        ordersSD.setColumns(ordersColumns);
+        ordersTable.setStorageDescriptor(ordersSD);
+
         // User: admin, Database: test, Table: customer, Access: All columns
         LFPolicyCacheKey adminCustomerLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "customer"), ADMIN_IAM_ROLE);
         GetUnfilteredTableMetadataResult adminCustomerGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
+                        .withTable(customerTable)
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("custkey", "name", "address", "nation", "phone", "acctbal", "mktsegment");
 
@@ -80,6 +112,7 @@ public class TestLakeFormationAccessControl
         LFPolicyCacheKey adminOrdersLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "orders"), ADMIN_IAM_ROLE);
         GetUnfilteredTableMetadataResult adminOrdersGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
+                        .withTable(ordersTable)
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "totalprice", "orderdate", "order-priority");
 
@@ -89,6 +122,7 @@ public class TestLakeFormationAccessControl
         LFPolicyCacheKey analystCustomerLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "customer"), ANALYST_IAM_ROLE);
         GetUnfilteredTableMetadataResult analystCustomerGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
+                        .withTable(customerTable)
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("custkey", "name", "nation", "mktsegment");
 
@@ -98,6 +132,7 @@ public class TestLakeFormationAccessControl
         LFPolicyCacheKey analystOrdersLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "orders"), ANALYST_IAM_ROLE);
         GetUnfilteredTableMetadataResult analystOrdersGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
+                        .withTable(ordersTable)
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "orderdate");
 
@@ -107,13 +142,20 @@ public class TestLakeFormationAccessControl
         LFPolicyCacheKey anyUserCustomerLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "customer"), DEFAULT_IAM_ROLE);
         LFPolicyCacheKey anyUserOrdersLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "orders"), DEFAULT_IAM_ROLE);
 
-        GetUnfilteredTableMetadataResult anyUserGetUnfilteredTableResult =
+        GetUnfilteredTableMetadataResult anyUserCustomerGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
+                        .withTable(customerTable)
                         .withIsRegisteredWithLakeFormation(true)
                         .withAuthorizedColumns(new ArrayList<>());
 
-        this.mockGetUnfilteredTable.put(anyUserCustomerLFPolicyCacheKey, Optional.of(anyUserGetUnfilteredTableResult));
-        this.mockGetUnfilteredTable.put(anyUserOrdersLFPolicyCacheKey, Optional.of(anyUserGetUnfilteredTableResult));
+        GetUnfilteredTableMetadataResult anyUserOrdersGetUnfilteredTableResult =
+                new GetUnfilteredTableMetadataResult()
+                        .withTable(ordersTable)
+                        .withIsRegisteredWithLakeFormation(true)
+                        .withAuthorizedColumns(new ArrayList<>());
+
+        this.mockGetUnfilteredTable.put(anyUserCustomerLFPolicyCacheKey, Optional.of(anyUserCustomerGetUnfilteredTableResult));
+        this.mockGetUnfilteredTable.put(anyUserOrdersLFPolicyCacheKey, Optional.of(anyUserOrdersGetUnfilteredTableResult));
     }
 
     @Test
@@ -287,6 +329,14 @@ public class TestLakeFormationAccessControl
                 CONTEXT,
                 new SchemaTableName("information_schema", "table"),
                 ImmutableSet.of());
+
+        // Allow if columns are Presto special columns
+        lakeFormationAccessControl.checkCanSelectFromColumns(
+                TRANSACTION_HANDLE,
+                user("admin"),
+                CONTEXT,
+                new SchemaTableName("test", "customer"),
+                ImmutableSet.of("$path"));
 
         // User: admin, full access to all tables
         lakeFormationAccessControl.checkCanSelectFromColumns(
