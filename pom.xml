@@ -30,7 +30,7 @@
     <scm>
         <connection>scm:git:git://github.com/prestodb/presto.git</connection>
         <url>https://github.com/prestodb/presto</url>
-        <tag>0.265-SNAPSHOT</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <properties>
@@ -178,6 +178,7 @@
         <module>presto-node-ttl-fetchers</module>
         <module>presto-cluster-ttl-providers</module>
         <module>presto-delta</module>
+        <module>presto-google-sheets</module>
     </modules>
 
     <dependencyManagement>

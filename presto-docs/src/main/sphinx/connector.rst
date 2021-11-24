@@ -15,6 +15,7 @@ from different data sources.
     connector/deltalake
     connector/druid
     connector/elasticsearch
+    connector/gsheets
     connector/hive
     connector/hive-security
     connector/iceberg
