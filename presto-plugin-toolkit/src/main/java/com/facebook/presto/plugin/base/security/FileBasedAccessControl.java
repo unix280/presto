@@ -15,6 +15,7 @@ package com.facebook.presto.plugin.base.security;
 
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.plugin.base.security.TableAccessControlRule.TablePrivilege;
+import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
@@ -282,7 +283,7 @@ public class FileBasedAccessControl
     }
 
     @Override
-    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, CatalogSchemaTableName tableName)
     {
         return Optional.empty();
     }

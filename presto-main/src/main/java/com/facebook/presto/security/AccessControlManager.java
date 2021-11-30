@@ -700,7 +700,7 @@ public class AccessControlManager
         CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, tableName.getCatalogName());
 
         if (entry != null) {
-            entry.getAccessControl().getRowFilter(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(tableName.getCatalogName()), context, toSchemaTableName(tableName))
+            entry.getAccessControl().getRowFilter(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(tableName.getCatalogName()), context, toCatalogSchemaTableName(tableName))
                     .ifPresent(filters::add);
         }
 

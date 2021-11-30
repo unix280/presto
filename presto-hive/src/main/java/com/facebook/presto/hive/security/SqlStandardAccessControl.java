@@ -20,6 +20,7 @@ import com.facebook.presto.hive.TransactionalMetadata;
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
+import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
@@ -446,7 +447,7 @@ public class SqlStandardAccessControl
     }
 
     @Override
-    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, CatalogSchemaTableName tableName)
     {
         return Optional.empty();
     }
