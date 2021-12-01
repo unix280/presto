@@ -39,6 +39,10 @@ public final class QueryEventListenerFactory
     private static final String QUERYEVENT_CLUSTER_NAME_ERROR = QUERYEVENT_CLUSTER_NAME + " is null";
     private static final String QUERYEVENT_WEBSOCKET_URL_ERROR = QUERYEVENT_WEBSOCKET_URL + " is null";
 
+    public static final String QUERYEVENT_JDBC_URI = "jdbc.uri";
+    public static final String QUERYEVENT_JDBC_USER = "jdbc.user";
+    public static final String QUERY_EVENT_JDBC_PWD = "jdbc.pwd";
+
     public String getName()
     {
         return "ahana-events";
@@ -46,6 +50,22 @@ public final class QueryEventListenerFactory
 
     public EventListener create(Map<String, String> config)
     {
+        /**
+         *  We need to obtain cluster operation and information on queries for maintainance of Ahana cluster in a form
+         *  of storage in relational database.
+         *  The code block below is dedicated for storing such information in a mysql database service
+         */
+        if (!config.containsKey(QUERYEVENT_JDBC_URI)) {
+            throw new RuntimeException("/etc/event-listener.properties file missing jdbc.uri");
+        }
+        if (!config.containsKey(QUERYEVENT_JDBC_USER)) {
+            throw new RuntimeException("/etc/event-listener.properties file missing jdbc.user");
+        }
+        if (!config.containsKey(QUERY_EVENT_JDBC_PWD)) {
+            throw new RuntimeException("/etc/event-listener.properties file missing jdbc.pwd");
+        }
+
+        // Below is for logging based metric collection
         String log4j2ConfigLocation = requireNonNull(config.get(QUERYEVENT_CONFIG_LOCATION), QUERYEVENT_CONFIG_LOCATION_ERROR);
         String clusterName = requireNonNull(config.get(QUERYEVENT_CLUSTER_NAME), QUERYEVENT_CLUSTER_NAME_ERROR);
         String webSocketCollectUrl = null;
@@ -58,7 +78,7 @@ public final class QueryEventListenerFactory
         boolean trackEventCreated = getBooleanConfig(config, QUERYEVENT_TRACK_CREATED, true);
         boolean trackEventCompleted = getBooleanConfig(config, QUERYEVENT_TRACK_COMPLETED, true);
         boolean trackEventCompletedSplit = getBooleanConfig(config, QUERYEVENT_TRACK_COMPLETED_SPLIT, false);
-        return new QueryEventListener(clusterName, loggerContext, sendToWebsockeCollector, webSocketCollectUrl, trackEventCreated, trackEventCompleted, trackEventCompletedSplit);
+        return new QueryEventListener(clusterName, loggerContext, sendToWebsockeCollector, webSocketCollectUrl, trackEventCreated, trackEventCompleted, trackEventCompletedSplit, config);
     }
 
     /**

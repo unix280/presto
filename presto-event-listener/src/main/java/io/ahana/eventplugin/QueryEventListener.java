@@ -13,39 +13,84 @@
  */
 package io.ahana.eventplugin;
 
+import com.facebook.airlift.concurrent.BoundedExecutor;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.eventlistener.EventListener;
+import com.facebook.presto.spi.eventlistener.OperatorStatistics;
 import com.facebook.presto.spi.eventlistener.QueryCompletedEvent;
 import com.facebook.presto.spi.eventlistener.QueryCreatedEvent;
 import com.facebook.presto.spi.eventlistener.QueryMetadata;
 import com.facebook.presto.spi.eventlistener.SplitCompletedEvent;
+import com.facebook.presto.spi.eventlistener.StageStatistics;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
+import org.skife.jdbi.v2.DBI;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+
+import static com.facebook.airlift.concurrent.Threads.daemonThreadsNamed;
+import static com.facebook.presto.spi.StandardErrorCode.UPDATE_EVENT_LISTENER_FAILURE;
+import static io.ahana.eventplugin.QueryEventListenerFactory.QUERYEVENT_JDBC_URI;
+import static io.ahana.eventplugin.QueryEventListenerFactory.QUERYEVENT_JDBC_USER;
+import static io.ahana.eventplugin.QueryEventListenerFactory.QUERY_EVENT_JDBC_PWD;
+import static java.time.ZoneOffset.UTC;
+import static java.util.concurrent.Executors.newCachedThreadPool;
 
 public final class QueryEventListener
         implements EventListener
 {
+    private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     private final Logger logger;
     private final boolean trackEventCreated;
     private final boolean trackEventCompleted;
     private final boolean trackEventCompletedSplit;
-
     private final String instanceId;
-    private WebSocketCollectorChannel webSocketCollectorChannel;
     private final ObjectMapper mapper = new ObjectMapper();
     private final String clusterName;
-    private boolean sendToWebSocketServer;
 
-    public QueryEventListener(String clusterName,
+    private boolean sendToWebSocketServer;
+    private boolean useMysqlServiceCollector;
+    private WebSocketCollectorChannel webSocketCollectorChannel;
+    private Map<String, String> config = new HashMap<>();
+    private MySQLWriter mySQLWriter;
+
+    public QueryEventListener(
+            final String clusterName,
             final LoggerContext loggerContext,
             final boolean sendToWebSocketServer,
-            String webSockerCollectUrl,
+            final String webSockerCollectUrl,
+            final boolean trackEventCreated,
+            final boolean trackEventCompleted,
+            final boolean trackEventCompletedSplit,
+            Map<String, String> config)
+    {
+        this(clusterName, loggerContext, sendToWebSocketServer, webSockerCollectUrl, trackEventCreated, trackEventCompleted, trackEventCompletedSplit);
+        this.useMysqlServiceCollector = useMysqlServiceCollector;
+        this.config.putAll(config);
+
+        if (this.useMysqlServiceCollector) {
+            mySQLWriter = new MySQLWriter(config);
+        }
+    }
+
+    public QueryEventListener(
+            final String clusterName,
+            final LoggerContext loggerContext,
+            final boolean sendToWebSocketServer,
+            final String webSockerCollectUrl,
             final boolean trackEventCreated,
             final boolean trackEventCompleted,
             final boolean trackEventCompletedSplit)
@@ -100,6 +145,10 @@ public final class QueryEventListener
         catch (JsonProcessingException e) {
             logger.warn("Failed to serialize query log event", e);
         }
+
+        // Post to mysql service
+        mySQLWriter.post(queryCreatedEvent);
+
     }
 
     public void queryCompleted(QueryCompletedEvent queryCompletedEvent)
@@ -136,6 +185,7 @@ public final class QueryEventListener
                 queryCompletedEvent.getOperatorStatistics());
 
         try {
+            // Logging for payload
             String eventPayload = this.mapper.writeValueAsString(new QueryEvent(this.instanceId, this.clusterName, null, queryCompletedEvent1,
                     null, flatten(queryCompletedEvent.getMetadata().getPlan().orElse("null")), getTimeValue(queryCompletedEvent.getStatistics().getCpuTime()),
                     getTimeValue(queryCompletedEvent.getStatistics().getRetriedCpuTime()), getTimeValue(queryCompletedEvent.getStatistics().getWallTime()), getTimeValue(queryCompletedEvent.getStatistics().getQueuedTime()),
@@ -148,6 +198,9 @@ public final class QueryEventListener
         catch (JsonProcessingException e) {
             logger.warn("Failed to serialize query log event", e);
         }
+
+        // Post to mysql service
+        mySQLWriter.post(queryCompletedEvent);
     }
 
     @Override
@@ -181,5 +234,297 @@ public final class QueryEventListener
     {
         return Optional.ofNullable(duration).isPresent()
                 ? duration.toMillis() : 0L;
+    }
+
+    private class MySQLWriter
+    {
+        private static final int MAX_THREADS_FOR_SQL_UPDATE = 10;
+        private final Executor executor = new BoundedExecutor(newCachedThreadPool(daemonThreadsNamed("mysql-writer-%s")), MAX_THREADS_FOR_SQL_UPDATE);
+
+        private Map<String, String> config;
+        private DBI dbi;
+        private PrestoQueryStatsDao dao;
+
+        MySQLWriter(Map<String, String> config)
+        {
+            this.config = config;
+            dbi = new DBI(
+                    config.get(QUERYEVENT_JDBC_URI),
+                    config.get(QUERYEVENT_JDBC_USER),
+                    config.get(QUERY_EVENT_JDBC_PWD));
+            dao = dbi.onDemand(PrestoQueryStatsDao.class);
+        }
+
+        private synchronized void executeSqlUpdate(Runnable runnable) throws PrestoException
+        {
+            executor.execute(() -> {
+                try {
+                    runnable.run();
+                }
+                catch (RuntimeException ex) {
+                    logger.warn(ex.getMessage(), "Failed to write query stats for query to MySQL.");
+                    throw new PrestoException(UPDATE_EVENT_LISTENER_FAILURE, "Failed to write query stats for query to MySQL. \n", ex.getCause());
+                }
+            });
+        }
+
+        private void post(QueryCompletedEvent queryCompletedEvent)
+        {
+            /**
+             * EXPORT TO TABLE: presto_query_plans
+             */
+            postQueryPlans(queryCompletedEvent);
+            /**
+             *  EXPORT TO TABLE: presto_query_stage_stats
+             */
+            postQueryStageStats(queryCompletedEvent.getMetadata().getQueryId(), queryCompletedEvent.getStageStatistics(), queryCompletedEvent.getCreateTime());
+            /**
+             * EXPORT TO TABLE: presto_query_operator_stats
+             */
+            postQueryOperatorStats(
+                    queryCompletedEvent.getMetadata().getQueryId(),
+                    queryCompletedEvent.getOperatorStatistics(),
+                    queryCompletedEvent.getCreateTime());
+            /**
+             * EXPORT TO TABLE: presto_query_statistics
+             */
+            postQueryStatistics(queryCompletedEvent);
+        }
+
+        private void post(QueryCreatedEvent queryCreatedEvent)
+        {
+            /**
+             * EXPORT TO TABLE: presto_query_creation_info
+             */
+            postQueryCreationInfo(queryCreatedEvent);
+        }
+
+        private void postQueryCreationInfo(QueryCreatedEvent queryCreatedEvent)
+        {
+            executeSqlUpdate(() -> dao.insertQueryCreationInfo(
+                    queryCreatedEvent.getMetadata().getQueryId(),
+                    queryCreatedEvent.getMetadata().getQuery(),
+                    queryCreatedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT),
+                    queryCreatedEvent.getContext().getSchema().orElse("null"),
+                    queryCreatedEvent.getContext().getCatalog().orElse("null"),
+                    queryCreatedEvent.getContext().getEnvironment(),
+                    queryCreatedEvent.getContext().getUser(),
+                    queryCreatedEvent.getContext().getRemoteClientAddress().orElse("null"),
+                    queryCreatedEvent.getContext().getSource().orElse("null"),
+                    queryCreatedEvent.getContext().getUserAgent().orElse("null"),
+                    queryCreatedEvent.getMetadata().getUri().toASCIIString(),
+                    queryCreatedEvent.getContext().getSessionProperties().toString(),
+                    queryCreatedEvent.getContext().getServerVersion(),
+                    queryCreatedEvent.getContext().getClientInfo().orElse("null"),
+                    queryCreatedEvent.getContext().getResourceGroupId().toString(),
+                    queryCreatedEvent.getContext().getPrincipal().orElse("null"),
+                    queryCreatedEvent.getMetadata().getTransactionId().toString(),
+                    queryCreatedEvent.getContext().getClientTags().toString(),
+                    queryCreatedEvent.getContext().getResourceEstimates().toString(),
+                    queryCreatedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT)));
+        }
+
+        private void postQueryPlans(QueryCompletedEvent queryCompletedEvent)
+        {
+            executeSqlUpdate(() -> dao.insertQueryPlans(
+                    queryCompletedEvent.getMetadata().getQueryId(),
+                    queryCompletedEvent.getMetadata().getQuery(),
+                    queryCompletedEvent.getMetadata().getJsonPlan().toString(),
+                    queryCompletedEvent.getMetadata().getPlan().toString(),
+                    queryCompletedEvent.getContext().getEnvironment(),
+                    queryCompletedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT)));
+        }
+
+        private void postQueryStatistics(QueryCompletedEvent queryCompletedEvent)
+        {
+            boolean queryFailed = queryCompletedEvent.getFailureInfo().isPresent();
+            if (queryFailed) {
+                executeSqlUpdate(() -> dao.insertQueryStatistics(
+                        queryCompletedEvent.getMetadata().getQueryId(),
+                        queryCompletedEvent.getMetadata().getQuery(),
+                        queryCompletedEvent.getQueryType().isPresent() ? queryCompletedEvent.getQueryType().get().toString() : null,
+                        queryCompletedEvent.getContext().getSchema().orElse(null),
+                        queryCompletedEvent.getContext().getCatalog().orElse(null),
+                        queryCompletedEvent.getContext().getEnvironment(),
+                        queryCompletedEvent.getContext().getUser(),
+                        queryCompletedEvent.getContext().getRemoteClientAddress().orElse(null),
+                        queryCompletedEvent.getContext().getSource().orElse(null),
+                        queryCompletedEvent.getContext().getUserAgent().orElse(null),
+                        queryCompletedEvent.getMetadata().getUri().toASCIIString(),
+                        queryCompletedEvent.getContext().getSessionProperties().toString(),
+                        queryCompletedEvent.getContext().getServerVersion(),
+                        queryCompletedEvent.getContext().getClientInfo().orElse(null),
+                        queryCompletedEvent.getContext().getResourceGroupId().isPresent() ? queryCompletedEvent.getContext().getResourceGroupId().get().toString() : null,
+                        queryCompletedEvent.getContext().getPrincipal().orElse(null),
+                        queryCompletedEvent.getMetadata().getTransactionId().orElse(null),
+                        queryCompletedEvent.getContext().getClientTags().toString(),
+                        queryCompletedEvent.getContext().getResourceEstimates().toString(),
+                        queryCompletedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT),
+                        queryCompletedEvent.getEndTime().atZone(UTC).format(DATETIME_FORMAT),
+                        queryCompletedEvent.getExecutionStartTime().atZone(UTC).format(DATETIME_FORMAT),
+                        queryCompletedEvent.getMetadata().getQueryState(),
+                        queryCompletedEvent.getFailureInfo().get().getFailureMessage().orElse(null),
+                        queryCompletedEvent.getFailureInfo().get().getFailureType().orElse(null),
+                        queryCompletedEvent.getFailureInfo().get().getFailuresJson(),
+                        queryCompletedEvent.getFailureInfo().get().getFailureTask().orElse(null),
+                        queryCompletedEvent.getFailureInfo().get().getFailureHost().orElse(null),
+                        queryCompletedEvent.getFailureInfo().get().getErrorCode().getCode(),
+                        queryCompletedEvent.getFailureInfo().get().getErrorCode().getName(),
+                        queryCompletedEvent.getFailureInfo().get().getErrorCode().getType().toString(),
+                        Arrays.toString(queryCompletedEvent.getWarnings().toArray()),
+                        queryCompletedEvent.getStatistics().getCompletedSplits(),
+                        queryCompletedEvent.getStatistics().getAnalysisTime().isPresent() ? queryCompletedEvent.getStatistics().getAnalysisTime().get().toMillis() : 0,
+                        queryCompletedEvent.getStatistics().getQueuedTime().toMillis(),
+                        queryCompletedEvent.getStatistics().getWallTime().toMillis(),
+                        queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().isPresent() ? queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().get().toMillis() : 0,
+                        queryCompletedEvent.getStatistics().getCpuTime().toMillis() == 0 ? 0 : queryCompletedEvent.getStatistics().getTotalBytes() / queryCompletedEvent.getStatistics().getCpuTime().toMillis(),
+                        queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().isPresent() ? queryCompletedEvent.getStatistics().getTotalBytes() / queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().get().toMillis() : 0,
+                        queryCompletedEvent.getStatistics().getTotalRows() == 0 ? 0 : queryCompletedEvent.getStatistics().getTotalRows() / queryCompletedEvent.getStatistics().getCpuTime().toMillis(),
+                        queryCompletedEvent.getStatistics().getTotalBytes(),
+                        queryCompletedEvent.getStatistics().getTotalRows(),
+                        queryCompletedEvent.getStatistics().getOutputRows(),
+                        queryCompletedEvent.getStatistics().getOutputBytes(),
+                        queryCompletedEvent.getStatistics().getWrittenOutputRows(),
+                        queryCompletedEvent.getStatistics().getWrittenOutputBytes(),
+                        queryCompletedEvent.getStatistics().getCumulativeMemory(),
+                        queryCompletedEvent.getStatistics().getPeakUserMemoryBytes(),
+                        queryCompletedEvent.getStatistics().getPeakTotalNonRevocableMemoryBytes(),
+                        queryCompletedEvent.getStatistics().getPeakTaskTotalMemory(),
+                        queryCompletedEvent.getStatistics().getPeakUserMemoryBytes(),
+                        queryCompletedEvent.getStatistics().getWrittenOutputBytes(),
+                        queryCompletedEvent.getStatistics().getPeakNodeTotalMemory(),
+                        queryCompletedEvent.getStatistics().getCpuTime().toMillis(),
+                        queryCompletedEvent.getStageStatistics().size(),
+                        queryCompletedEvent.getStatistics().getCumulativeMemory(),
+                        queryCompletedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT)));
+            }
+            else {
+                executeSqlUpdate(() -> dao.insertQueryStatistics(
+                        queryCompletedEvent.getMetadata().getQueryId(),
+                        queryCompletedEvent.getMetadata().getQuery(),
+                        queryCompletedEvent.getQueryType().isPresent() ? queryCompletedEvent.getQueryType().get().toString() : null,
+                        queryCompletedEvent.getContext().getSchema().orElse(null),
+                        queryCompletedEvent.getContext().getCatalog().orElse(null),
+                        queryCompletedEvent.getContext().getEnvironment(),
+                        queryCompletedEvent.getContext().getUser(),
+                        queryCompletedEvent.getContext().getRemoteClientAddress().orElse(null),
+                        queryCompletedEvent.getContext().getSource().orElse(null),
+                        queryCompletedEvent.getContext().getUserAgent().orElse(null),
+                        queryCompletedEvent.getMetadata().getUri().toASCIIString(),
+                        queryCompletedEvent.getContext().getSessionProperties().toString(),
+                        queryCompletedEvent.getContext().getServerVersion(),
+                        queryCompletedEvent.getContext().getClientInfo().orElse(null),
+                        queryCompletedEvent.getContext().getResourceGroupId().isPresent() ? queryCompletedEvent.getContext().getResourceGroupId().get().toString() : null,
+                        queryCompletedEvent.getContext().getPrincipal().orElse(null),
+                        queryCompletedEvent.getMetadata().getTransactionId().orElse(null),
+                        queryCompletedEvent.getContext().getClientTags().toString(),
+                        queryCompletedEvent.getContext().getResourceEstimates().toString(),
+                        queryCompletedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT),
+                        queryCompletedEvent.getEndTime().atZone(UTC).format(DATETIME_FORMAT),
+                        queryCompletedEvent.getExecutionStartTime().atZone(UTC).format(DATETIME_FORMAT),
+                        queryCompletedEvent.getMetadata().getQueryState(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        0,
+                        null,
+                        null,
+                        Arrays.toString(queryCompletedEvent.getWarnings().toArray()),
+                        queryCompletedEvent.getStatistics().getCompletedSplits(),
+                        queryCompletedEvent.getStatistics().getAnalysisTime().isPresent() ? queryCompletedEvent.getStatistics().getAnalysisTime().get().toMillis() : 0,
+                        queryCompletedEvent.getStatistics().getQueuedTime().toMillis(),
+                        queryCompletedEvent.getStatistics().getWallTime().toMillis(),
+                        queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().isPresent() ? queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().get().toMillis() : 0,
+                        queryCompletedEvent.getStatistics().getCpuTime().toMillis() == 0 ? 0 : queryCompletedEvent.getStatistics().getTotalBytes() / queryCompletedEvent.getStatistics().getCpuTime().toMillis(),
+                        queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().isPresent() ? queryCompletedEvent.getStatistics().getTotalBytes() / queryCompletedEvent.getContext().getResourceEstimates().getExecutionTime().get().toMillis() : 0,
+                        queryCompletedEvent.getStatistics().getTotalRows() == 0 ? 0 : queryCompletedEvent.getStatistics().getTotalRows() / queryCompletedEvent.getStatistics().getCpuTime().toMillis(),
+                        queryCompletedEvent.getStatistics().getTotalBytes(),
+                        queryCompletedEvent.getStatistics().getTotalRows(),
+                        queryCompletedEvent.getStatistics().getOutputRows(),
+                        queryCompletedEvent.getStatistics().getOutputBytes(),
+                        queryCompletedEvent.getStatistics().getWrittenOutputRows(),
+                        queryCompletedEvent.getStatistics().getWrittenOutputBytes(),
+                        queryCompletedEvent.getStatistics().getCumulativeMemory(),
+                        queryCompletedEvent.getStatistics().getPeakUserMemoryBytes(),
+                        queryCompletedEvent.getStatistics().getPeakTotalNonRevocableMemoryBytes(),
+                        queryCompletedEvent.getStatistics().getPeakTaskTotalMemory(),
+                        queryCompletedEvent.getStatistics().getPeakUserMemoryBytes(),
+                        queryCompletedEvent.getStatistics().getWrittenOutputBytes(),
+                        queryCompletedEvent.getStatistics().getPeakNodeTotalMemory(),
+                        queryCompletedEvent.getStatistics().getCpuTime().toMillis(),
+                        queryCompletedEvent.getStageStatistics().size(),
+                        queryCompletedEvent.getStatistics().getCumulativeMemory(),
+                        queryCompletedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT)));
+            }
+        }
+
+        private void postQueryStageStats(String queryId, List<StageStatistics> stageStatistics, Instant createTime)
+        {
+            for (StageStatistics stageStatistic : stageStatistics) {
+                executeSqlUpdate(() -> dao.insertQueryStageStats(
+                        queryId,
+                        stageStatistic.getStageId(),
+                        stageStatistic.getStageExecutionId(),
+                        stageStatistic.getTasks(),
+                        stageStatistic.getTotalScheduledTime().toMillis(),
+                        stageStatistic.getTotalCpuTime().toMillis(),
+                        stageStatistic.getRetriedCpuTime().toMillis(),
+                        stageStatistic.getTotalBlockedTime().toMillis(),
+                        stageStatistic.getRawInputDataSize().toBytes(),
+                        stageStatistic.getProcessedInputDataSize().toBytes(),
+                        stageStatistic.getPhysicalWrittenDataSize().toBytes(),
+                        stageStatistic.getGcStatistics().toString(),
+                        stageStatistic.getCpuDistribution().toString(),
+                        stageStatistic.getMemoryDistribution().toString(),
+                        createTime.atZone(UTC).format(DATETIME_FORMAT)));
+            }
+        }
+
+        private void postQueryOperatorStats(String queryId, List<OperatorStatistics> operatorStatistics, Instant createTime)
+        {
+            for (OperatorStatistics operatorStatistic : operatorStatistics) {
+                executeSqlUpdate(() -> dao.insertQueryOperatorStats(
+                        queryId,
+                        operatorStatistic.getStageId(),
+                        operatorStatistic.getStageExecutionId(),
+                        operatorStatistic.getPipelineId(),
+                        operatorStatistic.getOperatorId(),
+                        operatorStatistic.getPlanNodeId().toString(),
+                        operatorStatistic.getOperatorType(),
+                        operatorStatistic.getTotalDrivers(),
+                        operatorStatistic.getAddInputCalls(),
+                        operatorStatistic.getAddInputWall().toMillis(),
+                        operatorStatistic.getAddInputCpu().toMillis(),
+                        operatorStatistic.getAddInputAllocation().toBytes(),
+                        operatorStatistic.getRawInputDataSize().toBytes(),
+                        operatorStatistic.getRawInputPositions(),
+                        operatorStatistic.getInputDataSize().toBytes(),
+                        operatorStatistic.getInputPositions(),
+                        operatorStatistic.getSumSquaredInputPositions(),
+                        operatorStatistic.getGetOutputCalls(),
+                        operatorStatistic.getGetOutputWall().toMillis(),
+                        operatorStatistic.getGetOutputCpu().toMillis(),
+                        operatorStatistic.getGetOutputAllocation().toBytes(),
+                        operatorStatistic.getOutputDataSize().toBytes(),
+                        operatorStatistic.getOutputPositions(),
+                        operatorStatistic.getPhysicalWrittenDataSize().toBytes(),
+                        operatorStatistic.getBlockedWall().toMillis(),
+                        operatorStatistic.getFinishCalls(),
+                        operatorStatistic.getFinishWall().toMillis(),
+                        operatorStatistic.getFinishCpu().toMillis(),
+                        operatorStatistic.getFinishAllocation().toBytes(),
+                        operatorStatistic.getUserMemoryReservation().toBytes(),
+                        operatorStatistic.getRevocableMemoryReservation().toBytes(),
+                        operatorStatistic.getSystemMemoryReservation().toBytes(),
+                        operatorStatistic.getPeakUserMemoryReservation().toBytes(),
+                        operatorStatistic.getPeakSystemMemoryReservation().toBytes(),
+                        operatorStatistic.getPeakTotalMemoryReservation().toBytes(),
+                        operatorStatistic.getSpilledDataSize().toBytes(),
+                        operatorStatistic.getInfo().orElse("null"),
+                        createTime.atZone(UTC).format(DATETIME_FORMAT)));
+            }
+        }
     }
 }
