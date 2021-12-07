@@ -16,6 +16,7 @@ package com.facebook.presto.hive;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
+import com.facebook.presto.hive.metastore.HiveColumnConverter;
 import com.facebook.presto.hive.metastore.PartitionNameWithVersion;
 import com.facebook.presto.hive.metastore.thrift.ThriftHiveMetastore;
 import com.facebook.presto.spi.PrestoException;
@@ -35,7 +36,7 @@ public class MockHiveMetastore
 
     public MockHiveMetastore(MockHiveCluster mockHiveCluster)
     {
-        super(mockHiveCluster, new MetastoreClientConfig(), null);
+        super(mockHiveCluster, new MetastoreClientConfig(), null, new HiveColumnConverter());
         this.clientProvider = requireNonNull(mockHiveCluster, "mockHiveCluster is null");
     }
 

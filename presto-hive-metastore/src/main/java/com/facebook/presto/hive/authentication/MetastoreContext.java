@@ -30,6 +30,7 @@ public final class MetastoreContext
     private final Optional<String> source;
     private final boolean impersonationEnabled;
     private final Optional<String> metastoreHeaders;
+    private final boolean userDefinedTypeEncodingEnabled;
 
     public MetastoreContext(ConnectorSession session, Optional<String> metastoreHeaders)
     {
@@ -38,20 +39,20 @@ public final class MetastoreContext
 
     public MetastoreContext(ConnectorIdentity identity, String queryId, Optional<String> metastoreHeaders)
     {
-        this(requireNonNull(identity, "identity is null"), queryId, Optional.empty(), Optional.empty(), metastoreHeaders);
+        this(requireNonNull(identity, "identity is null"), queryId, Optional.empty(), Optional.empty(), metastoreHeaders, false);
     }
 
-    public MetastoreContext(ConnectorIdentity identity, String queryId, Optional<String> clientInfo, Optional<String> source, Optional<String> metastoreHeaders)
+    public MetastoreContext(ConnectorIdentity identity, String queryId, Optional<String> clientInfo, Optional<String> source, Optional<String> metastoreHeaders, boolean userDefinedTypeEncodingEnabled)
     {
-        this(requireNonNull(identity, "identity is null").getUser(), queryId, clientInfo, source, metastoreHeaders);
+        this(requireNonNull(identity, "identity is null").getUser(), queryId, clientInfo, source, metastoreHeaders, userDefinedTypeEncodingEnabled);
     }
 
-    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, Optional<String> metastoreHeaders)
+    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, Optional<String> metastoreHeaders, boolean userDefinedTypeEncodingEnabled)
     {
-        this(username, queryId, clientInfo, source, false, metastoreHeaders);
+        this(username, queryId, clientInfo, source, false, metastoreHeaders, userDefinedTypeEncodingEnabled);
     }
 
-    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, boolean impersonationEnabled, Optional<String> metastoreHeaders)
+    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, boolean impersonationEnabled, Optional<String> metastoreHeaders, boolean userDefinedTypeEncodingEnabled)
     {
         this.username = requireNonNull(username, "username is null");
         this.queryId = requireNonNull(queryId, "queryId is null");
@@ -59,6 +60,7 @@ public final class MetastoreContext
         this.source = requireNonNull(source, "source is null");
         this.impersonationEnabled = impersonationEnabled;
         this.metastoreHeaders = requireNonNull(metastoreHeaders, "metastoreHeaders is null");
+        this.userDefinedTypeEncodingEnabled = userDefinedTypeEncodingEnabled;
     }
 
     public String getUsername()
@@ -86,6 +88,11 @@ public final class MetastoreContext
         return impersonationEnabled;
     }
 
+    public boolean isUserDefinedTypeEncodingEnabled()
+    {
+        return userDefinedTypeEncodingEnabled;
+    }
+
     public Optional<String> getMetastoreHeaders()
     {
         return metastoreHeaders;
@@ -100,6 +107,7 @@ public final class MetastoreContext
                 .add("clientInfo", clientInfo.orElse(""))
                 .add("source", source.orElse(""))
                 .add("impersonationEnabled", Boolean.toString(impersonationEnabled))
+                .add("userDefinedTypeEncodingEnabled", Boolean.toString(userDefinedTypeEncodingEnabled))
                 .toString();
     }
 
@@ -118,12 +126,13 @@ public final class MetastoreContext
                 Objects.equals(queryId, other.queryId) &&
                 Objects.equals(clientInfo, other.clientInfo) &&
                 Objects.equals(source, other.source) &&
-                impersonationEnabled == other.impersonationEnabled;
+                impersonationEnabled == other.impersonationEnabled &&
+                userDefinedTypeEncodingEnabled == other.userDefinedTypeEncodingEnabled;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(username, queryId, clientInfo, source, impersonationEnabled);
+        return Objects.hash(username, queryId, clientInfo, source, impersonationEnabled, userDefinedTypeEncodingEnabled);
     }
 }

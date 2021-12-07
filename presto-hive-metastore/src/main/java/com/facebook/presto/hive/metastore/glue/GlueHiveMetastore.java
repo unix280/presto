@@ -720,7 +720,7 @@ public class GlueHiveMetastore
         com.amazonaws.services.glue.model.Table table = getGlueTableOrElseThrow(metastoreContext, databaseName, tableName);
         ImmutableList.Builder<com.amazonaws.services.glue.model.Column> newDataColumns = ImmutableList.builder();
         newDataColumns.addAll(table.getStorageDescriptor().getColumns());
-        newDataColumns.add(convertColumn(new Column(columnName, columnType, Optional.ofNullable(columnComment))));
+        newDataColumns.add(convertColumn(new Column(columnName, columnType, Optional.ofNullable(columnComment), Optional.empty())));
         table.getStorageDescriptor().setColumns(newDataColumns.build());
         replaceGlueTable(metastoreContext, databaseName, tableName, table);
     }
