@@ -31,6 +31,7 @@ executors:
         auth:
           username: $DOCKERHUB_USERNAME
           password: $DOCKERHUB_PASSWORD
+    resource_class: large
     working_directory: ~/prestodb
     environment:
       MAVEN_OPTS: "-Xmx2G -Xms1G -XX:+ExitOnOutOfMemoryError"
