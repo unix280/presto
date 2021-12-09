@@ -946,7 +946,7 @@ public class PlanBuilder
                 new SqlParser(),
                 getTypes(),
                 expression,
-                ImmutableList.of(),
+                ImmutableMap.of(),
                 WarningCollector.NOOP);
         return SqlToRowExpressionTranslator.translate(
                 expression,

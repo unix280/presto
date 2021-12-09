@@ -59,7 +59,9 @@ import com.facebook.presto.sql.tree.Identifier;
 import com.facebook.presto.sql.tree.LikePredicate;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.Node;
+import com.facebook.presto.sql.tree.NodeRef;
 import com.facebook.presto.sql.tree.OrderBy;
+import com.facebook.presto.sql.tree.Parameter;
 import com.facebook.presto.sql.tree.Property;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.Query;
@@ -166,6 +168,7 @@ final class ShowQueriesRewrite
             Optional<QueryExplainer> queryExplainer,
             Statement node,
             List<Expression> parameters,
+            Map<NodeRef<Parameter>, Expression> parameterLookup,
             AccessControl accessControl,
             WarningCollector warningCollector)
     {
