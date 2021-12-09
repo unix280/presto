@@ -131,6 +131,7 @@ public final class HiveSessionProperties
     private static final String DWRF_WRITER_STRIPE_CACHE_SIZE = "dwrf_writer_stripe_cache_size";
     private static final String USE_RECORD_PAGE_SOURCE_FOR_CUSTOM_SPLIT = "use_record_page_source_for_custom_split";
     public static final String MAX_INITIAL_SPLITS = "max_initial_splits";
+    private static final String HUDI_METADATA_ENABLED = "hudi_metadata_enabled";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -654,7 +655,12 @@ public final class HiveSessionProperties
                         MAX_INITIAL_SPLITS,
                         "Hive max initial split count",
                         hiveClientConfig.getMaxInitialSplits(),
-                        true));
+                        true),
+                booleanProperty(
+                        HUDI_METADATA_ENABLED,
+                        "For Hudi tables prefer to fetch the list of file names, sizes and other metadata from the internal metadata table rather than storage",
+                        hiveClientConfig.isHudiMetadataEnabled(),
+                        false));
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
@@ -1124,5 +1130,10 @@ public final class HiveSessionProperties
     public static int getHiveMaxInitialSplitSize(ConnectorSession session)
     {
         return session.getProperty(MAX_INITIAL_SPLITS, Integer.class);
+    }
+
+    public static boolean isHudiMetadataEnabled(ConnectorSession session)
+    {
+        return session.getProperty(HUDI_METADATA_ENABLED, Boolean.class);
     }
 }

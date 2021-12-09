@@ -98,7 +98,6 @@ public class TestCachingDirectoryLister
                 TABLE,
                 new Path(LOCATION),
                 new NamenodeStats(),
-                path1 -> true,
                 hiveDirectoryContext);
 
         int count = 0;
