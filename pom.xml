@@ -1251,104 +1251,24 @@
             <!-- Start dependencies for querying Hudi table-->
             <dependency>
                 <groupId>org.apache.hudi</groupId>
-                <artifactId>hudi-common</artifactId>
+                <artifactId>hudi-presto-bundle</artifactId>
                 <version>${dep.hudi.version}</version>
                 <exclusions>
                     <exclusion>
-                        <groupId>org.apache.hbase</groupId>
-                        <artifactId>hbase-server</artifactId>
+                        <groupId>com.google.protobuf</groupId>
+                        <artifactId>protobuf-java</artifactId>
                     </exclusion>
                     <exclusion>
-                        <groupId>org.apache.orc</groupId>
-                        <artifactId>orc-core</artifactId>
+                        <groupId>commons-lang</groupId>
+                        <artifactId>commons-lang</artifactId>
                     </exclusion>
                     <exclusion>
-                        <groupId>org.objenesis</groupId>
-                        <artifactId>objenesis</artifactId>
+                        <groupId>org.apache.hudi</groupId>
+                        <artifactId>hudi-common</artifactId>
                     </exclusion>
                     <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>jcl-over-slf4j</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.fasterxml.jackson.core</groupId>
-                        <artifactId>jackson-annotations</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.fasterxml.jackson.core</groupId>
-                        <artifactId>jackson-databind</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.httpcomponents</groupId>
-                        <artifactId>httpclient</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.httpcomponents</groupId>
-                        <artifactId>fluent-hc</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.rocksdb</groupId>
-                        <artifactId>rocksdbjni</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.esotericsoftware</groupId>
-                        <artifactId>kryo-shaded</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.hudi</groupId>
-                <artifactId>hudi-hadoop-mr</artifactId>
-                <version>${dep.hudi.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.apache.hbase</groupId>
-                        <artifactId>hbase-server</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.orc</groupId>
-                        <artifactId>orc-core</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.objenesis</groupId>
-                        <artifactId>objenesis</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>jcl-over-slf4j</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.fasterxml.jackson.core</groupId>
-                        <artifactId>jackson-annotations</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.fasterxml.jackson.core</groupId>
-                        <artifactId>jackson-databind</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.httpcomponents</groupId>
-                        <artifactId>httpclient</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.httpcomponents</groupId>
-                        <artifactId>fluent-hc</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.rocksdb</groupId>
-                        <artifactId>rocksdbjni</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>com.esotericsoftware</groupId>
-                        <artifactId>kryo-shaded</artifactId>
+                        <groupId>org.apache.hudi</groupId>
+                        <artifactId>hudi-hadoop-mr-bundle</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>

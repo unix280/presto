@@ -167,7 +167,8 @@ public class TestHiveClientConfig
                 .setUseRecordPageSourceForCustomSplit(true)
                 .setHudiMetadataEnabled(false)
                 .setUseRecordPageSourceForCustomSplit(true)
-                .setFileSplittable(true));
+                .setFileSplittable(true)
+                .setHudiMetadataEnabled(false));
     }
 
     @Test
@@ -294,6 +295,7 @@ public class TestHiveClientConfig
                 .put("hive.use-record-page-source-for-custom-split", "false")
                 .put("hive.hudi-metadata-enabled", "true")
                 .put("hive.file-splittable", "false")
+                .put("hive.hudi-metadata-enabled", "true")
                 .build();
 
         HiveClientConfig expected = new HiveClientConfig()
