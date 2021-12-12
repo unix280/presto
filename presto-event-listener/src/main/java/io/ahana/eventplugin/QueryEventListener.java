@@ -75,6 +75,7 @@ public final class QueryEventListener
             final boolean trackEventCreated,
             final boolean trackEventCompleted,
             final boolean trackEventCompletedSplit,
+            final boolean useMysqlServiceCollector,
             Map<String, String> config)
     {
         this(clusterName, loggerContext, sendToWebSocketServer, webSockerCollectUrl, trackEventCreated, trackEventCompleted, trackEventCompletedSplit);
@@ -147,8 +148,9 @@ public final class QueryEventListener
         }
 
         // Post to mysql service
-        mySQLWriter.post(queryCreatedEvent);
-
+        if (useMysqlServiceCollector) {
+            mySQLWriter.post(queryCreatedEvent);
+        }
     }
 
     public void queryCompleted(QueryCompletedEvent queryCompletedEvent)
@@ -200,7 +202,9 @@ public final class QueryEventListener
         }
 
         // Post to mysql service
-        mySQLWriter.post(queryCompletedEvent);
+        if (useMysqlServiceCollector) {
+            mySQLWriter.post(queryCompletedEvent);
+        }
     }
 
     @Override

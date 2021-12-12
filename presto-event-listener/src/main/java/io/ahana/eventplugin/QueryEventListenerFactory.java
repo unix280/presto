@@ -35,6 +35,8 @@ public final class QueryEventListenerFactory
     public static final String QUERYEVENT_WEBSOCKET_COLLECT = "juicyray.queryevent.websocket.enabled";
     public static final String QUERYEVENT_WEBSOCKET_URL = "juicyray.queryevent.websocket.url";
 
+    public static final String QUERYEVENT_MYSQL_COLLECT = "mysql.service.enabled";
+
     private static final String QUERYEVENT_CONFIG_LOCATION_ERROR = QUERYEVENT_CONFIG_LOCATION + " is null";
     private static final String QUERYEVENT_CLUSTER_NAME_ERROR = QUERYEVENT_CLUSTER_NAME + " is null";
     private static final String QUERYEVENT_WEBSOCKET_URL_ERROR = QUERYEVENT_WEBSOCKET_URL + " is null";
@@ -73,12 +75,13 @@ public final class QueryEventListenerFactory
         if (sendToWebsockeCollector) {
             webSocketCollectUrl = requireNonNull(config.get(QUERYEVENT_WEBSOCKET_URL), QUERYEVENT_WEBSOCKET_URL_ERROR);
         }
+        boolean useMysqlServiceCollector = getBooleanConfig(config, QUERYEVENT_MYSQL_COLLECT, false);
 
         LoggerContext loggerContext = Configurator.initialize("presto-queryevent-log", log4j2ConfigLocation);
         boolean trackEventCreated = getBooleanConfig(config, QUERYEVENT_TRACK_CREATED, true);
         boolean trackEventCompleted = getBooleanConfig(config, QUERYEVENT_TRACK_COMPLETED, true);
         boolean trackEventCompletedSplit = getBooleanConfig(config, QUERYEVENT_TRACK_COMPLETED_SPLIT, false);
-        return new QueryEventListener(clusterName, loggerContext, sendToWebsockeCollector, webSocketCollectUrl, trackEventCreated, trackEventCompleted, trackEventCompletedSplit, config);
+        return new QueryEventListener(clusterName, loggerContext, sendToWebsockeCollector, webSocketCollectUrl, trackEventCreated, trackEventCompleted, trackEventCompletedSplit, useMysqlServiceCollector, config);
     }
 
     /**
