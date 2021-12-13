@@ -23,7 +23,7 @@ import java.util.Optional;
 
 public class GlueHiveMetastoreConfig
 {
-    private static final String SUPPORTED_PERMISSION_TYPE = "COLUMN_PERMISSION";
+    private static final String SUPPORTED_PERMISSION_TYPE = "CELL_FILTER_PERMISSION";
 
     private Optional<String> glueRegion = Optional.empty();
     private boolean pinGlueClientToCurrentRegion;

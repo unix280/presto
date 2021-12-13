@@ -38,7 +38,7 @@ public class TestGlueHiveMetastoreConfig
                 .setIamRole(null)
                 .setLakeFormationPartnerTagName(null)
                 .setLakeFormationPartnerTagValue(null)
-                .setSupportedPermissionType(null)
+                .setSupportedPermissionType("CELL_FILTER_PERMISSION")
                 .setImpersonationEnabled(false)
                 .setColumnStatisticsEnabled(false)
                 .setReadStatisticsThreads(1)
