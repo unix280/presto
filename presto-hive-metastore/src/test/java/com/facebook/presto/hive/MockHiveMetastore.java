@@ -36,7 +36,7 @@ public class MockHiveMetastore
 
     public MockHiveMetastore(MockHiveCluster mockHiveCluster)
     {
-        super(mockHiveCluster, new MetastoreClientConfig(), null, new HiveColumnConverter());
+        super(mockHiveCluster, new MetastoreClientConfig(), null);
         this.clientProvider = requireNonNull(mockHiveCluster, "mockHiveCluster is null");
     }
 

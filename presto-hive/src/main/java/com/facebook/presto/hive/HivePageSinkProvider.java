@@ -77,6 +77,7 @@ public class HivePageSinkProvider
     private final HiveWriterStats hiveWriterStats;
     private final OrcFileWriterFactory orcFileWriterFactory;
     private final long perTransactionMetastoreCacheMaximumSize;
+    private final ColumnConverterProvider columnConverterProvider;
 
     @Inject
     public HivePageSinkProvider(
@@ -95,7 +96,8 @@ public class HivePageSinkProvider
             EventClient eventClient,
             HiveSessionProperties hiveSessionProperties,
             HiveWriterStats hiveWriterStats,
-            OrcFileWriterFactory orcFileWriterFactory)
+            OrcFileWriterFactory orcFileWriterFactory,
+            ColumnConverterProvider columnConverterProvider)
     {
         this.fileWriterFactories = ImmutableSet.copyOf(requireNonNull(fileWriterFactories, "fileWriterFactories is null"));
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
@@ -118,6 +120,7 @@ public class HivePageSinkProvider
         this.hiveSessionProperties = requireNonNull(hiveSessionProperties, "hiveSessionProperties is null");
         this.hiveWriterStats = requireNonNull(hiveWriterStats, "stats is null");
         this.orcFileWriterFactory = requireNonNull(orcFileWriterFactory, "orcFileWriterFactory is null");
+        this.columnConverterProvider = requireNonNull(columnConverterProvider, "columnConverterProvider is null");
         this.perTransactionMetastoreCacheMaximumSize = metastoreClientConfig.getPerTransactionMetastoreCacheMaximumSize();
     }
 
@@ -169,7 +172,7 @@ public class HivePageSinkProvider
                 session.getQueryId(),
                 // The scope of metastore cache is within a single HivePageSink object
                 // TODO: Extend metastore cache scope to the entire transaction
-                new HivePageSinkMetadataProvider(handle.getPageSinkMetadata(), memoizeMetastore(metastore, perTransactionMetastoreCacheMaximumSize), new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session), isUserDefinedTypeEncodingEnabled(session))),
+                new HivePageSinkMetadataProvider(handle.getPageSinkMetadata(), memoizeMetastore(metastore, perTransactionMetastoreCacheMaximumSize), new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session), isUserDefinedTypeEncodingEnabled(session), columnConverterProvider)),
                 typeManager,
                 hdfsEnvironment,
                 pageSorter,

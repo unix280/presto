@@ -16,6 +16,7 @@ package com.facebook.presto.hive.metastore;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.hive.ColumnConverterProvider;
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveBasicStatistics;
@@ -117,6 +118,7 @@ public class SemiTransactionalHiveMetastore
     private final ExtendedHiveMetastore delegate;
     private final HdfsEnvironment hdfsEnvironment;
     private final ListeningExecutorService renameExecutor;
+    private final ColumnConverterProvider columnConverterProvider;
     private final boolean skipDeletionForAlter;
     private final boolean skipTargetCleanupOnRollback;
     private final boolean undoMetastoreOperationsEnabled;
@@ -139,14 +141,21 @@ public class SemiTransactionalHiveMetastore
             ListeningExecutorService renameExecutor,
             boolean skipDeletionForAlter,
             boolean skipTargetCleanupOnRollback,
-            boolean undoMetastoreOperationsEnabled)
+            boolean undoMetastoreOperationsEnabled,
+            ColumnConverterProvider columnConverterProvider)
     {
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.renameExecutor = requireNonNull(renameExecutor, "renameExecutor is null");
+        this.columnConverterProvider = requireNonNull(columnConverterProvider, "columnConverterProvider is null");
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
         this.undoMetastoreOperationsEnabled = undoMetastoreOperationsEnabled;
+    }
+
+    public ColumnConverterProvider getColumnConverterProvider()
+    {
+        return columnConverterProvider;
     }
 
     public synchronized List<String> getAllDatabases(MetastoreContext metastoreContext)
@@ -386,7 +395,7 @@ public class SemiTransactionalHiveMetastore
         // When creating a table, it should never have partition actions. This is just a sanity check.
         checkNoPartitionAction(table.getDatabaseName(), table.getTableName());
         Action<TableAndMore> oldTableAction = tableActions.get(table.getSchemaTableName());
-        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session));
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session), isUserDefinedTypeEncodingEnabled(session), columnConverterProvider);
         TableAndMore tableAndMore = new TableAndMore(table, metastoreContext, Optional.of(principalPrivileges), currentPath, Optional.empty(), ignoreExisting, statistics, statistics);
         if (oldTableAction == null) {
             HdfsContext hdfsContext = new HdfsContext(session, table.getDatabaseName(), table.getTableName(), table.getStorage().getLocation(), true);
@@ -413,7 +422,7 @@ public class SemiTransactionalHiveMetastore
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Action<TableAndMore> oldTableAction = tableActions.get(schemaTableName);
         if (oldTableAction == null || oldTableAction.getType() == ActionType.ALTER) {
-            MetastoreContext metastoreContext = new MetastoreContext(hdfsContext.getIdentity(), hdfsContext.getQueryId().orElse(PRESTO_QUERY_ID_NAME), hdfsContext.getSession().flatMap(MetastoreUtil::getMetastoreHeaders));
+            MetastoreContext metastoreContext = new MetastoreContext(hdfsContext.getIdentity(), hdfsContext.getQueryId().orElse(PRESTO_QUERY_ID_NAME), hdfsContext.getSession().flatMap(MetastoreUtil::getMetastoreHeaders), columnConverterProvider);
             tableActions.put(schemaTableName, new Action<>(ActionType.DROP, null, hdfsContext, metastoreContext));
             return;
         }
@@ -467,7 +476,7 @@ public class SemiTransactionalHiveMetastore
         setShared();
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Action<TableAndMore> oldTableAction = tableActions.get(schemaTableName);
-        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session), isUserDefinedTypeEncodingEnabled(session));
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session), isUserDefinedTypeEncodingEnabled(session), columnConverterProvider);
         if (oldTableAction == null || oldTableAction.getData().getTable().getTableType().equals(TEMPORARY_TABLE)) {
             Table table = getTable(metastoreContext, databaseName, tableName)
                     .orElseThrow(() -> new TableNotFoundException(schemaTableName));
@@ -514,7 +523,8 @@ public class SemiTransactionalHiveMetastore
                         session.getClientInfo(),
                         session.getSource(),
                         getMetastoreHeaders(session),
-                        isUserDefinedTypeEncodingEnabled(session)),
+                        isUserDefinedTypeEncodingEnabled(session),
+                        columnConverterProvider),
                 databaseName,
                 tableName);
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
@@ -735,7 +745,7 @@ public class SemiTransactionalHiveMetastore
         Map<List<String>, Action<PartitionAndMore>> partitionActionsOfTable = partitionActions.computeIfAbsent(new SchemaTableName(databaseName, tableName), k -> new HashMap<>());
         Action<PartitionAndMore> oldPartitionAction = partitionActionsOfTable.get(partition.getValues());
         HdfsContext hdfsContext = new HdfsContext(session, databaseName, tableName, tablePath, isNewTable);
-        MetastoreContext metastoreContext = new MetastoreContext(session, getMetastoreHeaders(session));
+        MetastoreContext metastoreContext = new MetastoreContext(session, getMetastoreHeaders(session), columnConverterProvider);
         if (oldPartitionAction == null) {
             partitionActionsOfTable.put(
                     partition.getValues(),
@@ -773,7 +783,7 @@ public class SemiTransactionalHiveMetastore
         Action<PartitionAndMore> oldPartitionAction = partitionActionsOfTable.get(partitionValues);
         if (oldPartitionAction == null) {
             HdfsContext hdfsContext = new HdfsContext(session, databaseName, tableName, tablePath, false);
-            MetastoreContext metastoreContext = new MetastoreContext(session, getMetastoreHeaders(session));
+            MetastoreContext metastoreContext = new MetastoreContext(session, getMetastoreHeaders(session), columnConverterProvider);
             partitionActionsOfTable.put(partitionValues, new Action<>(ActionType.DROP, null, hdfsContext, metastoreContext));
             return;
         }
@@ -805,7 +815,7 @@ public class SemiTransactionalHiveMetastore
         SchemaTableName schemaTableName = new SchemaTableName(databaseName, tableName);
         Map<List<String>, Action<PartitionAndMore>> partitionActionsOfTable = partitionActions.computeIfAbsent(schemaTableName, k -> new HashMap<>());
         Action<PartitionAndMore> oldPartitionAction = partitionActionsOfTable.get(partitionValues);
-        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session), isUserDefinedTypeEncodingEnabled(session));
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), getMetastoreHeaders(session), isUserDefinedTypeEncodingEnabled(session), columnConverterProvider);
 
         if (oldPartitionAction == null) {
             Partition partition = delegate.getPartition(metastoreContext, databaseName, tableName, partitionValues)
@@ -1013,7 +1023,8 @@ public class SemiTransactionalHiveMetastore
                         action.getHdfsContext().getClientInfo(),
                         action.getHdfsContext().getSource(),
                         hdfsContext.getSession().flatMap(MetastoreUtil::getMetastoreHeaders),
-                        hdfsContext.getSession().map(MetastoreUtil::isUserDefinedTypeEncodingEnabled).orElse(false));
+                        hdfsContext.getSession().map(MetastoreUtil::isUserDefinedTypeEncodingEnabled).orElse(false),
+                        columnConverterProvider);
                 switch (action.getType()) {
                     case DROP:
                         committer.prepareDropTable(metastoreContext, schemaTableName);
@@ -1043,7 +1054,8 @@ public class SemiTransactionalHiveMetastore
                             action.getHdfsContext().getClientInfo(),
                             action.getHdfsContext().getSource(),
                             hdfsContext.getSession().flatMap(MetastoreUtil::getMetastoreHeaders),
-                            hdfsContext.getSession().map(MetastoreUtil::isUserDefinedTypeEncodingEnabled).orElse(false));
+                            hdfsContext.getSession().map(MetastoreUtil::isUserDefinedTypeEncodingEnabled).orElse(false),
+                            columnConverterProvider);
                     switch (action.getType()) {
                         case DROP:
                             committer.prepareDropPartition(metastoreContext, schemaTableName, partitionValues);

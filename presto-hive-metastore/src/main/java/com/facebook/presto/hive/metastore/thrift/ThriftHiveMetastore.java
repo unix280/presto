@@ -129,7 +129,6 @@ public class ThriftHiveMetastore
     private final ThriftHiveMetastoreStats stats;
     private final HiveCluster clientProvider;
     private final Function<Exception, Exception> exceptionMapper;
-    private final ColumnConverter columnConverter;
     private static final String DEFAULT_METASTORE_USER = "presto";
     private final HdfsContext hdfsContext;
     private final HdfsEnvironment hdfsEnvironment;
@@ -137,7 +136,7 @@ public class ThriftHiveMetastore
     private final boolean impersonationEnabled;
 
     @Inject
-    public ThriftHiveMetastore(HiveCluster hiveCluster, MetastoreClientConfig metastoreClientConfig, HdfsEnvironment hdfsEnvironment, ColumnConverter columnConverter)
+    public ThriftHiveMetastore(HiveCluster hiveCluster, MetastoreClientConfig metastoreClientConfig, HdfsEnvironment hdfsEnvironment)
     {
         this(
                 hiveCluster,
@@ -145,7 +144,6 @@ public class ThriftHiveMetastore
                 new ThriftHiveMetastoreStats(),
                 identity(),
                 hdfsEnvironment,
-                columnConverter,
                 requireNonNull(metastoreClientConfig, "config is null").isMetastoreImpersonationEnabled());
     }
 
@@ -155,7 +153,6 @@ public class ThriftHiveMetastore
             ThriftHiveMetastoreStats stats,
             Function<Exception, Exception> exceptionMapper,
             HdfsEnvironment hdfsEnvironment,
-            ColumnConverter columnConverter,
             boolean impersonationEnabled)
 
     {
@@ -164,7 +161,6 @@ public class ThriftHiveMetastore
         this.clientProvider = requireNonNull(hiveCluster, "hiveCluster is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.exceptionMapper = requireNonNull(exceptionMapper, "exceptionMapper is null");
-        this.columnConverter = requireNonNull(columnConverter, "columnConverter is null");
         this.hdfsEnvironment = hdfsEnvironment;
         this.impersonationEnabled = impersonationEnabled;
     }
@@ -433,7 +429,7 @@ public class ThriftHiveMetastore
         modifiedTable.setParameters(updateStatisticsParameters(modifiedTable.getParameters(), basicStatistics));
         alterTable(metastoreContext, databaseName, tableName, modifiedTable);
 
-        com.facebook.presto.hive.metastore.Table table = fromMetastoreApiTable(modifiedTable, columnConverter);
+        com.facebook.presto.hive.metastore.Table table = fromMetastoreApiTable(modifiedTable, metastoreContext.getColumnConverter());
         OptionalLong rowCount = basicStatistics.getRowCount();
         List<ColumnStatisticsObj> metastoreColumnStatistics = updatedStatistics.getColumnStatistics().entrySet().stream()
                 .filter(entry -> table.getColumn(entry.getKey()).get().getType().getTypeInfo().getCategory() == PRIMITIVE)
@@ -511,7 +507,7 @@ public class ThriftHiveMetastore
         alterPartitionWithoutStatistics(metastoreContext, databaseName, tableName, modifiedPartition);
 
         Map<String, HiveType> columns = modifiedPartition.getSd().getCols().stream()
-                .collect(toImmutableMap(FieldSchema::getName, schema -> columnConverter.toColumn(schema).getType()));
+                .collect(toImmutableMap(FieldSchema::getName, schema -> metastoreContext.getColumnConverter().toColumn(schema).getType()));
         setPartitionColumnStatistics(metastoreContext, databaseName, tableName, partitionName, columns, updatedStatistics.getColumnStatistics(), basicStatistics.getRowCount());
 
         Set<String> removedStatistics = difference(currentStatistics.getColumnStatistics().keySet(), updatedStatistics.getColumnStatistics().keySet());
@@ -979,7 +975,7 @@ public class ThriftHiveMetastore
     public void addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitionsWithStatistics)
     {
         List<Partition> partitions = partitionsWithStatistics.stream()
-                .map(part -> ThriftMetastoreUtil.toMetastoreApiPartition(part, columnConverter))
+                .map(part -> ThriftMetastoreUtil.toMetastoreApiPartition(part, metastoreContext.getColumnConverter()))
                 .collect(toImmutableList());
         addPartitionsWithoutStatistics(metastoreContext, databaseName, tableName, partitions);
         for (PartitionWithStatistics partitionWithStatistics : partitionsWithStatistics) {
@@ -1071,7 +1067,7 @@ public class ThriftHiveMetastore
     @Override
     public void alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partitionWithStatistics)
     {
-        alterPartitionWithoutStatistics(metastoreContext, databaseName, tableName, toMetastoreApiPartition(partitionWithStatistics, columnConverter));
+        alterPartitionWithoutStatistics(metastoreContext, databaseName, tableName, toMetastoreApiPartition(partitionWithStatistics, metastoreContext.getColumnConverter()));
         storePartitionColumnStatistics(metastoreContext, databaseName, tableName, partitionWithStatistics.getPartitionName(), partitionWithStatistics);
         dropExtraColumnStatisticsAfterAlterPartition(metastoreContext, databaseName, tableName, partitionWithStatistics);
     }

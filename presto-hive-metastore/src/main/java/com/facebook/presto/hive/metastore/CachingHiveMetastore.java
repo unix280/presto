@@ -974,7 +974,7 @@ public class CachingHiveMetastore
 
     private <T> KeyAndContext<T> getCachingKey(MetastoreContext context, T key)
     {
-        MetastoreContext metastoreContext = delegate.isImpersonationEnabled() ? new MetastoreContext(context.getUsername(), context.getQueryId(), context.getClientInfo(), context.getSource(), true, context.getMetastoreHeaders(), context.isUserDefinedTypeEncodingEnabled()) : context;
+        MetastoreContext metastoreContext = delegate.isImpersonationEnabled() ? new MetastoreContext(context.getUsername(), context.getQueryId(), context.getClientInfo(), context.getSource(), true, context.getMetastoreHeaders(), context.isUserDefinedTypeEncodingEnabled(), context.getColumnConverterProvider()) : context;
         return new KeyAndContext<>(metastoreContext, key);
     }
 
@@ -1064,6 +1064,6 @@ public class CachingHiveMetastore
 
     private MetastoreContext updateIdentity(MetastoreContext context)
     {
-        return delegate.isImpersonationEnabled() ? new MetastoreContext(context.getUsername(), context.getQueryId(), context.getClientInfo(), context.getSource(), true, context.getMetastoreHeaders(), context.isUserDefinedTypeEncodingEnabled()) : context;
+        return delegate.isImpersonationEnabled() ? new MetastoreContext(context.getUsername(), context.getQueryId(), context.getClientInfo(), context.getSource(), true, context.getMetastoreHeaders(), context.isUserDefinedTypeEncodingEnabled(), context.getColumnConverterProvider()) : context;
     }
 }
