@@ -14,12 +14,14 @@
 package com.facebook.presto.hive.security.lakeformation;
 
 import com.amazonaws.services.glue.model.Column;
+import com.amazonaws.services.glue.model.ColumnRowFilter;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
 import com.amazonaws.services.glue.model.StorageDescriptor;
 import com.amazonaws.services.glue.model.Table;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingConfig;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.security.lakeformation.LakeFormationAccessControl.LFPolicyCacheKey;
+import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
@@ -29,6 +31,7 @@ import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.PrincipalType;
+import com.facebook.presto.spi.security.ViewExpression;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableSet;
@@ -45,7 +48,9 @@ import java.util.Optional;
 
 import static com.facebook.presto.spi.security.Privilege.SELECT;
 import static com.google.common.io.Resources.getResource;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
 public class TestLakeFormationAccessControl
@@ -100,21 +105,49 @@ public class TestLakeFormationAccessControl
 
         // User: admin, Database: test, Table: customer, Access: All columns
         LFPolicyCacheKey adminCustomerLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "customer"), ADMIN_IAM_ROLE);
+        List<ColumnRowFilter> cellFiltersCustomer = new ArrayList<>();
+        ColumnRowFilter cellFilterCustkey = new ColumnRowFilter().withColumnName("custkey").withRowFilterExpression("nation=INDIA");
+        ColumnRowFilter cellFilterName = new ColumnRowFilter().withColumnName("name").withRowFilterExpression("nation=INDIA");
+        ColumnRowFilter cellFilterAddress = new ColumnRowFilter().withColumnName("address").withRowFilterExpression("nation=INDIA");
+        ColumnRowFilter cellFilterNation = new ColumnRowFilter().withColumnName("nation").withRowFilterExpression("nation=INDIA");
+        ColumnRowFilter cellFilterPhone = new ColumnRowFilter().withColumnName("phone").withRowFilterExpression("nation=INDIA");
+        ColumnRowFilter cellFilterAcctbal = new ColumnRowFilter().withColumnName("acctbal").withRowFilterExpression("nation=INDIA");
+        ColumnRowFilter cellFilterMktsegment = new ColumnRowFilter().withColumnName("mktsegment").withRowFilterExpression("nation=INDIA");
+        cellFiltersCustomer.add(cellFilterCustkey);
+        cellFiltersCustomer.add(cellFilterName);
+        cellFiltersCustomer.add(cellFilterAddress);
+        cellFiltersCustomer.add(cellFilterNation);
+        cellFiltersCustomer.add(cellFilterPhone);
+        cellFiltersCustomer.add(cellFilterAcctbal);
+        cellFiltersCustomer.add(cellFilterMktsegment);
         GetUnfilteredTableMetadataResult adminCustomerGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
                         .withTable(customerTable)
                         .withIsRegisteredWithLakeFormation(true)
-                        .withAuthorizedColumns("custkey", "name", "address", "nation", "phone", "acctbal", "mktsegment");
+                        .withAuthorizedColumns("custkey", "name", "address", "nation", "phone", "acctbal", "mktsegment")
+                        .withCellFilters(cellFiltersCustomer);
 
         this.mockGetUnfilteredTable.put(adminCustomerLFPolicyCacheKey, Optional.of(adminCustomerGetUnfilteredTableResult));
 
         // User: admin, Database: test, Table: orders, Access: All columns
         LFPolicyCacheKey adminOrdersLFPolicyCacheKey = new LFPolicyCacheKey(new SchemaTableName("test", "orders"), ADMIN_IAM_ROLE);
+        List<ColumnRowFilter> cellFiltersOrders = new ArrayList<>();
+        ColumnRowFilter cellFilterOrderkey = new ColumnRowFilter().withColumnName("orderkey").withRowFilterExpression("custkey=1");
+        ColumnRowFilter cellFilterOrderstatus = new ColumnRowFilter().withColumnName("orderstatus").withRowFilterExpression("custkey=2");
+        ColumnRowFilter cellFilterTotalprice = new ColumnRowFilter().withColumnName("totalprice").withRowFilterExpression("custkey=1");
+        ColumnRowFilter cellFilterOrderdate = new ColumnRowFilter().withColumnName("orderdate").withRowFilterExpression("custkey=1");
+        ColumnRowFilter cellFilterOrderpriority = new ColumnRowFilter().withColumnName("order-priority").withRowFilterExpression("custkey=1");
+        cellFiltersOrders.add(cellFilterOrderkey);
+        cellFiltersOrders.add(cellFilterOrderstatus);
+        cellFiltersOrders.add(cellFilterTotalprice);
+        cellFiltersOrders.add(cellFilterOrderdate);
+        cellFiltersOrders.add(cellFilterOrderpriority);
         GetUnfilteredTableMetadataResult adminOrdersGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
                         .withTable(ordersTable)
                         .withIsRegisteredWithLakeFormation(true)
-                        .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "totalprice", "orderdate", "order-priority");
+                        .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "totalprice", "orderdate", "order-priority")
+                        .withCellFilters(cellFiltersOrders);
 
         this.mockGetUnfilteredTable.put(adminOrdersLFPolicyCacheKey, Optional.of(adminOrdersGetUnfilteredTableResult));
 
@@ -124,7 +157,8 @@ public class TestLakeFormationAccessControl
                 new GetUnfilteredTableMetadataResult()
                         .withTable(customerTable)
                         .withIsRegisteredWithLakeFormation(true)
-                        .withAuthorizedColumns("custkey", "name", "nation", "mktsegment");
+                        .withAuthorizedColumns("custkey", "name", "nation", "mktsegment")
+                        .withCellFilters(new ArrayList<>());
 
         this.mockGetUnfilteredTable.put(analystCustomerLFPolicyCacheKey, Optional.of(analystCustomerGetUnfilteredTableResult));
 
@@ -134,7 +168,8 @@ public class TestLakeFormationAccessControl
                 new GetUnfilteredTableMetadataResult()
                         .withTable(ordersTable)
                         .withIsRegisteredWithLakeFormation(true)
-                        .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "orderdate");
+                        .withAuthorizedColumns("orderkey", "custkey", "orderstatus", "orderdate")
+                        .withCellFilters(new ArrayList<>());
 
         this.mockGetUnfilteredTable.put(analystOrdersLFPolicyCacheKey, Optional.of(analystOrdersGetUnfilteredTableResult));
 
@@ -146,13 +181,15 @@ public class TestLakeFormationAccessControl
                 new GetUnfilteredTableMetadataResult()
                         .withTable(customerTable)
                         .withIsRegisteredWithLakeFormation(true)
-                        .withAuthorizedColumns(new ArrayList<>());
+                        .withAuthorizedColumns(new ArrayList<>())
+                        .withCellFilters(new ArrayList<>());
 
         GetUnfilteredTableMetadataResult anyUserOrdersGetUnfilteredTableResult =
                 new GetUnfilteredTableMetadataResult()
                         .withTable(ordersTable)
                         .withIsRegisteredWithLakeFormation(true)
-                        .withAuthorizedColumns(new ArrayList<>());
+                        .withAuthorizedColumns(new ArrayList<>())
+                        .withCellFilters(new ArrayList<>());
 
         this.mockGetUnfilteredTable.put(anyUserCustomerLFPolicyCacheKey, Optional.of(anyUserCustomerGetUnfilteredTableResult));
         this.mockGetUnfilteredTable.put(anyUserOrdersLFPolicyCacheKey, Optional.of(anyUserOrdersGetUnfilteredTableResult));
@@ -367,6 +404,14 @@ public class TestLakeFormationAccessControl
                 CONTEXT,
                 new SchemaTableName("test", "orders"),
                 ImmutableSet.of("orderkey")));
+
+        // User: admin, access denied due to multiple rowFilters
+        assertDenied(() -> lakeFormationAccessControl.checkCanSelectFromColumns(
+                TRANSACTION_HANDLE,
+                user("admin"),
+                CONTEXT,
+                new SchemaTableName("test", "orders"),
+                ImmutableSet.of("orderkey")));
     }
 
     @Test
@@ -409,6 +454,29 @@ public class TestLakeFormationAccessControl
                 CONTEXT,
                 new SchemaTableName("test", "orders"),
                 ImmutableSet.of("orderkey")));
+    }
+
+    @Test
+    private void testGetRowFilters()
+    {
+        // Return empty ViewExpression when no RowFilter is present
+        Optional<ViewExpression> viewExpressionAnalyst = lakeFormationAccessControl.getRowFilter(
+                TRANSACTION_HANDLE,
+                user("analyst"),
+                CONTEXT,
+                new CatalogSchemaTableName("testCatalog", "test", "customer"));
+
+        assertEquals(viewExpressionAnalyst, Optional.empty());
+
+        // Return a valid ViewExpression when a single distinct RowFilter is present
+        Optional<ViewExpression> viewExpressionAdmin = lakeFormationAccessControl.getRowFilter(
+                TRANSACTION_HANDLE,
+                user("admin"),
+                CONTEXT,
+                new CatalogSchemaTableName("testCatalog", "test", "customer"));
+
+        assertTrue(viewExpressionAdmin.isPresent());
+        assertEquals(viewExpressionAdmin.get().getExpression(), "nation=INDIA");
     }
 
     private static ConnectorIdentity user(String name)

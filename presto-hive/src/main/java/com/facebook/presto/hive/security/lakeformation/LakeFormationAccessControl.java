@@ -23,6 +23,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.glue.AWSGlueAsync;
 import com.amazonaws.services.glue.AWSGlueAsyncClientBuilder;
 import com.amazonaws.services.glue.model.Column;
+import com.amazonaws.services.glue.model.ColumnRowFilter;
 import com.amazonaws.services.glue.model.EntityNotFoundException;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataRequest;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
@@ -36,12 +37,14 @@ import com.facebook.presto.hive.metastore.glue.GlueSecurityMapping;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappings;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.security.lakeformation.annotations.ForLakeFormationSecurity;
+import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.security.AccessControlContext;
 import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.ConnectorIdentity;
+import com.facebook.presto.spi.security.ViewExpression;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -382,6 +385,19 @@ public class LakeFormationAccessControl
                 denySelectTable(tableName.getTableName(), format("Access Denied: User [ %s ] has [SELECT] " +
                         "privilege only on [ %s ] columns of [ %s/%s ]", identity.getUser(), authorizedColumns, tableName.getSchemaName(), tableName.getTableName()));
             }
+
+            // Check if multiple Cell Filters are created in Lake Formation
+            // This will be done by checking if any two columns have a different row filter associated with them
+            List<ColumnRowFilter> columnRowFilters = result.get().getCellFilters();
+            Set<String> uniqueRowFilters = columnRowFilters
+                    .stream()
+                    .map(ColumnRowFilter::getRowFilterExpression)
+                    .collect(Collectors.toSet());
+            if (uniqueRowFilters.size() > 1) {
+                denySelectTable(
+                        tableName.getTableName(),
+                        "Access Denied: Presto does not support multiple cell filters associated with the same table");
+            }
         }
     }
 
@@ -470,6 +486,20 @@ public class LakeFormationAccessControl
                 denyCreateViewWithSelect(tableName.getTableName(), identity, format("Access Denied: User [ %s ] has [SELECT] " +
                         "privilege only on [ %s ] columns of [ %s/%s ]", identity.getUser(), authorizedColumns, tableName.getSchemaName(), tableName.getTableName()));
             }
+
+            // Check if multiple Cell Filters are created in Lake Formation
+            // This will be done by checking if any two columns have a different row filter associated with them
+            List<ColumnRowFilter> columnRowFilters = result.get().getCellFilters();
+            Set<String> uniqueRowFilters = columnRowFilters
+                    .stream()
+                    .map(ColumnRowFilter::getRowFilterExpression)
+                    .collect(Collectors.toSet());
+            if (uniqueRowFilters.size() > 1) {
+                denyCreateViewWithSelect(
+                        tableName.getTableName(),
+                        identity,
+                        "Access Denied: Presto does not support multiple cell filters associated with the same table");
+            }
         }
     }
 
@@ -482,6 +512,52 @@ public class LakeFormationAccessControl
     public void checkCanSetCatalogSessionProperty(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String propertyName)
     {
         // allow
+    }
+
+    /**
+     * Get a row filter associated with the given table and identity.
+     * <p>
+     * The filter must be a scalar SQL expression of boolean type over the columns in the table.
+     *
+     * @return the filter, or {@link Optional#empty()} if not applicable
+     */
+    @Override
+    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, CatalogSchemaTableName tableName)
+    {
+        String catalogName = tableName.getCatalogName();
+        SchemaTableName schemaTableName = tableName.getSchemaTableName();
+        if (INFORMATION_SCHEMA_NAME.equals(schemaTableName.getSchemaName())) {
+            return Optional.empty();
+        }
+
+        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, schemaTableName);
+
+        Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
+        if (!result.isPresent()) {
+            return Optional.empty();
+        }
+
+        ViewExpression viewExpression = null;
+        if (result.get().isRegisteredWithLakeFormation()) {
+            List<ColumnRowFilter> columnRowFilters = result.get().getCellFilters();
+            Set<String> uniqueRowFilters = columnRowFilters
+                    .stream()
+                    .map(ColumnRowFilter::getRowFilterExpression)
+                    .collect(Collectors.toSet());
+
+            if (uniqueRowFilters.size() == 1) {
+                String rowFilter = uniqueRowFilters.iterator().next();
+                if (!rowFilter.equals("TRUE")) {
+                    viewExpression = new ViewExpression(
+                            identity.getUser(),
+                            Optional.of(catalogName),
+                            Optional.of(schemaTableName.getSchemaName()),
+                            rowFilter);
+                }
+            }
+        }
+
+        return Optional.ofNullable(viewExpression);
     }
 
     private AWSCredentialsProvider createAssumeRoleCredentialsProvider(String iamRole)
