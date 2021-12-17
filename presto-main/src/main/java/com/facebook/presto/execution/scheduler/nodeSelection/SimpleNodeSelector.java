@@ -18,13 +18,13 @@ import com.facebook.presto.execution.NodeTaskMap;
 import com.facebook.presto.execution.RemoteTask;
 import com.facebook.presto.execution.scheduler.BucketNodeMap;
 import com.facebook.presto.execution.scheduler.InternalNodeInfo;
+import com.facebook.presto.execution.scheduler.ModularHashingNodeProvider;
 import com.facebook.presto.execution.scheduler.NodeAssignmentStats;
 import com.facebook.presto.execution.scheduler.NodeMap;
 import com.facebook.presto.execution.scheduler.SplitPlacementResult;
 import com.facebook.presto.metadata.InternalNode;
 import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.Split;
-import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SplitContext;
 import com.facebook.presto.spi.SplitWeight;
@@ -147,19 +147,17 @@ public class SimpleNodeSelector
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
 
-        // todo identify if sorting will cause bottleneck
-        List<HostAddress> sortedCandidates = sortedNodes(nodeMap);
         OptionalInt preferredNodeCount = OptionalInt.empty();
         for (Split split : splits) {
             List<InternalNode> candidateNodes;
             switch (split.getNodeSelectionStrategy()) {
                 case HARD_AFFINITY:
-                    candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
+                    candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(new ModularHashingNodeProvider(nodeMap.getActiveNodes())), includeCoordinator);
                     preferredNodeCount = OptionalInt.of(candidateNodes.size());
                     break;
                 case SOFT_AFFINITY:
                 case SOFT_AFFINITY_BY_SPLIT:
-                    candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
+                    candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(new ModularHashingNodeProvider(nodeMap.getAllNodes())), includeCoordinator);
                     preferredNodeCount = OptionalInt.of(candidateNodes.size());
                     candidateNodes = ImmutableList.<InternalNode>builder()
                             .addAll(candidateNodes)

@@ -17,7 +17,7 @@ import com.facebook.presto.hive.metastore.Storage;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
-import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.NodeProvider;
 import com.facebook.presto.spi.SplitWeight;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -34,7 +34,6 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 
-import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY_BY_SPLIT;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -210,25 +209,13 @@ public class HiveSplit
     }
 
     @Override
-    public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+    public List<HostAddress> getPreferredNodes(NodeProvider nodeProvider)
     {
-        if (sortedCandidates == null || sortedCandidates.isEmpty()) {
-            throw new PrestoException(NO_NODES_AVAILABLE, "sortedCandidates is null or empty for HiveSplit");
-        }
-
-        int size = sortedCandidates.size();
-        int mod;
-        int position;
-
         switch (getNodeSelectionStrategy()) {
             case SOFT_AFFINITY:
-                mod = path.hashCode() % size;
-                position = mod < 0 ? mod + size : mod;
-                return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+                return nodeProvider.get(path, 2);
             case SOFT_AFFINITY_BY_SPLIT:
-                mod = (path.hashCode() + (int) (start / (fileSize / size))) % size;
-                position = mod < 0 ? mod + size : mod;
-                return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+                return nodeProvider.get(path, 2, start, fileSize);
             default:
                 return addresses;
         }

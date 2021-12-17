@@ -17,6 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.dispatcher.NoOpQueryManager;
 import com.facebook.presto.execution.scheduler.LegacyNetworkTopology;
+import com.facebook.presto.execution.scheduler.ModularHashingNodeProvider;
 import com.facebook.presto.execution.scheduler.NetworkLocation;
 import com.facebook.presto.execution.scheduler.NetworkLocationCache;
 import com.facebook.presto.execution.scheduler.NetworkTopology;
@@ -34,6 +35,7 @@ import com.facebook.presto.server.BasicQueryStats;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.NodeProvider;
 import com.facebook.presto.spi.NodeState;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SplitWeight;
@@ -240,7 +242,7 @@ public class TestNodeScheduler
         Set<Split> splits = ImmutableSet.of(split);
 
         Map.Entry<InternalNode, Split> assignment = Iterables.getOnlyElement(nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values())).getAssignments().entries());
-        assertEquals(assignment.getKey().getHostAndPort(), split.getPreferredNodes(ImmutableList.of()).get(0));
+        assertEquals(assignment.getKey().getHostAndPort(), split.getPreferredNodes(new ModularHashingNodeProvider(nodeSelector.getAllNodes())).get(0));
         assertEquals(assignment.getValue(), split);
     }
 
@@ -358,7 +360,7 @@ public class TestNodeScheduler
         int rack1 = 0;
         int rack2 = 0;
         for (Split split : unassigned) {
-            String rack = topology.locate(split.getPreferredNodes(ImmutableList.of()).get(0)).getSegments().get(0);
+            String rack = topology.locate(split.getPreferredNodes(new ModularHashingNodeProvider(nodeSelector.getAllNodes())).get(0)).getSegments().get(0);
             switch (rack) {
                 case "rack1":
                     rack1++;
@@ -1147,7 +1149,7 @@ public class TestNodeScheduler
         }
 
         @Override
-        public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+        public List<HostAddress> getPreferredNodes(NodeProvider nodeProvider)
         {
             return ImmutableList.of(HostAddress.fromString("127.0.0.1:11"));
         }
@@ -1199,7 +1201,7 @@ public class TestNodeScheduler
         }
 
         @Override
-        public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+        public List<HostAddress> getPreferredNodes(NodeProvider nodeProvider)
         {
             return hosts;
         }
@@ -1235,9 +1237,9 @@ public class TestNodeScheduler
         }
 
         @Override
-        public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+        public List<HostAddress> getPreferredNodes(NodeProvider nodeProvider)
         {
-            return ImmutableList.of(sortedCandidates.get(scheduleIdentifierId % sortedCandidates.size()));
+            return nodeProvider.get(String.valueOf(scheduleIdentifierId), 1);
         }
     }
 
@@ -1265,20 +1267,13 @@ public class TestNodeScheduler
         }
 
         @Override
-        public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+        public List<HostAddress> getPreferredNodes(NodeProvider nodeProvider)
         {
-            int size = sortedCandidates.size();
-            int mod;
-            int position;
             switch (getNodeSelectionStrategy()) {
                 case SOFT_AFFINITY:
-                    mod = path.hashCode() % size;
-                    position = mod < 0 ? mod + size : mod;
-                    return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+                    return nodeProvider.get(path, 2);
                 case SOFT_AFFINITY_BY_SPLIT:
-                    mod = (path.hashCode() + (int) (start / (fileSize / size))) % size;
-                    position = mod < 0 ? mod + size : mod;
-                    return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+                    return nodeProvider.get(path, 2, start, fileSize);
                 default:
                     return ImmutableList.of();
             }
@@ -1300,9 +1295,9 @@ public class TestNodeScheduler
         }
 
         @Override
-        public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+        public List<HostAddress> getPreferredNodes(NodeProvider nodeProvider)
         {
-            return ImmutableList.of(sortedCandidates.get(new Random().nextInt(sortedCandidates.size())));
+            return nodeProvider.get(String.valueOf(new Random().nextInt()), 1);
         }
     }
 
