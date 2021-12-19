@@ -29,6 +29,7 @@ import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.NodeState;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.facebook.presto.testing.TestingTransactionHandle;
@@ -62,6 +63,8 @@ import static com.facebook.airlift.concurrent.Threads.daemonThreadsNamed;
 import static com.facebook.presto.execution.scheduler.NetworkLocation.ROOT_LOCATION;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.NO_PREFERENCE;
+import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY;
+import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY_BY_SPLIT;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -353,6 +356,78 @@ public class TestNodeScheduler
         splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestAffinitySplitRemote(3)));
         splitPlacementResult = nodeSelector.computeAssignments(splits, getRemoteTableScanTask(splitPlacementResult));
         assertEquals(splitPlacementResult.getAssignments().keySet().size(), 3);
+    }
+
+    @Test
+    public void testSoftAffinityBySplitAssignment()
+    {
+        NodeTaskMap nodeTaskMap = new NodeTaskMap(finalizerService);
+
+        NodeSchedulerConfig nodeSchedulerConfig = new NodeSchedulerConfig()
+                .setMaxSplitsPerNode(20)
+                .setIncludeCoordinator(false)
+                .setMaxPendingSplitsPerTask(10);
+
+        InMemoryNodeManager newNodeManager = new InMemoryNodeManager();
+        newNodeManager.addNode(CONNECTOR_ID, nodeManager.getNodes(NodeState.ACTIVE));
+
+        ImmutableList.Builder<InternalNode> nodeBuilder = ImmutableList.builder();
+        // Add three more nodes for this test to make total 6 nodes
+        nodeBuilder.add(new InternalNode("other4", URI.create("http://127.0.0.1:14"), NodeVersion.UNKNOWN, false));
+        nodeBuilder.add(new InternalNode("other5", URI.create("http://127.0.0.1:15"), NodeVersion.UNKNOWN, false));
+        nodeBuilder.add(new InternalNode("other6", URI.create("http://127.0.0.1:16"), NodeVersion.UNKNOWN, false));
+
+        newNodeManager.addNode(CONNECTOR_ID, nodeBuilder.build());
+
+        NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), newNodeManager, new NodeSelectionStats(), nodeSchedulerConfig, nodeTaskMap);
+        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID, 6);
+
+        // Test assignments with SOFT_AFFINITY first
+        Set<Split> splits = getSplits(SOFT_AFFINITY);
+        SplitPlacementResult splitPlacementResult = nodeSelector.computeAssignments(splits, ImmutableList.of());
+        Set<InternalNode> internalNodes = splitPlacementResult.getAssignments().keySet();
+        // Soft affinity schedules to only 3 nodes
+        assertEquals(internalNodes.size(), 3);
+
+        splits = getSplits(SOFT_AFFINITY_BY_SPLIT);
+        splitPlacementResult = nodeSelector.computeAssignments(splits, ImmutableList.of());
+        internalNodes = splitPlacementResult.getAssignments().keySet();
+        // Uniform scheduling schedules splits to 6 nodes.
+        assertEquals(internalNodes.size(), 6);
+    }
+
+    private Set<Split> getSplits(NodeSelectionStrategy nodeSelectionStrategy)
+    {
+        Set<Split> splits = new HashSet<>();
+        TestingTransactionHandle transactionHandle = TestingTransactionHandle.create();
+
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_02d7d0e7-2a88-43a9-8bb2-021146b89c47.orc", 0, 1367800409, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_02d7d0e7-2a88-43a9-8bb2-021146b89c47.orc", 67108864, 1367800409, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_02d7d0e7-2a88-43a9-8bb2-021146b89c47.orc", 134217728, 1367800409, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_02d7d0e7-2a88-43a9-8bb2-021146b89c47.orc", 201326592, 1367800409, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_02d7d0e7-2a88-43a9-8bb2-021146b89c47.orc", 268435456, 1367800409, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_083e164a-8736-486f-964a-3fd5c2a64f5d.orc", 67108864, 1029571796, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_083e164a-8736-486f-964a-3fd5c2a64f5d.orc", 134217728, 1029571796, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_083e164a-8736-486f-964a-3fd5c2a64f5d.orc", 201326592, 1029571796, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_083e164a-8736-486f-964a-3fd5c2a64f5d.orc", 268435456, 1029571796, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_083e164a-8736-486f-964a-3fd5c2a64f5d.orc", 335544320, 1029571796, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_3868393a-030d-4d9c-8707-f058d478892c.orc", 0, 1457902603, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_3868393a-030d-4d9c-8707-f058d478892c.orc", 134217728, 1457902603, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_3868393a-030d-4d9c-8707-f058d478892c.orc", 201326592, 1457902603, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_3868393a-030d-4d9c-8707-f058d478892c.orc", 268435456, 1457902603, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_3868393a-030d-4d9c-8707-f058d478892c.orc", 335544320, 1457902603, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_7ef5233e-f6b5-4df6-a546-4e8ce330c07a.orc", 0, 1400076028, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_7ef5233e-f6b5-4df6-a546-4e8ce330c07a.orc", 201326592, 1400076028, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_7ef5233e-f6b5-4df6-a546-4e8ce330c07a.orc", 268435456, 1400076028, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_7ef5233e-f6b5-4df6-a546-4e8ce330c07a.orc", 335544320, 1400076028, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_7ef5233e-f6b5-4df6-a546-4e8ce330c07a.orc", 402653184, 1400076028, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_ffd3419d-4721-43c3-a779-70b786c37a46.orc", 0, 1462817046, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_ffd3419d-4721-43c3-a779-70b786c37a46.orc", 268435456, 1462817046, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_ffd3419d-4721-43c3-a779-70b786c37a46.orc", 335544320, 1462817046, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_ffd3419d-4721-43c3-a779-70b786c37a46.orc", 402653184, 1462817046, nodeSelectionStrategy)));
+        splits.add(new Split(CONNECTOR_ID, transactionHandle, new TestSoftAffinityBySplitRemote("s3://bucket/table/20211103_134849_00035_qxsp9_ffd3419d-4721-43c3-a779-70b786c37a46.orc", 1395707158, 1462817046, nodeSelectionStrategy)));
+
+        return splits;
     }
 
     @Test
@@ -766,6 +841,50 @@ public class TestNodeScheduler
         public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
         {
             return ImmutableList.of(sortedCandidates.get(scheduleIdentifierId % sortedCandidates.size()));
+        }
+    }
+
+    private static class TestSoftAffinityBySplitRemote
+            extends TestSplitRemote
+    {
+        private String path;
+        private long start;
+        private long fileSize;
+        NodeSelectionStrategy nodeSelectionStrategy;
+
+        public TestSoftAffinityBySplitRemote(String path, long start, long fileSize, NodeSelectionStrategy nodeSelectionStrategy)
+        {
+            super();
+            this.path = path;
+            this.start = start;
+            this.fileSize = fileSize;
+            this.nodeSelectionStrategy = nodeSelectionStrategy;
+        }
+
+        @Override
+        public NodeSelectionStrategy getNodeSelectionStrategy()
+        {
+            return nodeSelectionStrategy;
+        }
+
+        @Override
+        public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+        {
+            int size = sortedCandidates.size();
+            int mod;
+            int position;
+            switch (getNodeSelectionStrategy()) {
+                case SOFT_AFFINITY:
+                    mod = path.hashCode() % size;
+                    position = mod < 0 ? mod + size : mod;
+                    return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+                case SOFT_AFFINITY_BY_SPLIT:
+                    mod = (path.hashCode() + (int) (start / (fileSize / size))) % size;
+                    position = mod < 0 ? mod + size : mod;
+                    return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+                default:
+                    return ImmutableList.of();
+            }
         }
     }
 

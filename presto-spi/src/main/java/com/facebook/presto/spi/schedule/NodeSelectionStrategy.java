@@ -17,5 +17,6 @@ public enum NodeSelectionStrategy
 {
     HARD_AFFINITY,
     SOFT_AFFINITY,
+    SOFT_AFFINITY_BY_SPLIT,
     NO_PREFERENCE
 }

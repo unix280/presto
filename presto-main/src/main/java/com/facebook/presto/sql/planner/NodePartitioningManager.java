@@ -134,6 +134,7 @@ public class NodePartitioningManager
                 cacheable = false;
                 break;
             case SOFT_AFFINITY:
+            case SOFT_AFFINITY_BY_SPLIT:
                 bucketToNode = getFixedMapping(connectorBucketNodeMap);
                 cacheable = true;
                 break;
@@ -176,6 +177,7 @@ public class NodePartitioningManager
             case HARD_AFFINITY:
                 return new FixedBucketNodeMap(getSplitToBucket(session, partitioningHandle), getFixedMapping(connectorBucketNodeMap), false);
             case SOFT_AFFINITY:
+            case SOFT_AFFINITY_BY_SPLIT:
                 if (preferDynamic) {
                     return new DynamicBucketNodeMap(getSplitToBucket(session, partitioningHandle), connectorBucketNodeMap.getBucketCount(), getFixedMapping(connectorBucketNodeMap));
                 }

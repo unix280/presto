@@ -35,6 +35,7 @@ import java.util.Set;
 
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY;
+import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY_BY_SPLIT;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -210,16 +211,22 @@ public class HiveSplit
             throw new PrestoException(NO_NODES_AVAILABLE, "sortedCandidates is null or empty for HiveSplit");
         }
 
-        if (getNodeSelectionStrategy() == SOFT_AFFINITY) {
-            // Use + 1 as secondary hash for now, would always get a different position from the first hash.
-            int size = sortedCandidates.size();
-            int mod = path.hashCode() % size;
-            int position = mod < 0 ? mod + size : mod;
-            return ImmutableList.of(
-                    sortedCandidates.get(position),
-                    sortedCandidates.get((position + 1) % size));
+        int size = sortedCandidates.size();
+        int mod;
+        int position;
+
+        switch (getNodeSelectionStrategy()) {
+            case SOFT_AFFINITY:
+                mod = path.hashCode() % size;
+                position = mod < 0 ? mod + size : mod;
+                return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+            case SOFT_AFFINITY_BY_SPLIT:
+                mod = (path.hashCode() + (int) (start / (fileSize / size))) % size;
+                position = mod < 0 ? mod + size : mod;
+                return ImmutableList.of(sortedCandidates.get(position), sortedCandidates.get((position + 1) % size));
+            default:
+                return addresses;
         }
-        return addresses;
     }
 
     @JsonProperty

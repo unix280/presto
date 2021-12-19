@@ -71,6 +71,7 @@ public class HiveNodePartitioningProvider
         switch (nodeSelectionStrategy) {
             case HARD_AFFINITY:
             case SOFT_AFFINITY:
+            case SOFT_AFFINITY_BY_SPLIT:
                 return createBucketNodeMap(Stream.generate(() -> sortedNodes).flatMap(List::stream).limit(bucketCount).collect(toImmutableList()), nodeSelectionStrategy);
             case NO_PREFERENCE:
                 return createBucketNodeMap(bucketCount);
