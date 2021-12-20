@@ -379,8 +379,8 @@ public class LakeFormationAccessControl
                     .forEach(deniedColumns::add);
 
             if (!deniedColumns.isEmpty()) {
-                denySelectTable(tableName.getTableName(), format("Access Denied: User [ %s ] does not have [SELECT] " +
-                        "privilege on [ %s ] columns of [ %s/%s ]", identity.getUser(), deniedColumns, tableName.getSchemaName(), tableName.getTableName()));
+                denySelectTable(tableName.getTableName(), format("Access Denied: User [ %s ] has [SELECT] " +
+                        "privilege only on [ %s ] columns of [ %s/%s ]", identity.getUser(), authorizedColumns, tableName.getSchemaName(), tableName.getTableName()));
             }
         }
     }
@@ -467,8 +467,8 @@ public class LakeFormationAccessControl
                     .forEach(deniedColumns::add);
 
             if (!deniedColumns.isEmpty()) {
-                denyCreateViewWithSelect(tableName.getTableName(), identity, format("Access Denied: User [ %s ] does not have [SELECT] " +
-                        "privilege on [ %s ] columns of [ %s/%s ]", identity.getUser(), deniedColumns, tableName.getSchemaName(), tableName.getTableName()));
+                denyCreateViewWithSelect(tableName.getTableName(), identity, format("Access Denied: User [ %s ] has [SELECT] " +
+                        "privilege only on [ %s ] columns of [ %s/%s ]", identity.getUser(), authorizedColumns, tableName.getSchemaName(), tableName.getTableName()));
             }
         }
     }
