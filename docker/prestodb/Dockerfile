@@ -24,7 +24,10 @@ RUN yum install tar gzip java-11-amazon-corretto less -y \
 	#  mkdir for config
 	&& mkdir -p $PRESTO_HOME/etc \
 	&& mkdir -p $PRESTO_HOME/etc/catalog \
-	&& mkdir -p /var/lib/presto/data
+	&& mkdir -p /var/lib/presto/data \
+        && mkdir -p /usr/lib/presto/utils \
+        # Download jmx prometheus exporter \
+        && curl -o /usr/lib/presto/utils/jmx_prometheus_javaagent-0.16.1.jar https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar
 
 COPY ./docker/prestodb/etc $PRESTO_HOME/etc
 COPY ./docker/prestodb/entrypoint.sh /opt
