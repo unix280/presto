@@ -10,7 +10,7 @@ ENV PRESTO_HOME="/opt/presto-server"
 COPY build-artifacts/$PRESTO_PKG .
 COPY build-artifacts/$PRESTO_CLI_JAR /opt/presto-cli
 
-RUN yum install tar gzip java-11-amazon-corretto less -y \
+RUN yum install tar gzip java-11-amazon-corretto less procps -y \
 	# Download Presto and move \
 	&& tar -zxf $PRESTO_PKG \
 	&& mv ./presto-server-$PRESTO_VERSION $PRESTO_HOME \
