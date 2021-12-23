@@ -30,6 +30,8 @@ import com.facebook.presto.spi.security.PrincipalType;
 import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.tests.DistributedQueryRunner;
+import com.facebook.presto.tests.tpcds.TpcdsTableName;
+import com.facebook.presto.tpcds.TpcdsPlugin;
 import com.facebook.presto.tpch.TpchPlugin;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -42,6 +44,7 @@ import java.io.File;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -57,6 +60,7 @@ import static com.facebook.presto.spi.security.SelectedRole.Type.ROLE;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.facebook.presto.tests.QueryAssertions.copyTpchTables;
 import static com.facebook.presto.tpch.TpchMetadata.TINY_SCHEMA_NAME;
+import static java.util.Locale.ENGLISH;
 import static io.airlift.units.Duration.nanosSince;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
@@ -75,9 +79,14 @@ public final class HiveQueryRunner
     public static final String HIVE_BUCKETED_CATALOG = "hive_bucketed";
     public static final String TPCH_SCHEMA = "tpch";
     public static final String TPCH_BUCKETED_SCHEMA = "tpch_bucketed";
+    public static final String TPCDS_SCHEMA = "tpcds";
+    public static final String TPCDS_BUCKETED_SCHEMA = "tpcds_bucketed";
     public static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext("test_user", "test_queryId", Optional.empty(), Optional.empty(), Optional.empty(), false, HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
     private static final String TEMPORARY_TABLE_SCHEMA = "__temporary_tables__";
     private static final DateTimeZone TIME_ZONE = DateTimeZone.forID("America/Bahia_Banderas");
+
+    private static List<String> tpchTables;
+    private static List<String> tpcdsTables;
 
     public static DistributedQueryRunner createQueryRunner(TpchTable<?>... tables)
             throws Exception
@@ -165,8 +174,10 @@ public final class HiveQueryRunner
                         .build();
         try {
             queryRunner.installPlugin(new TpchPlugin());
+            queryRunner.installPlugin(new TpcdsPlugin());
             queryRunner.installPlugin(new TestingHiveEventListenerPlugin());
             queryRunner.createCatalog("tpch", "tpch");
+            queryRunner.createCatalog("tpcds", "tpcds");
 
             queryRunner.installPlugin(new JmxPlugin());
             queryRunner.createCatalog("jmx", "jmx");
@@ -215,12 +226,30 @@ public final class HiveQueryRunner
                 metastore.createDatabase(METASTORE_CONTEXT, createDatabaseMetastoreObject(TEMPORARY_TABLE_SCHEMA));
             }
 
+            setupTpcdsTables();
+            if (!metastore.getDatabase(METASTORE_CONTEXT, TPCDS_SCHEMA).isPresent()) {
+                metastore.createDatabase(METASTORE_CONTEXT, createDatabaseMetastoreObject(TPCDS_SCHEMA));
+                copyTables(queryRunner, "tpcds", TINY_SCHEMA_NAME, createSession(Optional.empty(), TPCDS_SCHEMA), tpcdsTables, true, false);
+            }
+
+            if (!metastore.getDatabase(METASTORE_CONTEXT, TPCDS_BUCKETED_SCHEMA).isPresent()) {
+                metastore.createDatabase(METASTORE_CONTEXT, createDatabaseMetastoreObject(TPCDS_BUCKETED_SCHEMA));
+                copyTables(queryRunner, "tpcds", TINY_SCHEMA_NAME, createBucketedSession(Optional.empty(), TPCDS_BUCKETED_SCHEMA), tpcdsTables, true, true);
+            }
+
             return queryRunner;
         }
         catch (Exception e) {
             queryRunner.close();
             throw e;
         }
+    }
+
+    private static void setupTpchTables(Iterable<TpchTable<?>> tables)
+    {
+        ImmutableList.Builder<String> tpchtableNames = ImmutableList.builder();
+        tables.forEach(table -> tpchtableNames.add(table.getTableName().toLowerCase(ENGLISH)));
+        tpchTables = tpchtableNames.build();
     }
 
     private static ExtendedHiveMetastore getFileHiveMetastore(DistributedQueryRunner queryRunner)
@@ -231,6 +260,15 @@ public final class HiveQueryRunner
         HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveClientConfig, metastoreClientConfig), ImmutableSet.of());
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
         return new FileHiveMetastore(hdfsEnvironment, baseDir.toURI().toString(), "test");
+    }
+
+    private static void setupTpcdsTables()
+    {
+        ImmutableList.Builder<String> tables = ImmutableList.builder();
+        for (TpcdsTableName tpcdsTable : TpcdsTableName.getBaseTables()) {
+            tables.add(tpcdsTable.getTableName().toLowerCase(ENGLISH));
+        }
+        tpcdsTables = tables.build();
     }
 
     public static DistributedQueryRunner createMaterializingQueryRunner(Iterable<TpchTable<?>> tables)
@@ -294,6 +332,11 @@ public final class HiveQueryRunner
 
     public static Session createSession(Optional<SelectedRole> role)
     {
+        return createSession(role, TPCH_SCHEMA);
+    }
+
+    public static Session createSession(Optional<SelectedRole> role, String schema)
+    {
         return testSessionBuilder()
                 .setIdentity(new Identity(
                         "hive",
@@ -303,11 +346,16 @@ public final class HiveQueryRunner
                         ImmutableMap.of(),
                         ImmutableMap.of()))
                 .setCatalog(HIVE_CATALOG)
-                .setSchema(TPCH_SCHEMA)
+                .setSchema(schema)
                 .build();
     }
 
     public static Session createBucketedSession(Optional<SelectedRole> role)
+    {
+        return createBucketedSession(role, TPCH_BUCKETED_SCHEMA);
+    }
+
+    public static Session createBucketedSession(Optional<SelectedRole> role, String schema)
     {
         return testSessionBuilder()
                 .setIdentity(new Identity(
@@ -318,7 +366,7 @@ public final class HiveQueryRunner
                         ImmutableMap.of(),
                         ImmutableMap.of()))
                 .setCatalog(HIVE_BUCKETED_CATALOG)
-                .setSchema(TPCH_BUCKETED_SCHEMA)
+                .setSchema(schema)
                 .build();
     }
 
