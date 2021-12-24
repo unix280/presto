@@ -19,6 +19,7 @@ import com.facebook.presto.common.CatalogSchemaName;
 import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.spi.CatalogSchemaTableName;
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
@@ -360,6 +361,42 @@ public class AccessControlManager
             tableNames = entry.getAccessControl().filterTables(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(catalogName), context, tableNames);
         }
         return tableNames;
+    }
+
+    @Override
+    public void checkCanShowColumnsMetadata(TransactionId transactionId, Identity identity, AccessControlContext context, CatalogSchemaTableName table)
+    {
+        requireNonNull(identity, "identity is null");
+        requireNonNull(table, "table is null");
+
+        authenticationCheck(() -> checkCanAccessCatalog(identity, context, table.getCatalogName()));
+
+        authorizationCheck(() -> systemAccessControl.get().checkCanShowColumnsMetadata(identity, context, table));
+
+        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, table.getCatalogName());
+        if (entry != null) {
+            authorizationCheck(() -> entry.getAccessControl().checkCanShowColumnsMetadata(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(), context, table.getSchemaTableName()));
+        }
+    }
+
+    @Override
+    public List<ColumnMetadata> filterColumns(TransactionId transactionId, Identity identity, AccessControlContext context, CatalogSchemaTableName table, List<ColumnMetadata> columns)
+    {
+        requireNonNull(transactionId, "transaction is null");
+        requireNonNull(identity, "identity is null");
+        requireNonNull(table, "tableName is null");
+
+        if (filterTables(transactionId, identity, context, table.getCatalogName(), ImmutableSet.of(table.getSchemaTableName())).isEmpty()) {
+            return ImmutableList.of();
+        }
+
+        columns = systemAccessControl.get().filterColumns(identity, context, table, columns);
+
+        CatalogAccessControlEntry entry = getConnectorAccessControl(transactionId, table.getCatalogName());
+        if (entry != null) {
+            columns = entry.getAccessControl().filterColumns(entry.getTransactionHandle(transactionId), identity.toConnectorIdentity(), context, table.getSchemaTableName(), columns);
+        }
+        return columns;
     }
 
     @Override

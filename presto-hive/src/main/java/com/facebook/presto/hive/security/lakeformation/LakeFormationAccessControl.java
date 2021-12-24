@@ -38,6 +38,7 @@ import com.facebook.presto.hive.metastore.glue.GlueSecurityMappings;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.security.lakeformation.annotations.ForLakeFormationSecurity;
 import com.facebook.presto.spi.CatalogSchemaTableName;
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
@@ -48,6 +49,7 @@ import com.facebook.presto.spi.security.ViewExpression;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableList;
 import org.jetbrains.annotations.TestOnly;
 import org.weakref.jmx.Flatten;
 import org.weakref.jmx.Managed;
@@ -309,6 +311,60 @@ public class LakeFormationAccessControl
     public Set<SchemaTableName> filterTables(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, Set<SchemaTableName> tableNames)
     {
         return tableNames;
+    }
+
+    /**
+     * Check if identity is allowed to show columns of tables by executing SHOW COLUMNS, DESCRIBE etc.
+     * <p>
+     * NOTE: This method is only present to give users an error message when listing is not allowed.
+     * The {@link #filterColumns} method must filter all results for unauthorized users,
+     * since there are multiple ways to list columns.
+     *
+     * @throws com.facebook.presto.spi.security.AccessDeniedException if not allowed
+     */
+    @Override
+    public void checkCanShowColumnsMetadata(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    {
+        // allow
+    }
+
+    /**
+     * Filter the list of columns to those visible to the identity.
+     */
+    @Override
+    public List<ColumnMetadata> filterColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, List<ColumnMetadata> columns)
+    {
+        if (INFORMATION_SCHEMA_NAME.equals(tableName.getSchemaName())) {
+            return columns;
+        }
+
+        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, tableName);
+
+        Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
+        if (!result.isPresent()) {
+            denySelectTable(tableName.getTableName(), format("Access Denied: " +
+                    "Error fetching table [%s/%s] or table does not exist", tableName.getSchemaName(), tableName.getTableName()));
+        }
+
+        if (result.get().isRegisteredWithLakeFormation()) {
+            List<String> authorizedColumns = result.get().getAuthorizedColumns();
+
+            if (authorizedColumns.isEmpty()) {
+                return ImmutableList.of();
+            }
+
+            List<Column> allColumns = result.get().getTable().getStorageDescriptor().getColumns();
+            List<String> allColumnNames = allColumns.stream().map(Column::getName).collect(Collectors.toList());
+            List<ColumnMetadata> allowedColumns = new ArrayList<>();
+
+            columns.stream()
+                    .filter(column -> (!allColumnNames.contains(column.getName())) || (authorizedColumns.contains(column.getName())))
+                    .forEach(allowedColumns::add);
+
+            return allowedColumns;
+        }
+
+        return columns;
     }
 
     /**

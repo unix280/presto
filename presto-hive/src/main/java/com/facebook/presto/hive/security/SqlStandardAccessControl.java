@@ -21,6 +21,7 @@ import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
 import com.facebook.presto.spi.CatalogSchemaTableName;
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
@@ -31,9 +32,11 @@ import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.Privilege;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.security.ViewExpression;
+import com.google.common.collect.ImmutableList;
 
 import javax.inject.Inject;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -72,6 +75,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyRevokeT
 import static com.facebook.presto.spi.security.AccessDeniedException.denySelectTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetRole;
+import static com.facebook.presto.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowRoles;
 import static com.facebook.presto.spi.security.PrincipalType.ROLE;
 import static com.facebook.presto.spi.security.PrincipalType.USER;
@@ -165,6 +169,23 @@ public class SqlStandardAccessControl
     public Set<SchemaTableName> filterTables(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, Set<SchemaTableName> tableNames)
     {
         return tableNames;
+    }
+
+    @Override
+    public void checkCanShowColumnsMetadata(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    {
+        if (!hasAnyTablePermission(transactionHandle, identity, tableName)) {
+            denyShowColumnsMetadata(tableName.toString());
+        }
+    }
+
+    @Override
+    public List<ColumnMetadata> filterColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, List<ColumnMetadata> columns)
+    {
+        if (!hasAnyTablePermission(transactionHandle, identity, tableName)) {
+            return ImmutableList.of();
+        }
+        return columns;
     }
 
     @Override
@@ -346,6 +367,18 @@ public class SqlStandardAccessControl
     {
     }
 
+    @Override
+    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, CatalogSchemaTableName tableName)
+    {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ViewExpression> getColumnMask(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, String columnName, Type type)
+    {
+        return Optional.empty();
+    }
+
     private boolean isAdmin(ConnectorTransactionHandle transaction, ConnectorIdentity identity)
     {
         SemiTransactionalHiveMetastore metastore = getMetastore(transaction);
@@ -440,21 +473,28 @@ public class SqlStandardAccessControl
         return rolesWithGrantOption.containsAll(roles);
     }
 
+    private boolean hasAnyTablePermission(ConnectorTransactionHandle transaction, ConnectorIdentity identity, SchemaTableName tableName)
+    {
+        if (isAdmin(transaction, identity)) {
+            return true;
+        }
+
+        if (tableName.equals(ROLES)) {
+            return false;
+        }
+
+        if (INFORMATION_SCHEMA_NAME.equals(tableName.getSchemaName())) {
+            return true;
+        }
+
+        SemiTransactionalHiveMetastore metastore = getMetastore(transaction);
+        return listEnabledTablePrivileges(metastore, tableName.getSchemaName(), tableName.getTableName(), identity)
+                .anyMatch(privilegeInfo -> true);
+    }
+
     private SemiTransactionalHiveMetastore getMetastore(ConnectorTransactionHandle transaction)
     {
         TransactionalMetadata metadata = hiveTransactionManager.get(transaction);
         return metadata.getMetastore();
-    }
-
-    @Override
-    public Optional<ViewExpression> getRowFilter(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, CatalogSchemaTableName tableName)
-    {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<ViewExpression> getColumnMask(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, String columnName, Type type)
-    {
-        return Optional.empty();
     }
 }

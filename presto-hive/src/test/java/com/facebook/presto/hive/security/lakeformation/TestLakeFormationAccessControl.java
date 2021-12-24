@@ -22,6 +22,7 @@ import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingConfig;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.security.lakeformation.LakeFormationAccessControl.LFPolicyCacheKey;
 import com.facebook.presto.spi.CatalogSchemaTableName;
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
@@ -46,6 +47,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.facebook.presto.common.type.BigintType.BIGINT;
+import static com.facebook.presto.common.type.IntegerType.INTEGER;
+import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.security.Privilege.SELECT;
 import static com.google.common.io.Resources.getResource;
 import static org.testng.Assert.assertEquals;
@@ -308,6 +312,11 @@ public class TestLakeFormationAccessControl
                 "test");
 
         // Column level access checks
+        lakeFormationAccessControl.checkCanShowColumnsMetadata(
+                TRANSACTION_HANDLE,
+                user("anyuser"),
+                CONTEXT,
+                new SchemaTableName("test", "orders"));
         lakeFormationAccessControl.checkCanAddColumn(
                 TRANSACTION_HANDLE,
                 user("anyuser"),
@@ -454,6 +463,38 @@ public class TestLakeFormationAccessControl
                 CONTEXT,
                 new SchemaTableName("test", "orders"),
                 ImmutableSet.of("orderkey")));
+    }
+
+    @Test
+    private void testFilterColumns()
+    {
+        List<ColumnMetadata> columns = new ArrayList<>();
+        columns.add(new ColumnMetadata("custkey", INTEGER));
+        columns.add(new ColumnMetadata("name", VARCHAR));
+        columns.add(new ColumnMetadata("address", VARCHAR));
+        columns.add(new ColumnMetadata("nation", VARCHAR));
+        columns.add(new ColumnMetadata("phone", BIGINT));
+        columns.add(new ColumnMetadata("acctbal", BIGINT));
+        columns.add(new ColumnMetadata("mktsegment", VARCHAR));
+
+        // User: admin, access to all columns
+        List<ColumnMetadata> adminColumns = lakeFormationAccessControl.filterColumns(
+                TRANSACTION_HANDLE,
+                user("admin"),
+                CONTEXT,
+                new SchemaTableName("test", "customer"),
+                columns);
+
+        assertEquals(adminColumns.size(), 7);
+
+        List<ColumnMetadata> analystColumns = lakeFormationAccessControl.filterColumns(
+                TRANSACTION_HANDLE,
+                user("analyst"),
+                CONTEXT,
+                new SchemaTableName("test", "customer"),
+                columns);
+
+        assertEquals(analystColumns.size(), 4);
     }
 
     @Test
