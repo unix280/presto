@@ -82,6 +82,7 @@ public class TestRangerBasedAccessControl
     {
         ConnectorAccessControl accessControl = createRangerAccessControl("default-allow-all.json", "user_groups.json", "user_roles.json");
         accessControl.checkCanCreateTable(TRANSACTION_HANDLE, user("admin"), CONTEXT, new SchemaTableName("test", "test"));
+        accessControl.checkCanShowCreateTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("bobschema", "bobtable"));
         accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("test", "test"), ImmutableSet.of());
         accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("bobschema", "bobtable"), ImmutableSet.of());
         accessControl.checkCanRenameTable(TRANSACTION_HANDLE, user("admin"), CONTEXT, new SchemaTableName("test", "test"), new SchemaTableName("test1", "test1"));
@@ -96,6 +97,7 @@ public class TestRangerBasedAccessControl
     {
         ConnectorAccessControl accessControl = createRangerAccessControl("default-schema-level-access.json", "user_groups.json", "user_roles.json");
         // 'etladmin' group have all access {group - etladmin, user - alice}
+        accessControl.checkCanShowCreateTable(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "test"));
         accessControl.checkCanCreateTable(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "test"));
         accessControl.checkCanRenameTable(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "test"), new SchemaTableName("foodmart", "test1"));
         accessControl.checkCanDropTable(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "test"));
@@ -114,6 +116,7 @@ public class TestRangerBasedAccessControl
         assertDenied(() -> accessControl.checkCanRenameColumn(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "test")));
 
         //  Access denied to others {group - readall, user - bob}
+        assertDenied(() -> accessControl.checkCanShowCreateTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test")));
         assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test"), ImmutableSet.of("column1")));
         assertDenied(() -> accessControl.checkCanCreateTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test")));
         assertDenied(() -> accessControl.checkCanRenameTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test"), new SchemaTableName("foodmart", "test1")));

@@ -257,6 +257,17 @@ public class LakeFormationAccessControl
     }
 
     /**
+     * Check if identity is allowed to execute SHOW CREATE TABLE or SHOW CREATE VIEW.
+     *
+     * @throws AccessDeniedException if not allowed
+     */
+    @Override
+    public void checkCanShowCreateTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    {
+        // allow
+    }
+
+    /**
      * Check if identity is allowed to create the specified table in this catalog.
      *
      * @throws AccessDeniedException if not allowed

@@ -289,6 +289,11 @@ public class TestLakeFormationAccessControl
         lakeFormationAccessControl.checkCanShowSchemas(TRANSACTION_HANDLE, user("anyuser"), CONTEXT);
 
         //Table level access checks
+        lakeFormationAccessControl.checkCanShowCreateTable(
+                TRANSACTION_HANDLE,
+                user("anyuser"),
+                CONTEXT,
+                new SchemaTableName("test", "orders"));
         lakeFormationAccessControl.checkCanCreateTable(
                 TRANSACTION_HANDLE,
                 user("anyuser"),

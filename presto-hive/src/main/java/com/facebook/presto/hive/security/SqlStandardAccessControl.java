@@ -76,6 +76,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denySelectT
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetRole;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowColumnsMetadata;
+import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowRoles;
 import static com.facebook.presto.spi.security.PrincipalType.ROLE;
 import static com.facebook.presto.spi.security.PrincipalType.USER;
@@ -134,6 +135,15 @@ public class SqlStandardAccessControl
     public Set<String> filterSchemas(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, Set<String> schemaNames)
     {
         return schemaNames;
+    }
+
+    @Override
+    public void checkCanShowCreateTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    {
+        // This should really be OWNERSHIP, but Hive uses `SELECT with GRANT`
+        if (!checkTablePermission(transactionHandle, identity, tableName, SELECT, true)) {
+            denyShowCreateTable(tableName.toString());
+        }
     }
 
     @Override
