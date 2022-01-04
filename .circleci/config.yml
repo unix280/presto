@@ -27,7 +27,7 @@ executors:
 
   openjdk:
     docker:
-      - image: circleci/openjdk:8-jdk-stretch-node
+      - image: cimg/openjdk:8.0-node
         auth:
           username: $DOCKERHUB_USERNAME
           password: $DOCKERHUB_PASSWORD
