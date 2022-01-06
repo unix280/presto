@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static com.facebook.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_MGR_DOWNLOAD_URL;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_GROUP_URL;
@@ -102,14 +103,13 @@ public class RangerBasedAccessControl
         try {
             OkHttpClient client = getAuthHttpClient(config);
 
-            HttpUrl hiveServicePolicyUrl = requireNonNull(HttpUrl.get(URI.create(config.getRangerHttpEndPoint())))
-                    .newBuilder()
-                    .encodedPath(RANGER_REST_POLICY_MGR_DOWNLOAD_URL + "/" + config.getRangerHiveServiceName()).build();
+            HttpUrl hiveServicePolicyUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(config.getRangerHttpEndPoint()))
+                    .appendPath(RANGER_REST_POLICY_MGR_DOWNLOAD_URL + "/" + config.getRangerHiveServiceName())
+                    .build()));
 
-            HttpUrl getUsersUrl = requireNonNull(HttpUrl.get(URI.create(config.getRangerHttpEndPoint())))
-                    .newBuilder()
-                    .encodedPath(RANGER_REST_USER_GROUP_URL)
-                    .build();
+            HttpUrl getUsersUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(config.getRangerHttpEndPoint()))
+                    .appendPath(RANGER_REST_USER_GROUP_URL)
+                    .build()));
 
             long startTime = System.nanoTime();
             servicePolicies = getHiveServicePolicies(client, hiveServicePolicyUrl);
@@ -126,8 +126,7 @@ public class RangerBasedAccessControl
             log.info("Retrieved users count " + users.getvXUsers().size());
         }
         catch (Exception e) {
-            log.error(e, "Exception while querying ranger service ");
-            throw new AccessDeniedException("Exception while querying ranger service ");
+            throw new RuntimeException("Exception while querying ranger service ", e);
         }
     }
 
@@ -160,10 +159,9 @@ public class RangerBasedAccessControl
         List<String> usersList = users.getvXUsers().stream().map(VXUser::getName).collect(Collectors.toList());
         HttpUrl getRolesUrl;
         for (String user : usersList) {
-            getRolesUrl = requireNonNull(HttpUrl.get(URI.create(rangerEndPoint)))
-                    .newBuilder()
-                    .encodedPath(RANGER_REST_USER_ROLES_URL + "/" + user)
-                    .build();
+            getRolesUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))
+                    .appendPath(RANGER_REST_USER_ROLES_URL + "/" + user)
+                    .build()));
             userRolesMapping.put(user, getRolesForUser(client, getRolesUrl));
         }
         return userRolesMapping;
