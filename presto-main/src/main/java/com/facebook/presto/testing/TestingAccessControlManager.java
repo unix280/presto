@@ -18,6 +18,8 @@ import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.security.AccessControlManager;
 import com.facebook.presto.security.AllowAllSystemAccessControl;
+import com.facebook.presto.spi.CatalogSchemaTableName;
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.security.AccessControlContext;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.security.ViewExpression;
@@ -57,6 +59,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denySelectC
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetSystemSessionProperty;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetUser;
+import static com.facebook.presto.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
 import static com.facebook.presto.testing.TestingAccessControlManager.TestingPrivilegeType.ADD_COLUMN;
 import static com.facebook.presto.testing.TestingAccessControlManager.TestingPrivilegeType.CREATE_SCHEMA;
@@ -75,6 +78,7 @@ import static com.facebook.presto.testing.TestingAccessControlManager.TestingPri
 import static com.facebook.presto.testing.TestingAccessControlManager.TestingPrivilegeType.SELECT_COLUMN;
 import static com.facebook.presto.testing.TestingAccessControlManager.TestingPrivilegeType.SET_SESSION;
 import static com.facebook.presto.testing.TestingAccessControlManager.TestingPrivilegeType.SET_USER;
+import static com.facebook.presto.testing.TestingAccessControlManager.TestingPrivilegeType.SHOW_COLUMNS;
 import static com.facebook.presto.testing.TestingAccessControlManager.TestingPrivilegeType.SHOW_CREATE_TABLE;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -309,6 +313,29 @@ public class TestingAccessControlManager
     }
 
     @Override
+    public void checkCanShowColumnsMetadata(TransactionId transactionId, Identity identity, AccessControlContext context, CatalogSchemaTableName table)
+    {
+        if (shouldDenyPrivilege(identity.getUser(), table.getSchemaTableName().getTableName(), SHOW_COLUMNS)) {
+            denyShowColumnsMetadata(table.getSchemaTableName().toString());
+        }
+        if (denyPrivileges.isEmpty()) {
+            super.checkCanShowColumnsMetadata(transactionId, identity, context, table);
+        }
+    }
+
+    @Override
+    public List<ColumnMetadata> filterColumns(TransactionId transactionId, Identity identity, AccessControlContext context, CatalogSchemaTableName table, List<ColumnMetadata> columns)
+    {
+        ImmutableList.Builder<ColumnMetadata> visibleColumns = ImmutableList.builder();
+        for (ColumnMetadata column : columns) {
+            if (!shouldDenyPrivilege(identity.getUser(), table.getSchemaTableName().getTableName() + "." + column.getName(), SELECT_COLUMN)) {
+                visibleColumns.add(column);
+            }
+        }
+        return super.filterColumns(transactionId, identity, context, table, visibleColumns.build());
+    }
+
+    @Override
     public void checkCanSetCatalogSessionProperty(TransactionId transactionId, Identity identity, AccessControlContext context, String catalogName, String propertyName)
     {
         if (shouldDenyPrivilege(identity.getUser(), catalogName + "." + propertyName, SET_SESSION)) {
@@ -363,7 +390,7 @@ public class TestingAccessControlManager
         SET_USER,
         CREATE_SCHEMA, DROP_SCHEMA, RENAME_SCHEMA,
         SHOW_CREATE_TABLE, CREATE_TABLE, DROP_TABLE, RENAME_TABLE, INSERT_TABLE, DELETE_TABLE,
-        ADD_COLUMN, DROP_COLUMN, RENAME_COLUMN, SELECT_COLUMN,
+        SHOW_COLUMNS, ADD_COLUMN, DROP_COLUMN, RENAME_COLUMN, SELECT_COLUMN,
         CREATE_VIEW, DROP_VIEW, CREATE_VIEW_WITH_SELECT_COLUMNS,
         SET_SESSION
     }

@@ -184,6 +184,8 @@ public class FeaturesConfig
 
     private boolean enforceFixedDistributionForOutputOperator;
 
+    private boolean hideUnauthorizedColumns;
+
     public enum PartitioningPrecisionStrategy
     {
         // Let Presto decide when to repartition
@@ -1562,6 +1564,19 @@ public class FeaturesConfig
     public FeaturesConfig setEnforceFixedDistributionForOutputOperator(boolean enforceFixedDistributionForOutputOperator)
     {
         this.enforceFixedDistributionForOutputOperator = enforceFixedDistributionForOutputOperator;
+        return this;
+    }
+
+    public boolean isHideUnauthorizedColumns()
+    {
+        return hideUnauthorizedColumns;
+    }
+
+    @Config("hide-unauthorized-columns")
+    @ConfigDescription("When enabled unauthorized columns are silently filtered from results of SELECT * statements")
+    public FeaturesConfig setHideUnauthorizedColumns(boolean hideUnauthorizedColumns)
+    {
+        this.hideUnauthorizedColumns = hideUnauthorizedColumns;
         return this;
     }
 }

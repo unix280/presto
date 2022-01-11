@@ -31,6 +31,7 @@ import com.facebook.presto.metadata.ViewDefinition;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.security.AllowAllAccessControl;
 import com.facebook.presto.security.ViewAccessControl;
+import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
@@ -142,11 +143,13 @@ import com.facebook.presto.sql.tree.With;
 import com.facebook.presto.sql.tree.WithQuery;
 import com.facebook.presto.sql.util.AstUtils;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
 
 import java.util.ArrayList;
@@ -248,6 +251,7 @@ import static java.util.Map.Entry;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toSet;
 
 class StatementAnalyzer
 {
@@ -1772,7 +1776,7 @@ class StatementAnalyzer
                 QualifiedName name = QualifiedName.of(reference.getValue());
                 Set<Expression> expressions = assignments.get(name)
                         .stream()
-                        .collect(Collectors.toSet());
+                        .collect(toSet());
 
                 if (expressions.size() > 1) {
                     throw new SemanticException(AMBIGUOUS_ATTRIBUTE, reference, "'%s' in ORDER BY is ambiguous", name);
@@ -1932,7 +1936,7 @@ class StatementAnalyzer
                     // expand * and T.*
                     Optional<QualifiedName> starPrefix = ((AllColumns) item).getPrefix();
 
-                    for (Field field : sourceScope.getRelationType().resolveFieldsWithPrefix(starPrefix)) {
+                    for (Field field : filterUnauthorizedFields(sourceScope.getRelationType().resolveFieldsWithPrefix(starPrefix))) {
                         outputFields.add(Field.newUnqualified(field.getName(), field.getType(), field.getOriginTable(), field.getOriginColumnName(), false));
                     }
                 }
@@ -2043,7 +2047,7 @@ class StatementAnalyzer
                     Optional<QualifiedName> starPrefix = ((AllColumns) item).getPrefix();
 
                     RelationType relationType = scope.getRelationType();
-                    List<Field> fields = relationType.resolveFieldsWithPrefix(starPrefix);
+                    List<Field> fields = filterUnauthorizedFields(relationType.resolveFieldsWithPrefix(starPrefix));
                     if (fields.isEmpty()) {
                         if (starPrefix.isPresent()) {
                             throw new SemanticException(MISSING_TABLE, item, "Table '%s' not found", starPrefix.get());
@@ -2086,6 +2090,52 @@ class StatementAnalyzer
             analysis.setOutputExpressions(node, result);
 
             return result;
+        }
+
+        private List<Field> filterUnauthorizedFields(List<Field> fields)
+        {
+            if (!SystemSessionProperties.isHideUnauthorizedColumns(session)) {
+                return fields;
+            }
+
+            List<Field> accessibleFields = new ArrayList<>();
+
+            //collect fields by table
+            ListMultimap<QualifiedObjectName, Field> tableFieldsMap = ArrayListMultimap.create();
+            fields.forEach(field -> {
+                Optional<QualifiedObjectName> originTable = field.getOriginTable();
+                if (originTable.isPresent()) {
+                    tableFieldsMap.put(originTable.get(), field);
+                }
+                else {
+                    // keep anonymous fields accessible
+                    accessibleFields.add(field);
+                }
+            });
+
+            tableFieldsMap.asMap().forEach((table, tableFields) -> {
+                List<ColumnMetadata> accessibleColumns = accessControl.filterColumns(
+                        session.getRequiredTransactionId(),
+                        session.getIdentity(),
+                        session.getAccessControlContext(),
+                        new CatalogSchemaTableName(table.getCatalogName(), table.getSchemaName(), table.getObjectName()),
+                        tableFields.stream()
+                                .filter(field -> field.getOriginColumnName().isPresent())
+                                .map(field -> new ColumnMetadata(field.getOriginColumnName().get(), field.getType()))
+                                .collect(toImmutableList()));
+
+                Set<String> accessibleColumnNames = accessibleColumns.stream()
+                        .map(ColumnMetadata::getName)
+                        .collect(toSet());
+
+                accessibleFields.addAll(tableFields.stream()
+                        .filter(field -> field.getOriginColumnName().isPresent() && accessibleColumnNames.contains(field.getOriginColumnName().get()))
+                        .collect(toImmutableList()));
+            });
+
+            return fields.stream()
+                    .filter(accessibleFields::contains)
+                    .collect(toImmutableList());
         }
 
         public void analyzeWhere(Node node, Scope scope, Expression predicate)

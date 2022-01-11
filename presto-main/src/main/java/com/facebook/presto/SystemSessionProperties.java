@@ -179,6 +179,7 @@ public final class SystemSessionProperties
     public static final String SKIP_REDUNDANT_SORT = "skip_redundant_sort";
     public static final String ALLOW_WINDOW_ORDER_BY_LITERALS = "allow_window_order_by_literals";
     public static final String ENFORCE_FIXED_DISTRIBUTION_FOR_OUTPUT_OPERATOR = "enforce_fixed_distribution_for_output_operator";
+    public static final String HIDE_UNAUTHORIZED_COLUMNS = "hide_unauthorized_columns";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -930,7 +931,20 @@ public final class SystemSessionProperties
                         ENFORCE_FIXED_DISTRIBUTION_FOR_OUTPUT_OPERATOR,
                         "Enforce fixed distribution for output operator",
                         featuresConfig.isEnforceFixedDistributionForOutputOperator(),
-                        true));
+                        true),
+                new PropertyMetadata<>(
+                        HIDE_UNAUTHORIZED_COLUMNS,
+                        "When enabled unauthorized columns are silently filtered from results of SELECT * statements",
+                        BOOLEAN,
+                        Boolean.class,
+                        featuresConfig.isHideUnauthorizedColumns(),
+                        false,
+                        value -> {
+                            boolean hideUnauthorizedColumns = (Boolean) value;
+                            validateHideUnauthorizedColumns(hideUnauthorizedColumns, featuresConfig.isHideUnauthorizedColumns());
+                            return hideUnauthorizedColumns;
+                        },
+                        value -> value));
     }
 
     public static boolean isSkipRedundantSort(Session session)
@@ -1376,6 +1390,13 @@ public final class SystemSessionProperties
         return session.getSystemProperty(MAX_TASKS_PER_STAGE, Integer.class);
     }
 
+    private static void validateHideUnauthorizedColumns(boolean value, boolean defaultValue)
+    {
+        if (defaultValue == true && value == false) {
+            throw new PrestoException(INVALID_SESSION_PROPERTY, format("%s cannot be disabled with session property when it was enabled with configuration", HIDE_UNAUTHORIZED_COLUMNS));
+        }
+    }
+
     private static Integer validateValueIsPowerOfTwo(Object value, String property)
     {
         Number number = (Number) value;
@@ -1572,5 +1593,10 @@ public final class SystemSessionProperties
     public static boolean isEnforceFixedDistributionForOutputOperator(Session session)
     {
         return session.getSystemProperty(ENFORCE_FIXED_DISTRIBUTION_FOR_OUTPUT_OPERATOR, Boolean.class);
+    }
+
+    public static boolean isHideUnauthorizedColumns(Session session)
+    {
+        return session.getSystemProperty(HIDE_UNAUTHORIZED_COLUMNS, Boolean.class);
     }
 }
