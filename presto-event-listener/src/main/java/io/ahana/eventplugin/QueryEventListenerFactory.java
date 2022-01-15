@@ -52,21 +52,23 @@ public final class QueryEventListenerFactory
 
     public EventListener create(Map<String, String> config)
     {
-        /**
-         *  We need to obtain cluster operation and information on queries for maintainance of Ahana cluster in a form
-         *  of storage in relational database.
-         *  The code block below is dedicated for storing such information in a mysql database service
-         */
-        if (!config.containsKey(QUERYEVENT_JDBC_URI)) {
-            throw new RuntimeException("/etc/event-listener.properties file missing jdbc.uri");
+        boolean useMysqlServiceCollector = getBooleanConfig(config, QUERYEVENT_MYSQL_COLLECT, false);
+        if (useMysqlServiceCollector) {
+            /**
+             *  We need to obtain cluster operation and information on queries for maintainance of Ahana cluster in a form
+             *  of storage in relational database.
+             *  The code block below is dedicated for storing such information in a mysql database service
+             */
+            if (!config.containsKey(QUERYEVENT_JDBC_URI)) {
+                throw new RuntimeException("/etc/event-listener.properties file missing jdbc.uri");
+            }
+            if (!config.containsKey(QUERYEVENT_JDBC_USER)) {
+                throw new RuntimeException("/etc/event-listener.properties file missing jdbc.user");
+            }
+            if (!config.containsKey(QUERY_EVENT_JDBC_PWD)) {
+                throw new RuntimeException("/etc/event-listener.properties file missing jdbc.pwd");
+            }
         }
-        if (!config.containsKey(QUERYEVENT_JDBC_USER)) {
-            throw new RuntimeException("/etc/event-listener.properties file missing jdbc.user");
-        }
-        if (!config.containsKey(QUERY_EVENT_JDBC_PWD)) {
-            throw new RuntimeException("/etc/event-listener.properties file missing jdbc.pwd");
-        }
-
         // Below is for logging based metric collection
         String log4j2ConfigLocation = requireNonNull(config.get(QUERYEVENT_CONFIG_LOCATION), QUERYEVENT_CONFIG_LOCATION_ERROR);
         String clusterName = requireNonNull(config.get(QUERYEVENT_CLUSTER_NAME), QUERYEVENT_CLUSTER_NAME_ERROR);
@@ -75,7 +77,6 @@ public final class QueryEventListenerFactory
         if (sendToWebsockeCollector) {
             webSocketCollectUrl = requireNonNull(config.get(QUERYEVENT_WEBSOCKET_URL), QUERYEVENT_WEBSOCKET_URL_ERROR);
         }
-        boolean useMysqlServiceCollector = getBooleanConfig(config, QUERYEVENT_MYSQL_COLLECT, false);
 
         LoggerContext loggerContext = Configurator.initialize("presto-queryevent-log", log4j2ConfigLocation);
         boolean trackEventCreated = getBooleanConfig(config, QUERYEVENT_TRACK_CREATED, true);
