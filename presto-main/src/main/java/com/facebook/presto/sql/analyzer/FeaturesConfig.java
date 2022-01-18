@@ -210,6 +210,8 @@ public class FeaturesConfig
     private boolean queryOptimizationWithMaterializedViewEnabled;
     private AggregationIfToFilterRewriteStrategy aggregationIfToFilterRewriteStrategy = AggregationIfToFilterRewriteStrategy.DISABLED;
     private boolean verboseRuntimeStatsEnabled;
+    private boolean hashBasedDistinctLimitEnabled;
+    private int hashBasedDistinctLimitThreshold = 10000;
 
     private boolean hideUnauthorizedColumns;
 
@@ -1888,6 +1890,32 @@ public class FeaturesConfig
     {
         this.aggregationIfToFilterRewriteStrategy = strategy;
         return this;
+    }
+
+    public boolean isHashBasedDistinctLimitEnabled()
+    {
+        return hashBasedDistinctLimitEnabled;
+    }
+
+    @Config("hash-based-distinct-limit-enabled")
+    @ConfigDescription("Enable fast hash-based distinct limit")
+    public FeaturesConfig setHashBasedDistinctLimitEnabled(boolean hashBasedDistinctLimitEnabled)
+    {
+        this.hashBasedDistinctLimitEnabled = hashBasedDistinctLimitEnabled;
+        return this;
+    }
+
+    @Config("hash-based-distinct-limit-threshold")
+    @ConfigDescription("Threshold for fast hash-based distinct limit")
+    public FeaturesConfig setHashBasedDistinctLimitThreshold(int hashBasedDistinctLimitThreshold)
+    {
+        this.hashBasedDistinctLimitThreshold = hashBasedDistinctLimitThreshold;
+        return this;
+    }
+
+    public int getHashBasedDistinctLimitThreshold()
+    {
+        return hashBasedDistinctLimitThreshold;
     }
 
     public boolean isHideUnauthorizedColumns()

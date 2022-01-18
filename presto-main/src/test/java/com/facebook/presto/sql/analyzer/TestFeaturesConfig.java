@@ -191,7 +191,9 @@ public class TestFeaturesConfig
                 .setEnforceFixedDistributionForOutputOperator(false)
                 .setHideUnauthorizedColumns(false)
                 .setVerboseRuntimeStatsEnabled(false)
-                .setAggregationIfToFilterRewriteStrategy(AggregationIfToFilterRewriteStrategy.DISABLED));
+                .setAggregationIfToFilterRewriteStrategy(AggregationIfToFilterRewriteStrategy.DISABLED)
+                .setHashBasedDistinctLimitEnabled(false)
+                .setHashBasedDistinctLimitThreshold(10000));
     }
 
     @Test
@@ -326,6 +328,8 @@ public class TestFeaturesConfig
                 .put("verbose-runtime-stats-enabled", "true")
                 .put("optimizer.aggregation-if-to-filter-rewrite-strategy", "filter_with_if")
                 .put("hide-unauthorized-columns", "true")
+                .put("hash-based-distinct-limit-enabled", "true")
+                .put("hash-based-distinct-limit-threshold", "500")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -465,7 +469,10 @@ public class TestFeaturesConfig
                 .setEmptyJoinOptimization(true)
                 .setEnforceFixedDistributionForOutputOperator(true)
                 .setHideUnauthorizedColumns(true)
-                .setVerboseRuntimeStatsEnabled(true);
+                .setVerboseRuntimeStatsEnabled(true)
+                .setAggregationIfToFilterRewriteStrategy(AggregationIfToFilterRewriteStrategy.FILTER_WITH_IF)
+                .setHashBasedDistinctLimitEnabled(true)
+                .setHashBasedDistinctLimitThreshold(500);
         assertFullMapping(properties, expected);
     }
 
