@@ -409,7 +409,7 @@ public class TestNodeScheduler
         newNodeManager.addNode(CONNECTOR_ID, nodeBuilder.build());
 
         NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), newNodeManager, new NodeSelectionStats(), nodeSchedulerConfig, nodeTaskMap);
-        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(CONNECTOR_ID, 6);
+        NodeSelector nodeSelector = nodeScheduler.createNodeSelector(session, CONNECTOR_ID, 6);
 
         // Test assignments with SOFT_AFFINITY first
         Set<Split> splits = getSplits(SOFT_AFFINITY);

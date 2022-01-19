@@ -146,6 +146,7 @@ public class SimpleNodeSelector
                     preferredNodeCount = OptionalInt.of(candidateNodes.size());
                     break;
                 case SOFT_AFFINITY:
+                case SOFT_AFFINITY_BY_SPLIT:
                     if (sortedCandidates == null) {
                         sortedCandidates = sortedNodes(nodeMap);
                     }
