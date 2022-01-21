@@ -54,7 +54,6 @@ import static com.facebook.presto.spi.StandardErrorCode.NODE_SELECTION_NOT_SUPPO
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -141,23 +140,18 @@ public class SimpleNodeSelector
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
 
-        List<HostAddress> sortedCandidates = null;
+        // todo identify if sorting will cause bottleneck
+        List<HostAddress> sortedCandidates = sortedNodes(nodeMap);
         OptionalInt preferredNodeCount = OptionalInt.empty();
         for (Split split : splits) {
             List<InternalNode> candidateNodes;
             switch (split.getNodeSelectionStrategy()) {
                 case HARD_AFFINITY:
-                    if (sortedCandidates == null) {
-                        sortedCandidates = sortedNodes(nodeMap);
-                    }
                     candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
                     preferredNodeCount = OptionalInt.of(candidateNodes.size());
                     break;
                 case SOFT_AFFINITY:
                 case SOFT_AFFINITY_BY_SPLIT:
-                    if (sortedCandidates == null) {
-                        sortedCandidates = sortedNodes(nodeMap);
-                    }
                     candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
                     preferredNodeCount = OptionalInt.of(candidateNodes.size());
                     candidateNodes = ImmutableList.<InternalNode>builder()

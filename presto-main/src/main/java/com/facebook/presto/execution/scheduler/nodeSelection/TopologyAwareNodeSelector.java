@@ -51,10 +51,10 @@ import static com.facebook.presto.execution.scheduler.NodeScheduler.selectDistri
 import static com.facebook.presto.execution.scheduler.NodeScheduler.selectExactNodes;
 import static com.facebook.presto.execution.scheduler.NodeScheduler.selectNodes;
 import static com.facebook.presto.execution.scheduler.NodeScheduler.toWhenHasSplitQueueSpaceFuture;
+import static com.facebook.presto.execution.scheduler.nodeSelection.NodeSelectionUtils.sortedNodes;
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
 public class TopologyAwareNodeSelector
@@ -147,13 +147,11 @@ public class TopologyAwareNodeSelector
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
 
-        List<HostAddress> candidates = nodeMap.getActiveNodes().stream()
-                .map(InternalNode::getHostAndPort)
-                .collect(toImmutableList());
-
+        // todo identify if sorting will cause bottleneck
+        List<HostAddress> sortedCandidates = sortedNodes(nodeMap);
         for (Split split : splits) {
             if (split.getNodeSelectionStrategy() == HARD_AFFINITY) {
-                List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(candidates), includeCoordinator);
+                List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
                 if (candidateNodes.isEmpty()) {
                     log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getActiveNodes());
                     throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
@@ -174,7 +172,7 @@ public class TopologyAwareNodeSelector
             int depth = networkLocationSegmentNames.size();
             int chosenDepth = 0;
             Set<NetworkLocation> locations = new HashSet<>();
-            for (HostAddress host : split.getPreferredNodes(candidates)) {
+            for (HostAddress host : split.getPreferredNodes(sortedCandidates)) {
                 locations.add(networkLocationCache.get(host));
             }
             if (locations.isEmpty()) {

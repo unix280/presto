@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import static alluxio.conf.PropertyKey.USER_CLIENT_CACHE_QUOTA_ENABLED;
 import static alluxio.Constants.SCHEME;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_READ_CACHE;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL;
@@ -38,6 +37,7 @@ import static alluxio.metrics.MetricKey.CLIENT_CACHE_HIT_RATE;
 import static alluxio.metrics.MetricsSystem.getMetricName;
 import static alluxio.metrics.MetricsSystem.meter;
 import static alluxio.metrics.MetricsSystem.registerGaugeIfAbsent;
+import static alluxio.conf.PropertyKey.USER_CLIENT_CACHE_QUOTA_ENABLED;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.hash.Hashing.md5;
 import static java.nio.charset.StandardCharsets.UTF_8;
