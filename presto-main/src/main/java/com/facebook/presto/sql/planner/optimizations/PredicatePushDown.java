@@ -144,14 +144,14 @@ public class PredicatePushDown
                 TRUE_CONSTANT);
     }
 
-    public static RowExpression createDynamicFilterExpression(String id, VariableReferenceExpression input, FunctionAndTypeManager functionAndTypeManager)
+    public static RowExpression createDynamicFilterExpression(String id, RowExpression input, FunctionAndTypeManager functionAndTypeManager)
     {
         return createDynamicFilterExpression(id, input, functionAndTypeManager, EQUAL.name());
     }
 
     private static RowExpression createDynamicFilterExpression(
             String id,
-            VariableReferenceExpression input,
+            RowExpression input,
             FunctionAndTypeManager functionAndTypeManager,
             String operator)
     {
@@ -628,7 +628,7 @@ public class PredicatePushDown
         {
             Map<String, VariableReferenceExpression> dynamicFilters = ImmutableMap.of();
             List<RowExpression> predicates = ImmutableList.of();
-            if (node.getType() == INNER) {
+            if (node.getType() == INNER || node.getType() == RIGHT) {
                 List<CallExpression> clauses = getDynamicFilterClauses(node, equiJoinClauses, joinFilter, functionAndTypeManager);
                 List<VariableReferenceExpression> buildSymbols = clauses.stream()
                         .map(expression -> (VariableReferenceExpression) expression.getArguments().get(1))
@@ -641,10 +641,10 @@ public class PredicatePushDown
 
                 ImmutableList.Builder<RowExpression> predicatesBuilder = ImmutableList.builder();
                 for (CallExpression expression : clauses) {
-                    VariableReferenceExpression probeSymbol = (VariableReferenceExpression) expression.getArguments().get(0);
+                    RowExpression probeExpression = expression.getArguments().get(0);
                     VariableReferenceExpression buildSymbol = (VariableReferenceExpression) expression.getArguments().get(1);
                     String id = buildSymbolToIdMap.get(buildSymbol);
-                    RowExpression predicate = createDynamicFilterExpression(id, probeSymbol, functionAndTypeManager, expression.getDisplayName());
+                    RowExpression predicate = createDynamicFilterExpression(id, probeExpression, functionAndTypeManager, expression.getDisplayName());
                     predicatesBuilder.add(predicate);
                 }
                 dynamicFilters = buildSymbolToIdMap.inverse();
@@ -732,17 +732,20 @@ public class PredicatePushDown
                 CallExpression call,
                 FunctionAndTypeManager functionAndTypeManager)
         {
-            String function = call.getDisplayName();
+            Optional<OperatorType> operatorType = functionAndTypeManager.getFunctionMetadata(call.getFunctionHandle()).getOperatorType();
+            if (!operatorType.isPresent()) {
+                return Optional.empty();
+            }
+            OperatorType operator = operatorType.get();
             List<RowExpression> arguments = call.getArguments();
             RowExpression left = arguments.get(0);
             RowExpression right = arguments.get(1);
-            boolean shouldFlip = false;
-            if (!(left instanceof VariableReferenceExpression && right instanceof VariableReferenceExpression)) {
+
+            // supported comparison for dynamic filtering: EQUAL, LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL
+            if (!operator.isComparisonOperator()) {
                 return Optional.empty();
             }
-
-            OperatorType operator = OperatorType.valueOf(function);
-            if (!operator.isComparisonOperator() || operator == NOT_EQUAL || operator == IS_DISTINCT_FROM) {
+            if (operator == NOT_EQUAL || operator == IS_DISTINCT_FROM) {
                 return Optional.empty();
             }
 
@@ -759,6 +762,7 @@ public class PredicatePushDown
                 return Optional.empty();
             }
 
+            boolean shouldFlip = false;
             if (leftChildContainsRightVariables && rightChildContainsLeftVariables) {
                 shouldFlip = true;
             }
@@ -769,6 +773,9 @@ public class PredicatePushDown
                 right = arguments.get(0);
             }
 
+            if (!(right instanceof VariableReferenceExpression)) {
+                return Optional.empty();
+            }
             return Optional.of(call(
                                 operator.name(),
                                 functionAndTypeManager.resolveOperator(operator, fromTypes(left.getType(), right.getType())),
