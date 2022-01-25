@@ -17,6 +17,7 @@ import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.log.Logging;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.QualifiedObjectName;
+import com.facebook.presto.connector.jmx.JmxPlugin;
 import com.facebook.presto.execution.QueryManagerConfig.ExchangeMaterializationStrategy;
 import com.facebook.presto.hive.TestHiveEventListenerPlugin.TestingHiveEventListenerPlugin;
 import com.facebook.presto.hive.authentication.MetastoreContext;
@@ -148,6 +149,9 @@ public final class HiveQueryRunner
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.installPlugin(new TestingHiveEventListenerPlugin());
             queryRunner.createCatalog("tpch", "tpch");
+
+            queryRunner.installPlugin(new JmxPlugin());
+            queryRunner.createCatalog("jmx", "jmx");
 
             File baseDir = queryRunner.getCoordinator().getBaseDataDir().resolve("hive_data").toFile();
 
