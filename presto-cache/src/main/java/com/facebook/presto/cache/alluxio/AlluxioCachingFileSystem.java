@@ -14,6 +14,7 @@
 package com.facebook.presto.cache.alluxio;
 
 import alluxio.hadoop.LocalCacheFileSystem;
+import alluxio.shaded.client.com.codahale.metrics.Meter;
 import alluxio.wire.FileInfo;
 import com.facebook.presto.cache.CachingFileSystem;
 import com.facebook.presto.hive.HiveFileContext;
@@ -27,6 +28,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 
 import static alluxio.Constants.SCHEME;
+import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_READ_CACHE;
+import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL;
+import static alluxio.metrics.MetricKey.CLIENT_CACHE_HIT_RATE;
+import static alluxio.metrics.MetricsSystem.getMetricName;
+import static alluxio.metrics.MetricsSystem.meter;
+import static alluxio.metrics.MetricsSystem.registerGaugeIfAbsent;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.hash.Hashing.md5;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -76,6 +83,15 @@ public class AlluxioCachingFileSystem
         }
 
         localCacheFileSystem.initialize(alluxioUri, configuration);
+        // Some of the local cache read metrics like bytes read, hit rate etc are registered
+        // only when a LocalCacheFileInStream object is created as part of openFile method below.
+        // In Presto, when the coordinator is not acting as a worker, file read might only happen
+        // on workers, while metrics are only exposed from coordinators, resulting in the metrics
+        // not being registered. Always register the metrics when initializing this class.
+        // A fix https://github.com/Alluxio/alluxio/pull/14912 for this in alluxio project is also
+        // in progress. Once we upgrade to alluxio version with this fix, we can safely remove
+        // the below call and associated changes.
+        Metrics.registerGauges();
     }
 
     @Override
@@ -101,5 +117,31 @@ public class AlluxioCachingFileSystem
             return cachingInputStream;
         }
         return dataTier.openFile(path, hiveFileContext);
+    }
+
+    private static final class Metrics
+    {
+        /** Cache hits. */
+        private static final Meter BYTES_READ_CACHE =
+                meter(CLIENT_CACHE_BYTES_READ_CACHE.getName());
+        /** Cache misses. */
+        private static final Meter BYTES_REQUESTED_EXTERNAL =
+                meter(CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL.getName());
+
+        private static void registerGauges()
+        {
+            // Cache hit rate = Cache hits / (Cache hits + Cache misses).
+            registerGaugeIfAbsent(
+                    getMetricName(CLIENT_CACHE_HIT_RATE.getName()),
+                    () -> {
+                        long cacheHits = BYTES_READ_CACHE.getCount();
+                        long cacheMisses = BYTES_REQUESTED_EXTERNAL.getCount();
+                        long total = cacheHits + cacheMisses;
+                        if (total > 0) {
+                            return cacheHits / (1.0 * total);
+                        }
+                        return 0;
+                    });
+        }
     }
 }
