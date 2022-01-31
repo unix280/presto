@@ -152,6 +152,8 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         ConnectorIdentity connectorIdentity = new ConnectorIdentity(
                 user, Optional.empty(), Optional.empty(), emptyMap(), emptyMap());
 
-        return new MetastoreContext(connectorIdentity);
+        String queryId = "test_queryId";
+
+        return new MetastoreContext(connectorIdentity, queryId);
     }
 }

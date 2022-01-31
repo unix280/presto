@@ -156,7 +156,7 @@ public class LakeFormationS3ConfigurationProvider
     {
         String iamRole = catalogIamRole;
         if (impersonationEnabled) {
-            MetastoreContext metastoreContext = new MetastoreContext(context.getIdentity());
+            MetastoreContext metastoreContext = new MetastoreContext(context.getIdentity(), context.getQueryId().orElse(""));
             iamRole = getGlueIamRole(metastoreContext);
         }
         String region;

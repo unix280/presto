@@ -13,42 +13,20 @@
  */
 package com.facebook.presto.hive;
 
-import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.tests.AbstractTestQueryFramework;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
 import java.io.File;
-import java.util.Optional;
 
 import static com.google.common.io.Files.createTempDir;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
-import static io.airlift.tpch.TpchTable.CUSTOMER;
-import static io.airlift.tpch.TpchTable.ORDERS;
 import static java.lang.String.format;
 
-public class TestHiveCreateExternalTableDisabled
+public abstract class TestHiveCreateExternalTableDisabled
         extends AbstractTestQueryFramework
 {
-    public TestHiveCreateExternalTableDisabled()
-    {
-        super(() -> createQueryRunner());
-    }
-
-    private static QueryRunner createQueryRunner()
-            throws Exception
-    {
-        return HiveQueryRunner.createQueryRunner(
-                ImmutableList.of(ORDERS, CUSTOMER),
-                ImmutableMap.of(),
-                "sql-standard",
-                ImmutableMap.of("hive.non-managed-table-writes-enabled", "true", "hive.non-managed-table-creates-enabled", "false"),
-                Optional.empty());
-    }
-
     @Test
     public void testCreateExternalTableWithData()
             throws Exception

@@ -54,6 +54,8 @@ public class TestGlueSecurityMappings
 
         private final String user;
 
+        public static final String PRESTO_QUERY_ID_NAME = "presto_query_id";
+
         private MappingSelector(String user)
         {
             this.user = requireNonNull(user, "user is null");
@@ -66,8 +68,9 @@ public class TestGlueSecurityMappings
 
         public MetastoreContext getMetastoreContext()
         {
-            return new MetastoreContext(new ConnectorIdentity(
-                    user, Optional.empty(), Optional.empty(), Collections.emptyMap(), Collections.emptyMap()));
+            return new MetastoreContext(
+                    new ConnectorIdentity(user, Optional.empty(), Optional.empty(), Collections.emptyMap(), Collections.emptyMap()),
+                    PRESTO_QUERY_ID_NAME);
         }
     }
 

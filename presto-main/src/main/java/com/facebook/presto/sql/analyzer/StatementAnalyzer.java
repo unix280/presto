@@ -50,11 +50,8 @@ import com.facebook.presto.spi.function.Signature;
 import com.facebook.presto.spi.function.SqlFunction;
 import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.Identity;
-<<<<<<< HEAD
 import com.facebook.presto.spi.security.ViewExpression;
-=======
 import com.facebook.presto.sql.SqlFormatterUtil;
->>>>>>> 35cfbd0530... Materialized view partition stitching for Hive
 import com.facebook.presto.sql.parser.ParsingException;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.ExpressionInterpreter;
@@ -188,12 +185,9 @@ import static com.facebook.presto.common.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.common.type.UnknownType.UNKNOWN;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.metadata.MetadataUtil.createQualifiedObjectName;
-<<<<<<< HEAD
 import static com.facebook.presto.metadata.MetadataUtil.toSchemaTableName;
-import static com.facebook.presto.spi.StandardErrorCode.DATATYPE_MISMATCH;
-=======
 import static com.facebook.presto.spi.MaterializedViewStatus.MaterializedDataPredicates;
->>>>>>> 35cfbd0530... Materialized view partition stitching for Hive
+import static com.facebook.presto.spi.StandardErrorCode.DATATYPE_MISMATCH;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_ROW_FILTER;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
@@ -1231,12 +1225,7 @@ class StatementAnalyzer
                     .forEach(filter -> analyzeRowFilter(session.getIdentity().getUser(), table, name, accessControlScope, filter));
 
             analysis.registerTable(table, tableHandle.get());
-<<<<<<< HEAD
-
-            return createAndAssignScope(table, scope, outputFields);
-=======
             return createAndAssignScope(table, scope, fields.build());
->>>>>>> 35cfbd0530... Materialized view partition stitching for Hive
         }
 
         private Scope processView(Table table, Optional<Scope> scope, QualifiedObjectName name, Optional<ViewDefinition> optionalView)

@@ -144,7 +144,7 @@ public class SqlStandardAccessControl
     public void checkCanShowCreateTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
         // This should really be OWNERSHIP, but Hive uses `SELECT with GRANT`
-        if (!checkTablePermission(transactionHandle, identity, tableName, SELECT, true)) {
+        if (!checkTablePermission(transactionHandle, identity, new MetastoreContext(identity, context.getQueryId().getId()), tableName, SELECT, true)) {
             denyShowCreateTable(tableName.toString());
         }
     }
@@ -190,7 +190,7 @@ public class SqlStandardAccessControl
     @Override
     public void checkCanShowColumnsMetadata(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
-        if (!hasAnyTablePermission(transactionHandle, identity, tableName)) {
+        if (!hasAnyTablePermission(transactionHandle, identity, context, tableName)) {
             denyShowColumnsMetadata(tableName.toString());
         }
     }
@@ -198,7 +198,7 @@ public class SqlStandardAccessControl
     @Override
     public List<ColumnMetadata> filterColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, List<ColumnMetadata> columns)
     {
-        if (!hasAnyTablePermission(transactionHandle, identity, tableName)) {
+        if (!hasAnyTablePermission(transactionHandle, identity, context, tableName)) {
             return ImmutableList.of();
         }
         return columns;
@@ -509,9 +509,10 @@ public class SqlStandardAccessControl
         return rolesWithGrantOption.containsAll(roles);
     }
 
-    private boolean hasAnyTablePermission(ConnectorTransactionHandle transaction, ConnectorIdentity identity, SchemaTableName tableName)
+    private boolean hasAnyTablePermission(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
-        if (isAdmin(transaction, identity)) {
+        MetastoreContext metastoreContext = new MetastoreContext(identity, context.getQueryId().getId());
+        if (isAdmin(transaction, identity, metastoreContext)) {
             return true;
         }
 
@@ -524,7 +525,7 @@ public class SqlStandardAccessControl
         }
 
         SemiTransactionalHiveMetastore metastore = getMetastore(transaction);
-        return listEnabledTablePrivileges(metastore, tableName.getSchemaName(), tableName.getTableName(), identity)
+        return listEnabledTablePrivileges(metastore, tableName.getSchemaName(), tableName.getTableName(), identity, metastoreContext)
                 .anyMatch(privilegeInfo -> true);
     }
 

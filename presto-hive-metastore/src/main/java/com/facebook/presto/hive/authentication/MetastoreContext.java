@@ -24,8 +24,8 @@ import static java.util.Objects.requireNonNull;
 
 public final class MetastoreContext
 {
-    private final String username;
-    private final String queryId;
+    private final Optional<String> username;
+    private final Optional<String> queryId;
     private final Optional<String> clientInfo;
     private final Optional<String> source;
     private final boolean impersonationEnabled;
@@ -45,21 +45,26 @@ public final class MetastoreContext
         this(requireNonNull(identity, "identity is null").getUser(), queryId, clientInfo, source, false);
     }
 
+    public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source)
+    {
+        this(username, queryId, clientInfo, source, false);
+    }
+
     public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, boolean impersonationEnabled)
     {
-        this.username = requireNonNull(username, "username is null");
-        this.queryId = requireNonNull(queryId, "queryId is null");
+        this.username = requireNonNull(Optional.of(username), "username is null");
+        this.queryId = requireNonNull(Optional.of(queryId), "queryId is null");
         this.clientInfo = requireNonNull(clientInfo, "clientInfo is null");
         this.source = requireNonNull(source, "source is null");
         this.impersonationEnabled = impersonationEnabled;
     }
 
-    public String getUsername()
+    public Optional<String> getUsername()
     {
         return username;
     }
 
-    public String getQueryId()
+    public Optional<String> getQueryId()
     {
         return queryId;
     }

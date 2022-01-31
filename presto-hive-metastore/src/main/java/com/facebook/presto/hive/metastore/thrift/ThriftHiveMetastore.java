@@ -1025,7 +1025,7 @@ public class ThriftHiveMetastore
         }
         String token;
         try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
-            token = client.getDelegationToken(metastoreContext.getUsername().get(), metastoreContext.getUsername().get());
+            token = client.getDelegationToken(metastoreContext.getUsername().orElse(""), metastoreContext.getUsername().orElse(""));
         }
         try (HiveMetastoreClient realClient = clientProvider.createMetastoreClient(Optional.of(token))) {
             return callable.call(realClient);
@@ -1215,23 +1215,23 @@ public class ThriftHiveMetastore
                                 while (iterator.hasNext()) {
                                     HivePrivilegeInfo requestedPrivilege = getOnlyElement(parsePrivilege(iterator.next(), Optional.empty()));
 
-                                for (HivePrivilegeInfo existingPrivilege : existingPrivileges) {
-                                    if ((requestedPrivilege.isContainedIn(existingPrivilege))) {
-                                        iterator.remove();
-                                    }
-                                    else if (existingPrivilege.isContainedIn(requestedPrivilege)) {
-                                        throw new PrestoException(NOT_SUPPORTED, format(
-                                                "Granting %s WITH GRANT OPTION is not supported while %s possesses %s",
-                                                requestedPrivilege.getHivePrivilege().name(),
-                                                grantee,
-                                                requestedPrivilege.getHivePrivilege().name()));
+                                    for (HivePrivilegeInfo existingPrivilege : existingPrivileges) {
+                                        if ((requestedPrivilege.isContainedIn(existingPrivilege))) {
+                                            iterator.remove();
+                                        }
+                                        else if (existingPrivilege.isContainedIn(requestedPrivilege)) {
+                                            throw new PrestoException(NOT_SUPPORTED, format(
+                                                    "Granting %s WITH GRANT OPTION is not supported while %s possesses %s",
+                                                    requestedPrivilege.getHivePrivilege().name(),
+                                                    grantee,
+                                                    requestedPrivilege.getHivePrivilege().name()));
+                                        }
                                     }
                                 }
-                            }
 
-                            if (privilegesToGrant.isEmpty()) {
-                                return null;
-                            }
+                                if (privilegesToGrant.isEmpty()) {
+                                    return null;
+                                }
 
                                 return client.grantPrivileges(buildPrivilegeBag(databaseName, tableName, grantee, privilegesToGrant));
                             })));
@@ -1261,13 +1261,13 @@ public class ThriftHiveMetastore
                                         .map(HivePrivilegeInfo::getHivePrivilege)
                                         .collect(toSet());
 
-                            Set<PrivilegeGrantInfo> privilegesToRevoke = requestedPrivileges.stream()
-                                    .filter(privilegeGrantInfo -> existingHivePrivileges.contains(getOnlyElement(parsePrivilege(privilegeGrantInfo, Optional.empty())).getHivePrivilege()))
-                                    .collect(toSet());
+                                Set<PrivilegeGrantInfo> privilegesToRevoke = requestedPrivileges.stream()
+                                        .filter(privilegeGrantInfo -> existingHivePrivileges.contains(getOnlyElement(parsePrivilege(privilegeGrantInfo, Optional.empty())).getHivePrivilege()))
+                                        .collect(toSet());
 
-                            if (privilegesToRevoke.isEmpty()) {
-                                return null;
-                            }
+                                if (privilegesToRevoke.isEmpty()) {
+                                    return null;
+                                }
 
                                 return client.revokePrivileges(buildPrivilegeBag(databaseName, tableName, grantee, privilegesToRevoke));
                             })));

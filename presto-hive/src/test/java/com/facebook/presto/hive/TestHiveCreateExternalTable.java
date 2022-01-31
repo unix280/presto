@@ -37,12 +37,8 @@ import static org.testng.Assert.assertTrue;
 public class TestHiveCreateExternalTable
         extends AbstractTestQueryFramework
 {
-    public TestHiveCreateExternalTable()
-    {
-        super(() -> createQueryRunner());
-    }
-
-    private static QueryRunner createQueryRunner()
+    @Override
+    protected QueryRunner createQueryRunner()
             throws Exception
     {
         return HiveQueryRunner.createQueryRunner(

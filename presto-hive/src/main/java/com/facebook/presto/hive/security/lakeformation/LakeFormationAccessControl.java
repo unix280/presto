@@ -349,7 +349,7 @@ public class LakeFormationAccessControl
             return columns;
         }
 
-        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, tableName);
+        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, context.getQueryId().getId(), tableName);
 
         Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
         if (!result.isPresent()) {
@@ -423,7 +423,7 @@ public class LakeFormationAccessControl
             return;
         }
 
-        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, tableName);
+        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, context.getQueryId().getId(), tableName);
 
         Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
         if (!result.isPresent()) {
@@ -524,7 +524,7 @@ public class LakeFormationAccessControl
             return;
         }
 
-        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, tableName);
+        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, context.getQueryId().getId(), tableName);
 
         Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
         if (!result.isPresent()) {
@@ -597,7 +597,7 @@ public class LakeFormationAccessControl
             return Optional.empty();
         }
 
-        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, schemaTableName);
+        LFPolicyCacheKey lfPolicyCacheKey = getLfPolicyCacheKey(identity, context.getQueryId().getId(), schemaTableName);
 
         Optional<GetUnfilteredTableMetadataResult> result = lakeFormationPolicyCache.getUnchecked(lfPolicyCacheKey);
         if (!result.isPresent()) {
@@ -682,12 +682,12 @@ public class LakeFormationAccessControl
         }
     }
 
-    private LFPolicyCacheKey getLfPolicyCacheKey(ConnectorIdentity identity, SchemaTableName tableName)
+    private LFPolicyCacheKey getLfPolicyCacheKey(ConnectorIdentity identity, String queryId, SchemaTableName tableName)
     {
         LFPolicyCacheKey lfPolicyCacheKey;
 
         if (impersonationEnabled) {
-            String iamRole = getGlueIamRole(new MetastoreContext(identity));
+            String iamRole = getGlueIamRole(new MetastoreContext(identity, queryId));
             lfPolicyCacheKey = new LFPolicyCacheKey(tableName, iamRole);
         }
         else {
