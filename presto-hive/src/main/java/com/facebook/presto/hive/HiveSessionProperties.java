@@ -130,6 +130,7 @@ public final class HiveSessionProperties
     private static final String DWRF_WRITER_STRIPE_CACHE_ENABLED = "dwrf_writer_stripe_cache_enabled";
     private static final String DWRF_WRITER_STRIPE_CACHE_SIZE = "dwrf_writer_stripe_cache_size";
     private static final String USE_RECORD_PAGE_SOURCE_FOR_CUSTOM_SPLIT = "use_record_page_source_for_custom_split";
+    public static final String MAX_INITIAL_SPLITS = "max_initial_splits";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -648,7 +649,12 @@ public final class HiveSessionProperties
                         USE_RECORD_PAGE_SOURCE_FOR_CUSTOM_SPLIT,
                         "Use record page source for custom split",
                         hiveClientConfig.isUseRecordPageSourceForCustomSplit(),
-                        false));
+                        false),
+                integerProperty(
+                        MAX_INITIAL_SPLITS,
+                        "Hive max initial split count",
+                        hiveClientConfig.getMaxInitialSplits(),
+                        true));
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
@@ -1113,5 +1119,10 @@ public final class HiveSessionProperties
     public static boolean isUseRecordPageSourceForCustomSplit(ConnectorSession session)
     {
         return session.getProperty(USE_RECORD_PAGE_SOURCE_FOR_CUSTOM_SPLIT, Boolean.class);
+    }
+
+    public static int getHiveMaxInitialSplitSize(ConnectorSession session)
+    {
+        return session.getProperty(MAX_INITIAL_SPLITS, Integer.class);
     }
 }
