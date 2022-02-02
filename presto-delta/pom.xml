@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.269-SNAPSHOT</version>
+        <version>0.264</version>
     </parent>
 
     <artifactId>presto-delta</artifactId>
@@ -15,6 +15,13 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <enforcer.skip>true</enforcer.skip>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>ahana-s3-maven-repo-releases</id>
+            <url>s3://ahana-maven-repo/release</url>
+        </repository>
+    </repositories>
 
     <dependencies>
         <dependency>
@@ -192,6 +199,10 @@
                     <groupId>org.apache.hudi</groupId>
                     <artifactId>hudi-presto-bundle</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.apache.ranger</groupId>
+                    <artifactId>ranger-plugins-audit</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -222,12 +233,6 @@
                     <artifactId>event</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-testng-services</artifactId>
-            <scope>test</scope>
         </dependency>
 
         <dependency>

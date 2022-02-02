@@ -16,8 +16,8 @@ package com.facebook.presto.delta;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.common.type.TypeManager;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
-import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.Storage;
 import com.facebook.presto.hive.metastore.Table;
 import com.facebook.presto.spi.ColumnHandle;
@@ -48,7 +48,6 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.delta.DeltaColumnHandle.ColumnType.PARTITION;
 import static com.facebook.presto.delta.DeltaColumnHandle.ColumnType.REGULAR;
 import static com.facebook.presto.delta.DeltaExpressionUtils.splitPredicate;
-import static com.facebook.presto.hive.HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Collections.emptyList;
 import static java.util.Locale.US;
@@ -172,8 +171,7 @@ public class DeltaMetadata
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                ImmutableList.of(),
-                Optional.empty());
+                ImmutableList.of());
 
         return ImmutableList.of(new ConnectorTableLayoutResult(newLayout, unenforcedPredicate));
     }
@@ -285,9 +283,7 @@ public class DeltaMetadata
                 session.getQueryId(),
                 session.getClientInfo(),
                 session.getSource(),
-                Optional.empty(),
-                false,
-                DEFAULT_COLUMN_CONVERTER_PROVIDER);
+                Optional.empty());
     }
 
     private void checkConnectorId(DeltaTableHandle tableHandle)

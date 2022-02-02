@@ -42,6 +42,9 @@ import com.facebook.presto.hive.metastore.CachingHiveMetastore;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.HivePartitionMutator;
 import com.facebook.presto.hive.metastore.MetastoreConfig;
+import com.facebook.presto.hive.rubix.RubixCacheConfigurationInitializer;
+import com.facebook.presto.hive.rubix.RubixConfig;
+import com.facebook.presto.hive.rubix.RubixConfigurationInitializer;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.google.inject.Binder;
@@ -104,7 +107,9 @@ public class DeltaModule
         binder.bind(HdfsConfiguration.class).annotatedWith(ForMetastoreHdfsEnvironment.class).to(HiveCachingHdfsConfiguration.class).in(Scopes.SINGLETON);
 
         configBinder(binder).bindConfig(HiveGcsConfig.class);
+        configBinder(binder).bindConfig(RubixConfig.class);
         binder.bind(GcsConfigurationInitializer.class).to(HiveGcsConfigurationInitializer.class).in(Scopes.SINGLETON);
+        newSetBinder(binder, RubixCacheConfigurationInitializer.class).addBinding().to(RubixConfigurationInitializer.class).in(Scopes.SINGLETON);
 
         binder.bind(HdfsConfigurationInitializer.class).in(Scopes.SINGLETON);
         newSetBinder(binder, DynamicConfigurationProvider.class);

@@ -16,10 +16,10 @@ package com.facebook.presto.delta;
 
 import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.common.Subfield;
-import com.facebook.presto.common.Utils;
 import com.facebook.presto.common.block.Block;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.predicate.TupleDomain;
+import com.facebook.presto.common.predicate.Utils;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeManager;
 import com.facebook.presto.hive.FileFormatDataSourceStats;
