@@ -205,12 +205,17 @@ public class TestRangerBasedAccessControl
                         entry -> entry.getKey(),
                         entry -> new HashSet(entry.getValue())));
 
+        Map<String, Set<String>> userGroupsSet =
+                users.getvXUsers().stream().collect(Collectors.toMap(
+                        entry -> entry.getName(),
+                        entry -> new HashSet(entry.getGroupNameList())));
+
         RangerBasedAccessControl rangerBasedAccessControl = new RangerBasedAccessControl();
         RangerBasedAccessControlConfig config = new RangerBasedAccessControlConfig().setRangerHiveServiceName("hive").setRangerHiveAuditPath(auditFilePath);
         RangerAuthorizer rangerAuthorizer = new RangerAuthorizer(servicePolicies, config);
         rangerBasedAccessControl.setRangerAuthorizer(rangerAuthorizer);
-        rangerBasedAccessControl.setUsers(users);
         rangerBasedAccessControl.setUserRoles(userRolesSet);
+        rangerBasedAccessControl.setUserGroups(userGroupsSet);
         return rangerBasedAccessControl;
     }
 

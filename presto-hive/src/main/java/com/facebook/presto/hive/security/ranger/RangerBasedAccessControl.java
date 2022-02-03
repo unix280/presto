@@ -26,6 +26,8 @@ import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import okhttp3.Credentials;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
@@ -73,6 +75,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCol
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static java.lang.String.format;
+import static java.util.Objects.isNull;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -85,8 +88,8 @@ public class RangerBasedAccessControl
     private static final Logger log = Logger.get(RangerBasedAccessControl.class);
 
     private RangerAuthorizer rangerAuthorizer;
-    private Users users;
-    private static Map<String, Set<String>> userRolesMapping = new HashMap<>();
+    private Map<String, Set<String>> userGroupsMapping = new HashMap<>();
+    private Map<String, Set<String>> userRolesMapping = new HashMap<>();
 
     @TestOnly
     public RangerBasedAccessControl()
@@ -103,19 +106,11 @@ public class RangerBasedAccessControl
         try {
             OkHttpClient client = getAuthHttpClient(config);
 
-            HttpUrl hiveServicePolicyUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(config.getRangerHttpEndPoint()))
-                    .appendPath(RANGER_REST_POLICY_MGR_DOWNLOAD_URL + "/" + config.getRangerHiveServiceName())
-                    .build()));
-
-            HttpUrl getUsersUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(config.getRangerHttpEndPoint()))
-                    .appendPath(RANGER_REST_USER_GROUP_URL)
-                    .build()));
-
             long startTime = System.nanoTime();
-            servicePolicies = getHiveServicePolicies(client, hiveServicePolicyUrl);
+            servicePolicies = getHiveServicePolicies(client, config);
             log.debug("Policy retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
             startTime = System.nanoTime();
-            users = getUsers(client, getUsersUrl);
+            userGroupsMapping = getUserGroupsMappings(client, config.getRangerHttpEndPoint());
             log.debug("User Group retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
             rangerAuthorizer = new RangerAuthorizer(servicePolicies, config);
             startTime = System.nanoTime();
@@ -123,32 +118,38 @@ public class RangerBasedAccessControl
             log.debug("Roles retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
 
             log.info("Retrieved policies count " + servicePolicies.getPolicies().size());
-            log.info("Retrieved users count " + users.getvXUsers().size());
         }
         catch (Exception e) {
             throw new RuntimeException("Exception while querying ranger service ", e);
         }
     }
 
-    private ServicePolicies getHiveServicePolicies(OkHttpClient client, HttpUrl httpUrl)
+    private ServicePolicies getHiveServicePolicies(OkHttpClient client, RangerBasedAccessControlConfig config)
             throws IOException
     {
-        Response response = doRequest(client, httpUrl);
+        HttpUrl hiveServicePolicyUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(config.getRangerHttpEndPoint()))
+                .appendPath(RANGER_REST_POLICY_MGR_DOWNLOAD_URL + "/" + config.getRangerHiveServiceName())
+                .build()));
+        Response response = doRequest(client, hiveServicePolicyUrl);
         if (!response.isSuccessful()) {
-            throw new RuntimeException(format("Request to %s failed: [Error: %s]", httpUrl, response));
+            throw new RuntimeException(format("Request to %s failed: [Error: %s]", hiveServicePolicyUrl, response));
         }
 
         return jsonParse(response, ServicePolicies.class);
     }
 
-    private Users getUsers(OkHttpClient client, HttpUrl endPtUri)
+    private Users getUsers(OkHttpClient client, String rangerEndPoint)
     {
-        Request request = new Request.Builder().url(endPtUri).header("Accept", "application/json").build();
+        HttpUrl getUsersUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))
+                .appendPath(RANGER_REST_USER_GROUP_URL)
+                .build()));
+
+        Request request = new Request.Builder().url(getUsersUrl).header("Accept", "application/json").build();
 
         JsonCodec<Users> usersJsonCodec = jsonCodec(Users.class);
         JsonResponse<Users> users = JsonResponse.execute(usersJsonCodec, client, request);
         if (!users.hasValue()) {
-            throw new RuntimeException(format("Request to %s failed: %s [Error: %s]", endPtUri, users, users.getResponseBody()));
+            throw new RuntimeException(format("Request to %s failed: %s [Error: %s]", getUsersUrl, users, users.getResponseBody()));
         }
 
         return users.getValue();
@@ -156,6 +157,7 @@ public class RangerBasedAccessControl
 
     private Map<String, Set<String>> getRolesForUserList(OkHttpClient client, String rangerEndPoint)
     {
+        Users users = getUsers(client, rangerEndPoint);
         List<String> usersList = users.getvXUsers().stream().map(VXUser::getName).collect(Collectors.toList());
         HttpUrl getRolesUrl;
         for (String user : usersList) {
@@ -185,9 +187,9 @@ public class RangerBasedAccessControl
     }
 
     @TestOnly
-    public void setUsers(Users users)
+    public void setUserGroups(Map<String, Set<String>> userGroupsMapping)
     {
-        this.users = users;
+        this.userGroupsMapping = userGroupsMapping;
     }
 
     @TestOnly
@@ -209,22 +211,16 @@ public class RangerBasedAccessControl
         return null;
     }
 
-    private boolean userExists(String userName)
+    private Map<String, Set<String>> getUserGroupsMappings(OkHttpClient client, String rangerEndPoint)
     {
-        return users.getvXUsers().stream()
-                .anyMatch(user -> userName.equalsIgnoreCase(user.getName()));
-    }
-
-    private Set<String> getGroupsForUser(String username)
-    {
-        if (userExists(username)) {
-            return new HashSet<>(users.getvXUsers().stream()
-                    .filter(user -> username.equalsIgnoreCase(user.getName()))
-                    .findFirst()
-                    .get()
-                    .getGroupNameList());
+        Users users = getUsers(client, rangerEndPoint);
+        ImmutableMap.Builder<String, Set<String>> userGroupsMapping = ImmutableMap.builder();
+        for (VXUser vxUser : users.getvXUsers()) {
+            if (!(isNull(vxUser.getGroupNameList()) || vxUser.getGroupNameList().isEmpty())) {
+                userGroupsMapping.put(vxUser.getName(), ImmutableSet.copyOf(vxUser.getGroupNameList()));
+            }
         }
-        return null;
+        return userGroupsMapping.build();
     }
 
     enum HiveAccessType
@@ -235,7 +231,7 @@ public class RangerBasedAccessControl
     private boolean checkAccess(ConnectorIdentity identity, SchemaTableName tableName, String column, HiveAccessType accessType)
     {
         return rangerAuthorizer.authorizeHiveResource(tableName.getSchemaName(), tableName.getTableName(), column,
-                accessType.toString(), identity.getUser(), getGroupsForUser(identity.getUser()), userRolesMapping.get(identity.getUser()));
+                accessType.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), userRolesMapping.get(identity.getUser()));
     }
 
     /**
@@ -246,7 +242,7 @@ public class RangerBasedAccessControl
     public void checkCanCreateSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
         if (!rangerAuthorizer.authorizeHiveResource(schemaName, null, null,
-                HiveAccessType.CREATE.toString(), identity.getUser(), getGroupsForUser(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
+                HiveAccessType.CREATE.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
             denyCreateSchema(schemaName, format("Access denied - User [ %s ] does not have [CREATE] " +
                     "privilege on [ %s ] ", identity.getUser(), schemaName));
         }
@@ -260,7 +256,7 @@ public class RangerBasedAccessControl
     public void checkCanDropSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
         if (!rangerAuthorizer.authorizeHiveResource(schemaName, null, null,
-                HiveAccessType.DROP.toString(), identity.getUser(), getGroupsForUser(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
+                HiveAccessType.DROP.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
             denyDropSchema(schemaName, format("Access denied - User [ %s ] does not have [DROP] " +
                     "privilege on [ %s ] ", identity.getUser(), schemaName));
         }
@@ -287,7 +283,7 @@ public class RangerBasedAccessControl
     public Set<String> filterSchemas(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, Set<String> schemaNames)
     {
         Set<String> allowedSchemas = new HashSet<>();
-        Set<String> groups = getGroupsForUser(identity.getUser());
+        Set<String> groups = userGroupsMapping.get(identity.getUser());
         Set<String> roles = userRolesMapping.get(identity.getUser());
 
         for (String schema : schemaNames) {
@@ -333,7 +329,7 @@ public class RangerBasedAccessControl
     public Set<SchemaTableName> filterTables(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, Set<SchemaTableName> tableNames)
     {
         Set<SchemaTableName> allowedTables = new HashSet<>();
-        Set<String> groups = getGroupsForUser(identity.getUser());
+        Set<String> groups = userGroupsMapping.get(identity.getUser());
         Set<String> roles = userRolesMapping.get(identity.getUser());
 
         for (SchemaTableName table : tableNames) {
