@@ -164,7 +164,9 @@ public class TestHiveClientConfig
                 .setMinimumAssignedSplitWeight(0.05)
                 .setUserDefinedTypeEncodingEnabled(false)
                 .setUseRecordPageSourceForCustomSplit(true)
-                .setHudiMetadataEnabled(false));
+                .setHudiMetadataEnabled(false)
+                .setUseRecordPageSourceForCustomSplit(true)
+                .setFileSplittable(true));
     }
 
     @Test
@@ -289,6 +291,7 @@ public class TestHiveClientConfig
                 .put("hive.minimum-assigned-split-weight", "1.0")
                 .put("hive.use-record-page-source-for-custom-split", "false")
                 .put("hive.hudi-metadata-enabled", "true")
+                .put("hive.file-splittable", "false")
                 .build();
 
         HiveClientConfig expected = new HiveClientConfig()
@@ -407,6 +410,8 @@ public class TestHiveClientConfig
                 .setSizeBasedSplitWeightsEnabled(false)
                 .setMinimumAssignedSplitWeight(1.0)
                 .setUserDefinedTypeEncodingEnabled(true)
+                .setUseRecordPageSourceForCustomSplit(false)
+                .setFileSplittable(false)
                 .setUseRecordPageSourceForCustomSplit(false)
                 .setHudiMetadataEnabled(true);
 
