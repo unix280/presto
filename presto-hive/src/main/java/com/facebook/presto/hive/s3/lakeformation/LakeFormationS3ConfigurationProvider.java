@@ -59,6 +59,7 @@ import java.util.function.Supplier;
 import static com.facebook.presto.hive.metastore.glue.GlueHiveMetastore.AHANA;
 import static com.facebook.presto.hive.metastore.glue.GlueHiveMetastore.LAKE_FORMATION_AUTHORIZED_CALLER;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ACCESS_KEY;
+import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_LAKE_FORMATION_CACHE_KEY;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SECRET_KEY;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SESSION_TOKEN;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -178,6 +179,9 @@ public class LakeFormationS3ConfigurationProvider
                 configuration.set(S3_ACCESS_KEY, result.getAccessKeyId());
                 configuration.set(S3_SECRET_KEY, result.getSecretAccessKey());
                 configuration.set(S3_SESSION_TOKEN, result.getSessionToken());
+
+                // Set a cache key to differentiate between filesystem objects in PrestoFileSystemCache for the same S3 authority.
+                configuration.set(S3_LAKE_FORMATION_CACHE_KEY, tableCredentialsCacheKey.toString());
             }
         }
     }

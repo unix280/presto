@@ -47,6 +47,7 @@ public interface S3ConfigurationUpdater
     String S3_SESSION_TOKEN = "presto.s3.session-token";
     String S3_ACL_TYPE = "presto.s3.upload-acl-type";
     String S3_SKIP_GLACIER_OBJECTS = "presto.s3.skip-glacier-objects";
+    String S3_LAKE_FORMATION_CACHE_KEY = "presto.s3.lake-formation-cache-key";
 
     void updateConfiguration(Configuration config);
 }
