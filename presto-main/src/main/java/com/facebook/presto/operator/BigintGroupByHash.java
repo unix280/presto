@@ -373,7 +373,8 @@ public class BigintGroupByHash
         return groupId;
     }
 
-    private class AddPageWork
+    @VisibleForTesting
+    class AddPageWork
             implements Work<Void>
     {
         private final Block block;
@@ -458,6 +459,7 @@ public class BigintGroupByHash
         }
     }
 
+    @VisibleForTesting
     private class GetGroupIdsWork
             implements Work<GroupByIdBlock>
     {
