@@ -237,7 +237,6 @@ public class HiveMetadataFactory
                 partitionObjectBuilder,
                 encryptionInformationProvider,
                 hivePartitionStats,
-                hiveFileRenamer,
-                columnConverterProvider);
+                hiveFileRenamer);
     }
 }
