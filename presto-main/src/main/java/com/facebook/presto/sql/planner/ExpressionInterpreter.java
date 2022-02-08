@@ -612,6 +612,9 @@ public class ExpressionInterpreter
             boolean found = false;
             List<Object> values = new ArrayList<>(valueList.getValues().size());
             List<Type> types = new ArrayList<>(valueList.getValues().size());
+
+            FunctionHandle equalsOperator = metadata.getFunctionAndTypeManager().resolveOperator(OperatorType.EQUAL, fromTypes(types(node.getValue(), valueList)));
+
             for (Expression expression : valueList.getValues()) {
                 Object inValue = process(expression, context);
                 if (value instanceof Expression || inValue instanceof Expression) {
@@ -625,7 +628,7 @@ public class ExpressionInterpreter
                     hasNullValue = true;
                 }
                 else {
-                    Boolean result = (Boolean) invokeOperator(OperatorType.EQUAL, types(node.getValue(), expression), ImmutableList.of(value, inValue));
+                    Boolean result = (Boolean) functionInvoker.invoke(equalsOperator, session.getSqlFunctionProperties(), ImmutableList.of(value, inValue));
                     if (result == null) {
                         hasNullValue = true;
                     }
