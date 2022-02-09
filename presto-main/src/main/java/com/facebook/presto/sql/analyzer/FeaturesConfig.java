@@ -216,6 +216,8 @@ public class FeaturesConfig
     private boolean hashBasedDistinctLimitEnabled;
     private int hashBasedDistinctLimitThreshold = 10000;
 
+    private boolean streamingForPartialAggregationEnabled;
+
     private boolean hideUnauthorizedColumns;
 
     public enum PartitioningPrecisionStrategy
@@ -1970,6 +1972,18 @@ public class FeaturesConfig
     public FeaturesConfig setHideUnauthorizedColumns(boolean hideUnauthorizedColumns)
     {
         this.hideUnauthorizedColumns = hideUnauthorizedColumns;
+        return this;
+    }
+
+    public boolean isStreamingForPartialAggregationEnabled()
+    {
+        return streamingForPartialAggregationEnabled;
+    }
+
+    @Config("streaming-for-partial-aggregation-enabled")
+    public FeaturesConfig setStreamingForPartialAggregationEnabled(boolean streamingForPartialAggregationEnabled)
+    {
+        this.streamingForPartialAggregationEnabled = streamingForPartialAggregationEnabled;
         return this;
     }
 }
