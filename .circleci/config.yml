@@ -795,6 +795,14 @@ workflows:
           requires:
             - start_test_suite
       - test_specific_module:
+          name: test_specific_module_presto_delta
+          context:
+            - docker_hub
+          module: presto-delta
+          resource_class: xlarge
+          requires:
+            - start_test_suite
+      - test_specific_module:
           name: test_specific_module_presto_hive
           context:
             - docker_hub
@@ -990,6 +998,7 @@ workflows:
             # - test_specific_module_presto_raptor
             - test_specific_module_presto_accumulo
             - test_specific_module_presto_cassandra
+            - test_specific_module_presto_delta
             - test_specific_module_presto_hive
             - test_specific_module_presto_hive_glue
             - test_specific_module_presto_hive_glue_impersonation
