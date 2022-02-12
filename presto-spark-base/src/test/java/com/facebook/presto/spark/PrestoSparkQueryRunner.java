@@ -180,7 +180,7 @@ public class PrestoSparkQueryRunner
     {
         PrestoSparkQueryRunner queryRunner = new PrestoSparkQueryRunner("hive", additionalConfigProperties);
         ExtendedHiveMetastore metastore = queryRunner.getMetastore();
-        MetastoreContext metastoreContext = new MetastoreContext(SESSION);
+        MetastoreContext metastoreContext = new MetastoreContext(SESSION, Optional.empty());
         if (!metastore.getDatabase(METASTORE_CONTEXT, "tpch").isPresent()) {
             metastore.createDatabase(METASTORE_CONTEXT, createDatabaseMetastoreObject("tpch"));
             copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, queryRunner.getDefaultSession(), tables);

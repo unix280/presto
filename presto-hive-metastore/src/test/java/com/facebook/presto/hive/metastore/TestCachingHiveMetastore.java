@@ -62,7 +62,7 @@ import static org.testng.Assert.assertTrue;
 public class TestCachingHiveMetastore
 {
     private static final ImmutableList<String> EXPECTED_PARTITIONS = ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2);
-    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION);
+    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty());
 
     private MockHiveMetastoreClient mockClient;
     private CachingHiveMetastore metastore;

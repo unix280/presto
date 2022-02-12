@@ -86,7 +86,7 @@ public class DetermineJoinDistributionType
         PlanNode buildSide = joinNode.getRight();
         PlanNodeStatsEstimate buildSideStatsEstimate = context.getStatsProvider().getStats(buildSide);
         double buildSideSizeInBytes = buildSideStatsEstimate.getOutputSizeInBytes(buildSide.getOutputVariables());
-        return buildSideSizeInBytes <= joinMaxBroadcastTableSize.toBytes();
+        return buildSideSizeInBytes <= joinMaxBroadcastTableSize.toBytes() || getSourceTablesSizeInBytes(buildSide, context) <= joinMaxBroadcastTableSize.toBytes();
     }
 
     public static double getSourceTablesSizeInBytes(PlanNode node, Context context)

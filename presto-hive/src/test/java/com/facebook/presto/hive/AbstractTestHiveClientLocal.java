@@ -28,6 +28,7 @@ import org.testng.annotations.BeforeClass;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Optional;
 
 import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.google.common.io.MoreFiles.deleteRecursively;
@@ -38,7 +39,7 @@ public abstract class AbstractTestHiveClientLocal
         extends AbstractTestHiveClient
 {
     private static final String DEFAULT_TEST_DB_NAME = "test";
-    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION);
+    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty());
 
     private File tempDir;
     private String testDbName;

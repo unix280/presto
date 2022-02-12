@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.s3.lakeformation;
 
 import com.amazonaws.services.lakeformation.model.GetTemporaryGlueTableCredentialsResult;
+import com.facebook.presto.cache.CacheConfig;
 import com.facebook.presto.hive.DynamicConfigurationProvider;
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.HiveClientConfig;
@@ -200,7 +201,7 @@ public class TestLakeFormationS3ConfigurationProvider
                     new ConnectorIdentity(
                             user, Optional.empty(), Optional.empty(), emptyMap(), emptyMap()),
                     new HiveSessionProperties(
-                            new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig()
+                            new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig(), new CacheConfig()
                     ).getSessionProperties());
 
             return new HdfsContext(connectorSession, "testSchema", "testTable", "path", false);

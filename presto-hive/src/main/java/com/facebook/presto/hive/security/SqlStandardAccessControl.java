@@ -145,7 +145,7 @@ public class SqlStandardAccessControl
     public void checkCanShowCreateTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
         // This should really be OWNERSHIP, but Hive uses `SELECT with GRANT`
-        if (!checkTablePermission(transactionHandle, identity, new MetastoreContext(identity, context.getQueryId().getId()), tableName, SELECT, true)) {
+        if (!checkTablePermission(transactionHandle, identity, new MetastoreContext(identity, context.getQueryId().getId(), Optional.empty()), tableName, SELECT, true)) {
             denyShowCreateTable(tableName.toString());
         }
     }
@@ -512,7 +512,7 @@ public class SqlStandardAccessControl
 
     private boolean hasAnyTablePermission(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
-        MetastoreContext metastoreContext = new MetastoreContext(identity, context.getQueryId().getId());
+        MetastoreContext metastoreContext = new MetastoreContext(identity, context.getQueryId().getId(), Optional.empty());
         if (isAdmin(transaction, identity, metastoreContext)) {
             return true;
         }

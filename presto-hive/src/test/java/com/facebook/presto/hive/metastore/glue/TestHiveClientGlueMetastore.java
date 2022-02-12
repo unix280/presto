@@ -49,7 +49,7 @@ import static org.testng.Assert.assertTrue;
 public class TestHiveClientGlueMetastore
         extends AbstractTestHiveClientLocal
 {
-    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION);
+    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty());
 
     public TestHiveClientGlueMetastore()
     {

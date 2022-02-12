@@ -56,7 +56,6 @@ import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verify;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;

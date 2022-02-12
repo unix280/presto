@@ -687,7 +687,7 @@ public class LakeFormationAccessControl
         LFPolicyCacheKey lfPolicyCacheKey;
 
         if (impersonationEnabled) {
-            String iamRole = getGlueIamRole(new MetastoreContext(identity, queryId));
+            String iamRole = getGlueIamRole(new MetastoreContext(identity, queryId, Optional.empty()));
             lfPolicyCacheKey = new LFPolicyCacheKey(tableName, iamRole);
         }
         else {

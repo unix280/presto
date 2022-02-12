@@ -184,7 +184,8 @@ public final class QueryEventListener
                 queryCompletedEvent.getExecutionStartTime(),
                 queryCompletedEvent.getEndTime(),
                 queryCompletedEvent.getStageStatistics(),
-                queryCompletedEvent.getOperatorStatistics());
+                queryCompletedEvent.getOperatorStatistics(),
+                queryCompletedEvent.getExpandedQuery());
 
         try {
             // Logging for payload

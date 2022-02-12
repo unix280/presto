@@ -34,6 +34,7 @@ import com.facebook.airlift.log.Logger;
 import com.facebook.presto.hive.DynamicConfigurationProvider;
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.authentication.MetastoreContext;
+import com.facebook.presto.hive.metastore.MetastoreUtil;
 import com.facebook.presto.hive.metastore.glue.GlueHiveMetastoreConfig;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMapping;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappings;
@@ -156,7 +157,7 @@ public class LakeFormationS3ConfigurationProvider
     {
         String iamRole = catalogIamRole;
         if (impersonationEnabled) {
-            MetastoreContext metastoreContext = new MetastoreContext(context.getIdentity(), context.getQueryId().orElse(""));
+            MetastoreContext metastoreContext = new MetastoreContext(context.getIdentity(), context.getQueryId().orElse(""), context.getSession().flatMap(MetastoreUtil::getMetastoreHeaders));
             iamRole = getGlueIamRole(metastoreContext);
         }
         String region;

@@ -63,7 +63,7 @@ import static org.testng.Assert.fail;
 public class TestHiveClientFileMetastore
         extends AbstractTestHiveClientLocal
 {
-    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION);
+    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty());
 
     private static final SplitSchedulingContext SPLIT_SCHEDULING_CONTEXT = new SplitSchedulingContext(
             UNGROUPED_SCHEDULING,

@@ -154,6 +154,6 @@ public class TestHiveClientGlueMetastoreWithImpersonation
 
         String queryId = "test_queryId";
 
-        return new MetastoreContext(connectorIdentity, queryId);
+        return new MetastoreContext(connectorIdentity, queryId, Optional.empty());
     }
 }

@@ -34,8 +34,8 @@ import com.facebook.presto.server.BasicQueryStats;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
-import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.NodeState;
+import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.facebook.presto.spi.ttl.ConfidenceBasedTtlInfo;
@@ -600,7 +600,7 @@ public class TestNodeScheduler
 
         newNodeManager.addNode(CONNECTOR_ID, nodeBuilder.build());
 
-        NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), newNodeManager, new NodeSelectionStats(), nodeSchedulerConfig, nodeTaskMap, new ThrowingNodeTtlFetcherManager(), new NoOpQueryManager());
+        NodeScheduler nodeScheduler = new NodeScheduler(new LegacyNetworkTopology(), newNodeManager, new NodeSelectionStats(), nodeSchedulerConfig, nodeTaskMap, new ThrowingNodeTtlFetcherManager(), new NoOpQueryManager(), new SimpleTtlNodeSelectorConfig());
         NodeSelector nodeSelector = nodeScheduler.createNodeSelector(session, CONNECTOR_ID, 6);
 
         // Test assignments with SOFT_AFFINITY first

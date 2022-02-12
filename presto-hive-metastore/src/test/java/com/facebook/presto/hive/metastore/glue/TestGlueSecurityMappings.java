@@ -70,7 +70,7 @@ public class TestGlueSecurityMappings
         {
             return new MetastoreContext(
                     new ConnectorIdentity(user, Optional.empty(), Optional.empty(), Collections.emptyMap(), Collections.emptyMap()),
-                    PRESTO_QUERY_ID_NAME);
+                    PRESTO_QUERY_ID_NAME, Optional.empty());
         }
     }
 

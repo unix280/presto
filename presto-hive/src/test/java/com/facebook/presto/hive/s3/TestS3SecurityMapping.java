@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.s3;
 
+import com.facebook.presto.cache.CacheConfig;
 import com.facebook.presto.hive.DynamicConfigurationProvider;
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.HiveClientConfig;
@@ -238,7 +239,7 @@ public class TestS3SecurityMapping
                     new ConnectorIdentity(
                             user, Optional.empty(), Optional.empty(), extraCredentials.build(), emptyMap()),
                     new HiveSessionProperties(
-                            new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig()
+                            new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig(), new CacheConfig()
                     ).getSessionProperties());
             return new HdfsContext(connectorSession, "schema");
         }
