@@ -9,6 +9,9 @@ start_docker_containers
 
 test_directory="$(date '+%Y%m%d-%H%M%S')-$(uuidgen | sha1sum | cut -b 1-6)"
 
+# obtain Hive version
+TESTS_HIVE_VERSION_MAJOR=$(get_hive_major_version)
+
 # insert AWS credentials
 exec_in_hadoop_master_container cp /etc/hadoop/conf/core-site.xml.s3-template /etc/hadoop/conf/core-site.xml
 exec_in_hadoop_master_container sed -i \
@@ -40,6 +43,7 @@ set +e
   -Dhive.hadoop2.metastoreHost=localhost \
   -Dhive.hadoop2.metastorePort=9083 \
   -Dhive.hadoop2.databaseName=default \
+  -Dhive.hadoop2.hiveVersionMajor="${TESTS_HIVE_VERSION_MAJOR}" \
   -Dhive.hadoop2.s3.awsAccessKey=${AWS_S3_ACCESS_KEY} \
   -Dhive.hadoop2.s3.awsSecretKey=${AWS_S3_SECRET_KEY} \
   -Dhive.hadoop2.s3.writableBucket=${AWS_S3_BUCKET} \

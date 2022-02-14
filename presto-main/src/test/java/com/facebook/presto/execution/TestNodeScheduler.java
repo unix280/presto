@@ -614,8 +614,8 @@ public class TestNodeScheduler
         splits = getSplits(SOFT_AFFINITY_BY_SPLIT);
         splitPlacementResult = nodeSelector.computeAssignments(splits, ImmutableList.of());
         internalNodes = splitPlacementResult.getAssignments().keySet();
-        // Uniform scheduling schedules splits to 6 nodes.
-        assertEquals(internalNodes.size(), 6);
+        // Uniform scheduling schedules splits to 7 nodes.
+        assertEquals(internalNodes.size(), 7);
     }
 
     private Set<Split> getSplits(NodeSelectionStrategy nodeSelectionStrategy)

@@ -16,11 +16,14 @@ package com.facebook.presto.sql.query;
 import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.execution.QueryManagerConfig;
 import com.facebook.presto.execution.TaskManagerConfig;
+import com.facebook.presto.execution.scheduler.NodeSchedulerConfig;
 import com.facebook.presto.execution.warnings.WarningCollectorConfig;
 import com.facebook.presto.memory.MemoryManagerConfig;
 import com.facebook.presto.memory.NodeMemoryConfig;
 import com.facebook.presto.metadata.SessionPropertyManager;
+import com.facebook.presto.spiller.NodeSpillConfig;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
+import com.facebook.presto.tracing.TracingConfig;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,7 +41,10 @@ public class TestFilterHideUnauthorizedColumnsSession
                 new MemoryManagerConfig(),
                 featuresConfig,
                 new NodeMemoryConfig(),
-                new WarningCollectorConfig()));
+                new WarningCollectorConfig(),
+                new NodeSchedulerConfig(),
+                new NodeSpillConfig(),
+                new TracingConfig()));
         assertThatThrownBy(() -> sessionPropertyManager.validateSystemSessionProperty(SystemSessionProperties.HIDE_UNAUTHORIZED_COLUMNS, "false"))
                 .hasMessage("hide_unauthorized_columns cannot be disabled with session property when it was enabled with configuration");
     }
@@ -54,7 +60,10 @@ public class TestFilterHideUnauthorizedColumnsSession
                 new MemoryManagerConfig(),
                 featuresConfig,
                 new NodeMemoryConfig(),
-                new WarningCollectorConfig()));
+                new WarningCollectorConfig(),
+                new NodeSchedulerConfig(),
+                new NodeSpillConfig(),
+                new TracingConfig()));
         sessionPropertyManager.validateSystemSessionProperty(SystemSessionProperties.HIDE_UNAUTHORIZED_COLUMNS, "true");
     }
 
@@ -68,7 +77,10 @@ public class TestFilterHideUnauthorizedColumnsSession
                 new MemoryManagerConfig(),
                 featuresConfig,
                 new NodeMemoryConfig(),
-                new WarningCollectorConfig()));
+                new WarningCollectorConfig(),
+                new NodeSchedulerConfig(),
+                new NodeSpillConfig(),
+                new TracingConfig()));
         sessionPropertyManager.validateSystemSessionProperty(SystemSessionProperties.HIDE_UNAUTHORIZED_COLUMNS, "false");
     }
 
@@ -82,7 +94,10 @@ public class TestFilterHideUnauthorizedColumnsSession
                 new MemoryManagerConfig(),
                 featuresConfig,
                 new NodeMemoryConfig(),
-                new WarningCollectorConfig()));
+                new WarningCollectorConfig(),
+                new NodeSchedulerConfig(),
+                new NodeSpillConfig(),
+                new TracingConfig()));
         sessionPropertyManager.validateSystemSessionProperty(SystemSessionProperties.HIDE_UNAUTHORIZED_COLUMNS, "true");
     }
 }
