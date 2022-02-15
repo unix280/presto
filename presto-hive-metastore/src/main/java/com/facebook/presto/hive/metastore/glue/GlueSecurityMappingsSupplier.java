@@ -21,7 +21,7 @@ import java.io.File;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import static com.facebook.presto.plugin.base.JsonUtils.parseJson;
+import static com.facebook.presto.plugin.base.util.JsonUtils.parseJson;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class GlueSecurityMappingsSupplier

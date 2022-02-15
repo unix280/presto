@@ -32,7 +32,7 @@ import java.util.function.Supplier;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ACCESS_KEY;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_IAM_ROLE;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SECRET_KEY;
-import static com.facebook.presto.plugin.base.JsonUtils.parseJson;
+import static com.facebook.presto.plugin.base.util.JsonUtils.parseJson;
 import static com.google.common.base.Verify.verify;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;

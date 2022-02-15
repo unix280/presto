@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.Optional;
 
 import static com.facebook.presto.hive.metastore.glue.TestGlueSecurityMappings.MappingSelector.empty;
-import static com.facebook.presto.plugin.base.JsonUtils.parseJson;
+import static com.facebook.presto.plugin.base.util.JsonUtils.parseJson;
 import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.assertEquals;
 

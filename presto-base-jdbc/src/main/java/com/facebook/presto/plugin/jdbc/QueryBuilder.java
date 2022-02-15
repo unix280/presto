@@ -13,9 +13,11 @@
  */
 package com.facebook.presto.plugin.jdbc;
 
+import com.facebook.presto.common.block.Block;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.predicate.Range;
 import com.facebook.presto.common.predicate.TupleDomain;
+import com.facebook.presto.common.type.ArrayType;
 import com.facebook.presto.common.type.BigintType;
 import com.facebook.presto.common.type.BooleanType;
 import com.facebook.presto.common.type.CharType;
@@ -39,6 +41,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import org.joda.time.DateTimeZone;
 
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -51,6 +54,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.common.type.DateTimeEncoding.unpackMillisUtc;
+import static com.facebook.presto.plugin.jdbc.util.TypeUtils.getArrayElementPgTypeName;
+import static com.facebook.presto.plugin.jdbc.util.TypeUtils.getJdbcObjectArray;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -71,7 +76,7 @@ public class QueryBuilder
 
     private final String quote;
 
-    private static class TypeAndValue
+    protected static class TypeAndValue
     {
         private final Type type;
         private final Object value;
@@ -141,10 +146,11 @@ public class QueryBuilder
             sql.append(" WHERE ")
                     .append(Joiner.on(" AND ").join(clauses));
         }
-        sql.append(String.format("/* %s : %s */", session.getUser(), session.getQueryId()));
+        sql.append(format("/* %s : %s */", session.getUser(), session.getQueryId()));
         PreparedStatement statement = client.getPreparedStatement(connection, sql.toString());
 
         for (int i = 0; i < accumulator.size(); i++) {
+            // TODO: map it to writeFunction
             TypeAndValue typeAndValue = accumulator.get(i);
             if (typeAndValue.getType().equals(BigintType.BIGINT)) {
                 statement.setLong(i + 1, (long) typeAndValue.getValue());
@@ -188,6 +194,12 @@ public class QueryBuilder
             }
             else if (typeAndValue.getType() instanceof CharType) {
                 statement.setString(i + 1, ((Slice) typeAndValue.getValue()).toStringUtf8());
+            }
+            else if (typeAndValue.getType() instanceof ArrayType) {
+                Type elementType = ((ArrayType) typeAndValue.getType()).getElementType();
+                Array jdbcArray = statement.getConnection().createArrayOf(getArrayElementPgTypeName(session, client, elementType),
+                        getJdbcObjectArray(session, elementType, (Block) typeAndValue.getValue()));
+                statement.setArray(i + 1, jdbcArray);
             }
             else {
                 throw new UnsupportedOperationException("Can't handle type: " + typeAndValue.getType());
