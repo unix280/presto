@@ -121,9 +121,11 @@ public class LakeFormationS3ConfigurationProvider
         this.accountIdLoadingCache = CacheBuilder.newBuilder()
                 .maximumSize(1000)
                 .build(CacheLoader.from(this::getAccountId));
+
+        // Expiration time set to 3585 seconds as default expiration time from LF APIs is 3600 seconds
         this.tableCredentialsLoadingCache = CacheBuilder.newBuilder()
                 .maximumSize(1000)
-                .expireAfterWrite(900, SECONDS)
+                .expireAfterWrite(3585, SECONDS)
                 .build(CacheLoader.from(this::getTemporaryTableCredentials));
         this.glueRegion = getGlueRegion(glueHiveMetastoreConfig);
         this.lakeFormationClient = createAsyncLakeFormationClient(requireNonNull(glueHiveMetastoreConfig, "glueHiveMetastoreConfig is null"), glueRegion);
