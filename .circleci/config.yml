@@ -697,7 +697,7 @@ workflows:
             - docker_hub
           module: presto-tests
           test_flags: -P presto-tests-execution-memory
-          resource_class: medium
+          resource_class: large
           custom_mvn_opts: -Xmx1024M -XX:+ExitOnOutOfMemoryError
           requires:
             - start_test_suite
