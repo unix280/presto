@@ -47,6 +47,8 @@ public final class TpchQueryRunner
                 .setCoordinatorCount(coordinatorCount)
                 .setSpotNodeCount(spotNodeCount)
                 .build();
+        queryRunner.waitForClusterToGetReady();
+        return queryRunner;
     }
 
     public static DistributedQueryRunner createQueryRunner(Map<String, String> resourceManagerProperties, Map<String, String> coordinatorProperties, Map<String, String> extraProperties, int coordinatorCount)
@@ -66,6 +68,10 @@ public final class TpchQueryRunner
                 .setCoordinatorCount(coordinatorCount)
                 .setSpotNodeCount(spotNodeCount)
                 .build();
+        if (!skipClusterReadyCheck) {
+            queryRunner.waitForClusterToGetReady();
+        }
+        return queryRunner;
     }
 
     public static void main(String[] args)
