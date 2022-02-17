@@ -744,10 +744,20 @@ public class PredicatePushDown
                 return Optional.empty();
             }
 
-            if (node.getRight().getOutputVariables().contains(left)) {
-                shouldFlip = true;
+            // supported expression for dynamic filtering:
+            // either 1. left child contains left variables and right child contains right variables
+            // or, 2. left child contains right variables and right child contains left variables
+            Set<VariableReferenceExpression> leftUniqueOutputs = VariablesExtractor.extractUnique(left);
+            Set<VariableReferenceExpression> rightUniqueOutputs = VariablesExtractor.extractUnique(right);
+            boolean leftChildContainsLeftVariables = node.getLeft().getOutputVariables().containsAll(leftUniqueOutputs);
+            boolean rightChildContainsRightVariables = node.getRight().getOutputVariables().containsAll(rightUniqueOutputs);
+            boolean leftChildContainsRightVariables = node.getLeft().getOutputVariables().containsAll(rightUniqueOutputs);
+            boolean rightChildContainsLeftVariables = node.getRight().getOutputVariables().containsAll(leftUniqueOutputs);
+            if (!((leftChildContainsLeftVariables && rightChildContainsRightVariables) || (leftChildContainsRightVariables && rightChildContainsLeftVariables))) {
+                return Optional.empty();
             }
-            if (node.getLeft().getOutputVariables().contains(right)) {
+
+            if (leftChildContainsRightVariables && rightChildContainsLeftVariables) {
                 shouldFlip = true;
             }
 
