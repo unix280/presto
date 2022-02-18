@@ -1025,7 +1025,7 @@ public class ThriftHiveMetastore
         }
         String token;
         try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
-            token = client.getDelegationToken(metastoreContext.getUsername().orElse(""), metastoreContext.getUsername().orElse(""));
+            token = client.getDelegationToken(metastoreContext.getUsername(), metastoreContext.getUsername());
         }
         try (HiveMetastoreClient realClient = clientProvider.createMetastoreClient(Optional.of(token))) {
             return callable.call(realClient);
@@ -1325,7 +1325,7 @@ public class ThriftHiveMetastore
     @Override
     public boolean isImpersonationEnabled()
     {
-        return false;
+        return impersonationEnabled;
     }
 
     private PrivilegeBag buildPrivilegeBag(

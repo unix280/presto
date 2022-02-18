@@ -121,7 +121,6 @@ public class TestHiveMetadataFileFormatEncryptionSettings
                 true,
                 HIVE_CLIENT_CONFIG.getMaxPartitionBatchSize(),
                 HIVE_CLIENT_CONFIG.getMaxPartitionsPerScan(),
-                false,
                 FUNCTION_AND_TYPE_MANAGER,
                 new HiveLocationService(HDFS_ENVIRONMENT),
                 FUNCTION_RESOLUTION,

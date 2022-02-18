@@ -80,7 +80,6 @@ public class TestCachingHiveMetastore
         metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(thriftHiveMetastore, hivePartitionMutator),
                 executor,
-                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,
@@ -218,7 +217,6 @@ public class TestCachingHiveMetastore
         CachingHiveMetastore partitionCachingEnabledmetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, mockPartitionMutator),
                 executor,
-                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,
@@ -264,7 +262,6 @@ public class TestCachingHiveMetastore
         CachingHiveMetastore partitionCachingEnabledmetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, partitionMutator),
                 executor,
-                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,
@@ -298,7 +295,6 @@ public class TestCachingHiveMetastore
         CachingHiveMetastore partitionCacheVerificationEnabledMetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, mockPartitionMutator),
                 executor,
-                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,

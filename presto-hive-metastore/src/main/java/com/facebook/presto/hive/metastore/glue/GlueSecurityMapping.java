@@ -46,8 +46,7 @@ public class GlueSecurityMapping
 
     public boolean matches(MetastoreContext metastoreContext)
     {
-        return user.test(metastoreContext.getUsername()
-                .orElseThrow(() -> new IllegalStateException("End-user name should exist when metastore impersonation is enabled")));
+        return user.test(metastoreContext.getUsername());
     }
 
     public String getIamRole()

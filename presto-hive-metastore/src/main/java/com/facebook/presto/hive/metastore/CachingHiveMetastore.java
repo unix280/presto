@@ -79,8 +79,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class CachingHiveMetastore
         implements ExtendedHiveMetastore
 {
-    private static final String NO_IMPERSONATION_USER = "no-impersonation-caching-user";
-
     public enum MetastoreCacheScope
     {
         ALL, PARTITION
@@ -101,7 +99,6 @@ public class CachingHiveMetastore
     private final LoadingCache<KeyAndContext<String>, Set<String>> rolesCache;
     private final LoadingCache<KeyAndContext<PrestoPrincipal>, Set<RoleGrant>> roleGrantsCache;
 
-    private final boolean metastoreImpersonationEnabled;
     private final boolean partitionVersioningEnabled;
     private final double partitionCacheValidationPercentage;
 
@@ -114,7 +111,6 @@ public class CachingHiveMetastore
         this(
                 delegate,
                 executor,
-                metastoreClientConfig.isMetastoreImpersonationEnabled(),
                 metastoreClientConfig.getMetastoreCacheTtl(),
                 metastoreClientConfig.getMetastoreRefreshInterval(),
                 metastoreClientConfig.getMetastoreCacheMaximumSize(),
@@ -126,7 +122,6 @@ public class CachingHiveMetastore
     public CachingHiveMetastore(
             ExtendedHiveMetastore delegate,
             ExecutorService executor,
-            boolean metastoreImpersonationEnabled,
             Duration cacheTtl,
             Duration refreshInterval,
             long maximumSize,
@@ -137,7 +132,6 @@ public class CachingHiveMetastore
         this(
                 delegate,
                 executor,
-                metastoreImpersonationEnabled,
                 OptionalLong.of(cacheTtl.toMillis()),
                 refreshInterval.toMillis() >= cacheTtl.toMillis() ? OptionalLong.empty() : OptionalLong.of(refreshInterval.toMillis()),
                 maximumSize,
@@ -146,12 +140,11 @@ public class CachingHiveMetastore
                 partitionCacheValidationPercentage);
     }
 
-    public static CachingHiveMetastore memoizeMetastore(ExtendedHiveMetastore delegate, boolean isMetastoreImpersonationEnabled, long maximumSize)
+    public static CachingHiveMetastore memoizeMetastore(ExtendedHiveMetastore delegate, long maximumSize)
     {
         return new CachingHiveMetastore(
                 delegate,
                 newDirectExecutorService(),
-                isMetastoreImpersonationEnabled,
                 OptionalLong.empty(),
                 OptionalLong.empty(),
                 maximumSize,
@@ -163,7 +156,6 @@ public class CachingHiveMetastore
     private CachingHiveMetastore(
             ExtendedHiveMetastore delegate,
             ExecutorService executor,
-            boolean metastoreImpersonationEnabled,
             OptionalLong expiresAfterWriteMillis,
             OptionalLong refreshMills,
             long maximumSize,
@@ -173,7 +165,6 @@ public class CachingHiveMetastore
     {
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(executor, "executor is null");
-        this.metastoreImpersonationEnabled = metastoreImpersonationEnabled;
         this.partitionVersioningEnabled = partitionVersioningEnabled;
         this.partitionCacheValidationPercentage = partitionCacheValidationPercentage;
 
@@ -981,7 +972,7 @@ public class CachingHiveMetastore
 
     private <T> KeyAndContext<T> getCachingKey(MetastoreContext context, T key)
     {
-        MetastoreContext metastoreContext = metastoreImpersonationEnabled ? context : new MetastoreContext(NO_IMPERSONATION_USER, context.getQueryId(), Optional.empty(), Optional.empty(), false, Optional.empty());
+        MetastoreContext metastoreContext = delegate.isImpersonationEnabled() ? new MetastoreContext(context.getUsername(), context.getQueryId(), context.getClientInfo(), context.getSource(), true, context.getMetastoreHeaders()) : context;
         return new KeyAndContext<>(metastoreContext, key);
     }
 
@@ -1069,9 +1060,8 @@ public class CachingHiveMetastore
         }
     }
 
-    private MetastoreContext updateIdentity(MetastoreContext metastoreContext)
+    private MetastoreContext updateIdentity(MetastoreContext context)
     {
-        // remove metastoreContext if not doing impersonation
-        return delegate.isImpersonationEnabled() ? metastoreContext : new MetastoreContext(NO_IMPERSONATION_USER, metastoreContext.getQueryId(), Optional.empty(), Optional.empty(), false, Optional.empty());
+        return delegate.isImpersonationEnabled() ? new MetastoreContext(context.getUsername(), context.getQueryId(), context.getClientInfo(), context.getSource(), true, context.getMetastoreHeaders()) : context;
     }
 }

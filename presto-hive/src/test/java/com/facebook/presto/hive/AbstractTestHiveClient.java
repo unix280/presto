@@ -924,7 +924,6 @@ public abstract class AbstractTestHiveClient
         ExtendedHiveMetastore metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster, new MetastoreClientConfig(), hdfsEnvironment), new HivePartitionMutator()),
                 executor,
-                false,
                 Duration.valueOf("1m"),
                 Duration.valueOf("15s"),
                 10000,
@@ -959,7 +958,6 @@ public abstract class AbstractTestHiveClient
                 true,
                 getHiveClientConfig().getMaxPartitionBatchSize(),
                 getHiveClientConfig().getMaxPartitionsPerScan(),
-                false,
                 FUNCTION_AND_TYPE_MANAGER,
                 locationService,
                 FUNCTION_RESOLUTION,

@@ -24,7 +24,7 @@ import static java.util.Objects.requireNonNull;
 
 public final class MetastoreContext
 {
-    private final Optional<String> username;
+    private final String username;
     private final String queryId;
     private final Optional<String> clientInfo;
     private final Optional<String> source;
@@ -53,7 +53,7 @@ public final class MetastoreContext
 
     public MetastoreContext(String username, String queryId, Optional<String> clientInfo, Optional<String> source, boolean impersonationEnabled, Optional<String> metastoreHeaders)
     {
-        this.username = Optional.of(requireNonNull(username, "username is null"));
+        this.username = requireNonNull(username, "username is null");
         this.queryId = requireNonNull(queryId, "queryId is null");
         this.clientInfo = requireNonNull(clientInfo, "clientInfo is null");
         this.source = requireNonNull(source, "source is null");
@@ -61,7 +61,7 @@ public final class MetastoreContext
         this.metastoreHeaders = requireNonNull(metastoreHeaders, "metastoreHeaders is null");
     }
 
-    public Optional<String> getUsername()
+    public String getUsername()
     {
         return username;
     }
