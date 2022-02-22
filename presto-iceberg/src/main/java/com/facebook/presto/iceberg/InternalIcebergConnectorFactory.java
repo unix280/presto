@@ -22,6 +22,9 @@ import com.facebook.presto.hive.NodeVersion;
 import com.facebook.presto.hive.authentication.HiveAuthenticationModule;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.HiveMetastoreModule;
+import com.facebook.presto.hive.rubix.RubixConfig;
+import com.facebook.presto.hive.rubix.RubixInitializer;
+import com.facebook.presto.hive.rubix.RubixModule;
 import com.facebook.presto.hive.s3.HiveS3Module;
 import com.facebook.presto.plugin.base.security.AllowAllAccessControl;
 import com.facebook.presto.spi.NodeManager;
@@ -64,6 +67,7 @@ public final class InternalIcebergConnectorFactory
                     new IcebergMetastoreModule(),
                     new HiveS3Module(catalogName),
                     new HiveAuthenticationModule(),
+                    new RubixModule(),
                     new HiveMetastoreModule(catalogName, metastore),
                     binder -> {
                         binder.bind(NodeVersion.class).toInstance(new NodeVersion(context.getNodeManager().getCurrentNode().getVersion()));
@@ -76,6 +80,12 @@ public final class InternalIcebergConnectorFactory
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(config)
                     .initialize();
+
+            if (injector.getInstance(RubixConfig.class).isCacheEnabled()) {
+                // RubixInitializer needs ConfigurationInitializers, hence kept outside RubixModule
+                RubixInitializer rubixInitializer = injector.getInstance(RubixInitializer.class);
+                rubixInitializer.initializeRubix(context.getNodeManager(), catalogName);
+            }
 
             LifeCycleManager lifeCycleManager = injector.getInstance(LifeCycleManager.class);
             IcebergTransactionManager transactionManager = injector.getInstance(IcebergTransactionManager.class);
