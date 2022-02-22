@@ -130,6 +130,7 @@ import static com.facebook.presto.hive.metastore.MetastoreUtil.convertPredicateT
 import static com.facebook.presto.hive.metastore.MetastoreUtil.createDirectory;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getHiveBasicStatistics;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.makePartName;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.makePartitionName;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.toPartitionValues;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.updateStatisticsParameters;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.verifyCanDropColumn;
@@ -147,6 +148,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Comparators.lexicographical;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.UnaryOperator.identity;
@@ -375,14 +379,34 @@ public class GlueHiveMetastore
     @Override
     public Map<String, PartitionStatistics> getPartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Set<String> partitionNames)
     {
-        ImmutableMap.Builder<String, PartitionStatistics> result = ImmutableMap.builder();
-        getPartitionsByNames(metastoreContext, databaseName, tableName, ImmutableList.copyOf(partitionNames)).forEach((partitionName, optionalPartition) -> {
-            Partition partition = optionalPartition.orElseThrow(() ->
-                    new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), toPartitionValues(partitionName)));
-            PartitionStatistics partitionStatistics = new PartitionStatistics(getHiveBasicStatistics(partition.getParameters()), columnStatisticsProvider.getPartitionColumnStatistics(metastoreContext, partition));
-            result.put(partitionName, partitionStatistics);
-        });
-        return result.build();
+        Table table = getTable(metastoreContext, databaseName, tableName)
+                .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
+        return getPartitionStatistics(metastoreContext, getExistingPartitionsByNames(metastoreContext, databaseName, tableName, ImmutableList.copyOf(partitionNames)))
+                .entrySet()
+                .stream()
+                .collect(toImmutableMap(
+                        entry -> makePartitionName(table, entry.getKey()),
+                        Entry::getValue));
+    }
+
+    private List<Partition> getExistingPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
+    {
+        Map<String, Partition> partitions = getPartitionsByNames(metastoreContext, databaseName, tableName, partitionNames).entrySet().stream()
+                .map(entry -> immutableEntry(entry.getKey(), entry.getValue().orElseThrow(() ->
+                        new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), toPartitionValues(entry.getKey())))))
+                .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        return partitionNames.stream()
+                .map(partitions::get)
+                .collect(toImmutableList());
+    }
+
+    private Map<Partition, PartitionStatistics> getPartitionStatistics(MetastoreContext metastoreContext, Collection<Partition> partitions)
+    {
+        return columnStatisticsProvider.getPartitionColumnStatistics(metastoreContext, partitions).entrySet().stream()
+                .collect(toImmutableMap(
+                        Entry::getKey,
+                        entry -> new PartitionStatistics(getHiveBasicStatistics(entry.getKey().getParameters()), entry.getValue())));
     }
 
     @Override

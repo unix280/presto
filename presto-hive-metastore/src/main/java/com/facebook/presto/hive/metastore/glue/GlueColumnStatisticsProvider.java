@@ -19,7 +19,9 @@ import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.Table;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
+import com.google.common.collect.ImmutableSet;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
@@ -29,7 +31,12 @@ public interface GlueColumnStatisticsProvider
 
     Map<String, HiveColumnStatistics> getTableColumnStatistics(MetastoreContext metastoreContext, Table table);
 
-    Map<String, HiveColumnStatistics> getPartitionColumnStatistics(MetastoreContext metastoreContext, Partition partition);
+    Map<Partition, Map<String, HiveColumnStatistics>> getPartitionColumnStatistics(MetastoreContext metastoreContext, Collection<Partition> partitions);
+
+    default Map<String, HiveColumnStatistics> getPartitionColumnStatistics(MetastoreContext metastoreContext, Partition partition)
+    {
+        return getPartitionColumnStatistics(metastoreContext, ImmutableSet.of(partition)).get(partition);
+    }
 
     void updateTableColumnStatistics(MetastoreContext metastoreContext, Table table, Map<String, HiveColumnStatistics> columnStatistics);
 

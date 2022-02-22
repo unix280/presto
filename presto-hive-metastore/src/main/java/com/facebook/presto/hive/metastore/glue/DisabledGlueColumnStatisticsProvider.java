@@ -24,10 +24,13 @@ import com.facebook.presto.spi.statistics.ColumnStatisticType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static java.util.function.UnaryOperator.identity;
 
 public class DisabledGlueColumnStatisticsProvider
         implements GlueColumnStatisticsProvider
@@ -45,9 +48,9 @@ public class DisabledGlueColumnStatisticsProvider
     }
 
     @Override
-    public Map<String, HiveColumnStatistics> getPartitionColumnStatistics(MetastoreContext metastoreContext, Partition partition)
+    public Map<Partition, Map<String, HiveColumnStatistics>> getPartitionColumnStatistics(MetastoreContext metastoreContext, Collection<Partition> partitions)
     {
-        return ImmutableMap.of();
+        return partitions.stream().collect(toImmutableMap(identity(), partition -> ImmutableMap.of()));
     }
 
     @Override
