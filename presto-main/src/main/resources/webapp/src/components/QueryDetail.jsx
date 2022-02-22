@@ -1080,8 +1080,8 @@ export class QueryDetail extends React.Component {
 
     renderRuntimeStats() {
         const query = this.state.query;
-        if (!query.queryStats.hasOwnProperty('runtimeStats')) return null;
-        else if (Object.values(query.queryStats.runtimeStats).length == 0) return null;
+        if (query.queryStats.runtimeStats === undefined) return null;
+        if (Object.values(query.queryStats.runtimeStats).length == 0) return null;
         return (
             <div className="row">
                 <div className="col-xs-6">
