@@ -23,9 +23,12 @@ import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.plugin.jdbc.BaseJdbcClient;
 import com.facebook.presto.plugin.jdbc.BaseJdbcConfig;
 import com.facebook.presto.plugin.jdbc.DriverConnectionFactory;
+import com.facebook.presto.plugin.jdbc.JdbcColumnHandle;
 import com.facebook.presto.plugin.jdbc.JdbcConnectorId;
 import com.facebook.presto.plugin.jdbc.JdbcIdentity;
+import com.facebook.presto.plugin.jdbc.JdbcSplit;
 import com.facebook.presto.plugin.jdbc.JdbcTypeHandle;
+import com.facebook.presto.plugin.jdbc.QueryBuilder;
 import com.facebook.presto.plugin.jdbc.ReadMapping;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorTableMetadata;
@@ -35,6 +38,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonFactoryBuilder;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
@@ -50,6 +54,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 
 import static com.esri.core.geometry.ogc.OGCGeometry.fromBinary;
@@ -60,7 +65,6 @@ import static com.facebook.presto.common.type.VarcharType.createVarcharType;
 import static com.facebook.presto.geospatial.GeometryUtils.wktFromJtsGeometry;
 import static com.facebook.presto.geospatial.serde.EsriGeometrySerde.serialize;
 import static com.facebook.presto.geospatial.serde.JtsGeometrySerde.deserialize;
-import static com.facebook.presto.operator.scalar.VarbinaryFunctions.fromHexVarbinary;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static com.facebook.presto.plugin.jdbc.StandardReadMappings.varcharReadMapping;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
@@ -68,6 +72,7 @@ import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMEN
 import static com.fasterxml.jackson.core.JsonFactory.Feature.CANONICALIZE_FIELD_NAMES;
 import static com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.airlift.slice.Slices.wrappedBuffer;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -143,6 +148,30 @@ public class PostgreSqlClient
     }
 
     @Override
+    public PreparedStatement buildSql(ConnectorSession session, Connection connection, JdbcSplit split, List<JdbcColumnHandle> columnHandles) throws SQLException
+    {
+        ImmutableMap.Builder<String, String> columnExpressions = ImmutableMap.builder();
+        for (JdbcColumnHandle column : columnHandles) {
+            JdbcTypeHandle jdbcTypeHandle = column.getJdbcTypeHandle();
+            if (jdbcTypeHandle.getJdbcTypeName().equalsIgnoreCase("geometry")) {
+                String columnName = column.getColumnName();
+                columnExpressions.put(columnName, "ST_AsBinary(\"" + columnName + "\")");
+            }
+        }
+        return new QueryBuilder(identifierQuote).buildSql(
+                this,
+                session,
+                connection,
+                split.getCatalogName(),
+                split.getSchemaName(),
+                split.getTableName(),
+                columnHandles,
+                columnExpressions.build(),
+                split.getTupleDomain(),
+                split.getAdditionalPredicate());
+    }
+
+    @Override
     public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata)
     {
         try {
@@ -207,7 +236,7 @@ public class PostgreSqlClient
     {
         return ReadMapping.sliceReadMapping(
                 VARCHAR,
-                (resultSet, columnIndex) -> getAsText(getGeomFromBinary(fromHexVarbinary(utf8Slice(resultSet.getString(columnIndex))))));
+                (resultSet, columnIndex) -> getAsText(getGeomFromBinary(wrappedBuffer(resultSet.getBytes(columnIndex)))));
     }
 
     private static Slice getAsText(Slice input)

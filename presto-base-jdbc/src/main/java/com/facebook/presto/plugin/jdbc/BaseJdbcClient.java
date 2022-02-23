@@ -305,6 +305,7 @@ public class BaseJdbcClient
                 split.getSchemaName(),
                 split.getTableName(),
                 columnHandles,
+                ImmutableMap.of(),
                 split.getTupleDomain(),
                 split.getAdditionalPredicate());
     }

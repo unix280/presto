@@ -47,6 +47,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.common.type.DateTimeEncoding.unpackMillisUtc;
@@ -55,6 +56,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.lang.Float.intBitsToFloat;
+import static java.lang.String.format;
 import static java.util.Collections.nCopies;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.DAYS;
@@ -104,22 +106,15 @@ public class QueryBuilder
             String schema,
             String table,
             List<JdbcColumnHandle> columns,
+            Map<String, String> columnExpressions,
             TupleDomain<ColumnHandle> tupleDomain,
             Optional<JdbcExpression> additionalPredicate)
             throws SQLException
     {
         StringBuilder sql = new StringBuilder();
 
-        String columnNames = columns.stream()
-                .map(JdbcColumnHandle::getColumnName)
-                .map(this::quote)
-                .collect(joining(", "));
-
         sql.append("SELECT ");
-        sql.append(columnNames);
-        if (columns.isEmpty()) {
-            sql.append("null");
-        }
+        sql.append(addColumnExpression(columns, columnExpressions));
 
         sql.append(" FROM ");
         if (!isNullOrEmpty(catalog)) {
@@ -200,6 +195,24 @@ public class QueryBuilder
         }
 
         return statement;
+    }
+
+    private String addColumnExpression(List<JdbcColumnHandle> columns, Map<String, String> columnExpressions)
+    {
+        if (columns.isEmpty()) {
+            return "null";
+        }
+
+        return columns.stream()
+                .map(jdbcColumnHandle -> {
+                    String columnAlias = quote(jdbcColumnHandle.getColumnName());
+                    String expression = columnExpressions.get(jdbcColumnHandle.getColumnName());
+                    if (expression == null) {
+                        return columnAlias;
+                    }
+                    return format("%s AS %s", expression, columnAlias);
+                })
+                .collect(joining(", "));
     }
 
     private static boolean isAcceptedType(Type type)
