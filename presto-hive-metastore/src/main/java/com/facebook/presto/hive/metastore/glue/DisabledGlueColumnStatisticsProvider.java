@@ -62,9 +62,9 @@ public class DisabledGlueColumnStatisticsProvider
     }
 
     @Override
-    public void updatePartitionStatistics(MetastoreContext metastoreContext, Partition partition, Map<String, HiveColumnStatistics> columnStatistics)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, Set<PartitionStatisticsUpdate> partitionStatisticsUpdates)
     {
-        if (!columnStatistics.isEmpty()) {
+        if (partitionStatisticsUpdates.stream().anyMatch(update -> !update.getColumnStatistics().isEmpty())) {
             throw new PrestoException(NOT_SUPPORTED, "Glue metastore column level statistics are disabled");
         }
     }

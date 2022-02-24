@@ -35,8 +35,8 @@ public class GlueHiveMetastoreConfig
     private Optional<String> catalogId = Optional.empty();
     private int partitionSegments = 5;
     private int getPartitionThreads = 20;
-    private int readStatisticsThreads = 1;
-    private int writeStatisticsThreads = 1;
+    private int readStatisticsThreads = 10;
+    private int writeStatisticsThreads = 10;
     private Optional<String> iamRole = Optional.empty();
     private Optional<String> lakeFormationPartnerTagValue = Optional.empty();
     private Optional<String> lakeFormationPartnerTagName = Optional.empty();

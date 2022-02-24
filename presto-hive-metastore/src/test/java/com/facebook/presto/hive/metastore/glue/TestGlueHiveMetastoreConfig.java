@@ -43,8 +43,8 @@ public class TestGlueHiveMetastoreConfig
                 .setSupportedPermissionType("CELL_FILTER_PERMISSION")
                 .setImpersonationEnabled(false)
                 .setColumnStatisticsEnabled(false)
-                .setReadStatisticsThreads(1)
-                .setWriteStatisticsThreads(1)
+                .setReadStatisticsThreads(10)
+                .setWriteStatisticsThreads(10)
                 .setIamRole(null)
                 .setAwsAccessKey(null)
                 .setAwsSecretKey(null));

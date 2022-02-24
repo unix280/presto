@@ -423,16 +423,18 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, Function<PartitionStatistics, PartitionStatistics>> updates)
     {
-        metastoreContext = updateIdentity(metastoreContext);
+        final MetastoreContext metastoreContextFinal = updateIdentity(metastoreContext);
         try {
-            delegate.updatePartitionStatistics(metastoreContext, databaseName, tableName, partitionName, update);
+            delegate.updatePartitionStatistics(metastoreContextFinal, databaseName, tableName, updates);
         }
         finally {
-            partitionStatisticsCache.asMap().keySet().stream()
-                    .filter(partitionFilterKey -> partitionFilterKey.getKey().equals(hivePartitionName(databaseName, tableName, partitionName)))
-                    .forEach(partitionStatisticsCache::invalidate);
+            updates.forEach((partitionName, update) -> {
+                HivePartitionName hivePartitionName = hivePartitionName(databaseName, tableName, partitionName);
+                partitionStatisticsCache.invalidate(getCachingKey(metastoreContextFinal, hivePartitionName));
+                partitionCache.invalidate(getCachingKey(metastoreContextFinal, hivePartitionName));
+            });
         }
     }
 

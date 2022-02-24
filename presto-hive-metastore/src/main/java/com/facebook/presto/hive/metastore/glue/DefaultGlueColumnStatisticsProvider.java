@@ -48,6 +48,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -67,6 +68,7 @@ import static com.facebook.presto.hive.metastore.glue.converter.GlueStatConverte
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Sets.difference;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.CompletableFuture.allOf;
 import static java.util.concurrent.CompletableFuture.runAsync;
 import static java.util.concurrent.CompletableFuture.supplyAsync;
 
@@ -305,56 +307,56 @@ public class DefaultGlueColumnStatisticsProvider
     }
 
     @Override
-    public void updatePartitionStatistics(MetastoreContext metastoreContext, Partition partition, Map<String, HiveColumnStatistics> updatedColumnStatistics)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, Set<PartitionStatisticsUpdate> partitionStatisticsUpdates)
     {
-        try {
+        Map<Partition, Map<String, HiveColumnStatistics>> currentStatistics = getPartitionColumnStatistics(
+                metastoreContext,
+                partitionStatisticsUpdates.stream()
+                        .map(PartitionStatisticsUpdate::getPartition).collect(toImmutableList()));
+
+        List<CompletableFuture<Void>> updateFutures = new ArrayList<>();
+        for (PartitionStatisticsUpdate update : partitionStatisticsUpdates) {
+            Partition partition = update.getPartition();
+            Map<String, HiveColumnStatistics> updatedColumnStatistics = update.getColumnStatistics();
+
             HiveBasicStatistics partitionStats = getHiveBasicStatistics(partition.getParameters());
             List<ColumnStatistics> columnStats = toGlueColumnStatistics(partition, updatedColumnStatistics, partitionStats.getRowCount()).stream()
                     .filter(this::isGlueWritable)
                     .collect(toImmutableList());
 
             List<List<ColumnStatistics>> columnChunks = Lists.partition(columnStats, GLUE_COLUMN_WRITE_STAT_PAGE_SIZE);
-
-            List<CompletableFuture<Void>> writePartitionStatsFutures = columnChunks.stream()
-                    .map(columnChunk ->
-                            runAsync(() -> {
-                                UpdateColumnStatisticsForPartitionRequest request = (UpdateColumnStatisticsForPartitionRequest) updateAWSRequest(
-                                        metastoreContext,
-                                        new UpdateColumnStatisticsForPartitionRequest()
-                                            .withCatalogId(catalogId)
-                                            .withDatabaseName(partition.getDatabaseName())
-                                            .withTableName(partition.getTableName())
-                                            .withPartitionValues(partition.getValues())
-                                            .withColumnStatisticsList(columnChunk));
-                                glueClient.updateColumnStatisticsForPartition(request);
-                            }, writeExecutor))
-                    .collect(toImmutableList());
-
-            Map<String, HiveColumnStatistics> currentColumnStatistics = this.getPartitionColumnStatisticsIfPresent(metastoreContext, partition).orElse(ImmutableMap.of());
-            Set<String> removedStatistics = difference(currentColumnStatistics.keySet(), updatedColumnStatistics.keySet());
-            List<CompletableFuture<Void>> deleteStatsFutures = removedStatistics.stream()
-                    .map(column -> runAsync(() ->
-                    {
-                        DeleteColumnStatisticsForPartitionRequest request = (DeleteColumnStatisticsForPartitionRequest) updateAWSRequest(
-                                metastoreContext,
-                                new DeleteColumnStatisticsForPartitionRequest()
+            columnChunks.forEach(columnChunk ->
+                    updateFutures.add(runAsync(() -> glueClient.updateColumnStatisticsForPartition(
+                            (UpdateColumnStatisticsForPartitionRequest) updateAWSRequest(
+                                    metastoreContext,
+                                    new UpdateColumnStatisticsForPartitionRequest()
                                     .withCatalogId(catalogId)
                                     .withDatabaseName(partition.getDatabaseName())
                                     .withTableName(partition.getTableName())
                                     .withPartitionValues(partition.getValues())
-                                    .withColumnName(column));
-                        glueClient.deleteColumnStatisticsForPartition(request);
-                    }, writeExecutor))
-                    .collect(toImmutableList());
+                                    .withColumnStatisticsList(columnChunk))),
+                            writeExecutor)));
 
-            ImmutableList<CompletableFuture<Void>> updateOperationsFutures = ImmutableList.<CompletableFuture<Void>>builder()
-                    .addAll(writePartitionStatsFutures)
-                    .addAll(deleteStatsFutures)
-                    .build();
-
-            getFutureValue(CompletableFuture.allOf(updateOperationsFutures.toArray(new CompletableFuture[0])));
+            Set<String> removedStatistics = difference(currentStatistics.get(partition).keySet(), updatedColumnStatistics.keySet());
+            removedStatistics.forEach(column ->
+                    updateFutures.add(runAsync(() -> glueClient.deleteColumnStatisticsForPartition(
+                            (DeleteColumnStatisticsForPartitionRequest) updateAWSRequest(
+                                    metastoreContext,
+                                    new DeleteColumnStatisticsForPartitionRequest()
+                                    .withCatalogId(catalogId)
+                                    .withDatabaseName(partition.getDatabaseName())
+                                    .withTableName(partition.getTableName())
+                                    .withPartitionValues(partition.getValues())
+                                    .withColumnName(column))),
+                            writeExecutor)));
+        }
+        try {
+            getFutureValue(allOf(updateFutures.stream().toArray(CompletableFuture[]::new)));
         }
         catch (RuntimeException ex) {
+            if (ex.getCause() != null && ex.getCause() instanceof EntityNotFoundException) {
+                throw new PrestoException(HIVE_PARTITION_NOT_FOUND, ex.getCause());
+            }
             throw new PrestoException(HIVE_METASTORE_ERROR, ex);
         }
     }

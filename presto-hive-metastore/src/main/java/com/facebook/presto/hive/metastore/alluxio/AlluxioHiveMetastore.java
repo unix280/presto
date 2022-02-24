@@ -193,7 +193,7 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, Function<PartitionStatistics, PartitionStatistics>> updates)
     {
         throw new UnsupportedOperationException("updatePartitionStatistics is not supported in AlluxioHiveMetastore");
     }

@@ -31,6 +31,9 @@ import com.amazonaws.services.glue.model.BatchCreatePartitionRequest;
 import com.amazonaws.services.glue.model.BatchCreatePartitionResult;
 import com.amazonaws.services.glue.model.BatchGetPartitionRequest;
 import com.amazonaws.services.glue.model.BatchGetPartitionResult;
+import com.amazonaws.services.glue.model.BatchUpdatePartitionRequest;
+import com.amazonaws.services.glue.model.BatchUpdatePartitionRequestEntry;
+import com.amazonaws.services.glue.model.BatchUpdatePartitionResult;
 import com.amazonaws.services.glue.model.CreateDatabaseRequest;
 import com.amazonaws.services.glue.model.CreateTableRequest;
 import com.amazonaws.services.glue.model.DatabaseInput;
@@ -72,6 +75,7 @@ import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
+import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
 import com.facebook.presto.hive.metastore.MetastoreUtil;
 import com.facebook.presto.hive.metastore.Partition;
@@ -99,6 +103,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import io.airlift.units.Duration;
 import org.apache.hadoop.fs.Path;
@@ -124,8 +129,8 @@ import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.facebook.airlift.concurrent.MoreFutures.getFutureValue;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
-import static com.facebook.presto.hive.HiveErrorCode.HIVE_PARTITION_DROPPED_DURING_QUERY;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.convertPredicateToParts;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.createDirectory;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getHiveBasicStatistics;
@@ -150,6 +155,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Comparators.lexicographical;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
@@ -440,43 +446,62 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, String partitionName, Function<PartitionStatistics, PartitionStatistics> update)
+    public void updatePartitionStatistics(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, Function<PartitionStatistics, PartitionStatistics>> updates)
     {
-        PartitionStatistics currentStatistics = getPartitionStatistics(metastoreContext, databaseName, tableName, ImmutableSet.of(partitionName)).get(partitionName);
-        if (currentStatistics == null) {
-            throw new PrestoException(HIVE_PARTITION_DROPPED_DURING_QUERY, "Statistics result does not contain entry for partition: " + partitionName);
-        }
-        PartitionStatistics updatedStatistics = update.apply(currentStatistics);
+        Iterables.partition(updates.entrySet(), BATCH_CREATE_PARTITION_MAX_PAGE_SIZE).forEach(partitionUpdates ->
+                updatePartitionStatisticsBatch(metastoreContext, databaseName, tableName, partitionUpdates.stream().collect(toImmutableMap(Entry::getKey, Entry::getValue))));
+    }
 
-        List<String> partitionValues = toPartitionValues(partitionName);
-        Partition partition = getPartition(metastoreContext, databaseName, tableName, partitionValues)
-                .orElseThrow(() -> new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), partitionValues));
-        try {
+    private void updatePartitionStatisticsBatch(MetastoreContext metastoreContext, String databaseName, String tableName, Map<String, Function<PartitionStatistics, PartitionStatistics>> updates)
+    {
+        ImmutableList.Builder<BatchUpdatePartitionRequestEntry> partitionUpdateRequests = ImmutableList.builder();
+        ImmutableSet.Builder<GlueColumnStatisticsProvider.PartitionStatisticsUpdate> columnStatisticsUpdates = ImmutableSet.builder();
+
+        Map<List<String>, String> partitionValuesToName = updates.keySet().stream()
+                .collect(toImmutableMap(MetastoreUtil::toPartitionValues, identity()));
+
+        List<Partition> partitions = batchGetPartition(metastoreContext, databaseName, tableName, ImmutableList.copyOf(updates.keySet()));
+        Map<Partition, Map<String, HiveColumnStatistics>> statisticsPerPartition = columnStatisticsProvider.getPartitionColumnStatistics(metastoreContext, partitions);
+
+        statisticsPerPartition.forEach((partition, columnStatistics) -> {
+            Function<PartitionStatistics, PartitionStatistics> update = updates.get(partitionValuesToName.get(partition.getValues()));
+
+            PartitionStatistics currentStatistics = new PartitionStatistics(getHiveBasicStatistics(partition.getParameters()), columnStatistics);
+            PartitionStatistics updatedStatistics = update.apply(currentStatistics);
+
+            Map<String, String> updatedStatisticsParameters = updateStatisticsParameters(partition.getParameters(), updatedStatistics.getBasicStatistics());
+
+            partition = Partition.builder(partition).setParameters(updatedStatisticsParameters).build();
+            Map<String, HiveColumnStatistics> updatedColumnStatistics = updatedStatistics.getColumnStatistics();
+
             PartitionInput partitionInput = GlueInputConverter.convertPartition(partition);
+            partitionInput.setParameters(partition.getParameters());
 
-            final Map<String, String> updateStatisticsParameters = updateStatisticsParameters(partition.getParameters(), updatedStatistics.getBasicStatistics());
-            partitionInput.setParameters(updateStatisticsParameters);
-            partition = Partition.builder(partition).setParameters(updateStatisticsParameters).build();
-            UpdatePartitionRequest request = (UpdatePartitionRequest) updateAWSRequest(
-                    metastoreContext,
-                    new UpdatePartitionRequest()
-                            .withCatalogId(catalogId)
-                            .withDatabaseName(databaseName)
-                            .withTableName(tableName)
-                            .withPartitionValueList(partition.getValues())
-                            .withPartitionInput(partitionInput));
+            partitionUpdateRequests.add(new BatchUpdatePartitionRequestEntry()
+                    .withPartitionValueList(partition.getValues())
+                    .withPartitionInput(partitionInput));
+            columnStatisticsUpdates.add(new GlueColumnStatisticsProvider.PartitionStatisticsUpdate(partition, updatedColumnStatistics));
+        });
 
-            stats.getUpdatePartition().record(() -> glueClient.updatePartition(request));
-            columnStatisticsProvider.updatePartitionStatistics(metastoreContext, partition, updatedStatistics.getColumnStatistics());
-        }
-        catch (EntityNotFoundException e) {
-            throw new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), partitionValues);
+        // Update basic statistics
+        Future<BatchUpdatePartitionResult> updatePartitionResult = glueClient.batchUpdatePartitionAsync(
+                (BatchUpdatePartitionRequest) updateAWSRequest(
+                        metastoreContext,
+                        new BatchUpdatePartitionRequest()
+                                .withCatalogId(catalogId)
+                                .withDatabaseName(databaseName)
+                                .withTableName(tableName)
+                                .withEntries(partitionUpdateRequests.build())));
+        try {
+            // Update column statistics
+            columnStatisticsProvider.updatePartitionStatistics(metastoreContext, columnStatisticsUpdates.build());
+            // Don't block on the batch update call until the column statistics have finished updating
+            getFutureValue(updatePartitionResult);
         }
         catch (AmazonServiceException e) {
             throw new PrestoException(HIVE_METASTORE_ERROR, e);
         }
     }
-
     @Override
     public Optional<List<String>> getAllTables(MetastoreContext metastoreContext, String databaseName)
     {
@@ -995,9 +1020,12 @@ public class GlueHiveMetastore
                 BatchCreatePartitionResult result = future.get();
                 propagatePartitionErrorToPrestoException(databaseName, tableName, result.getErrors());
             }
-            for (PartitionWithStatistics partition : partitions) {
-                columnStatisticsProvider.updatePartitionStatistics(metastoreContext, partition.getPartition(), partition.getStatistics().getColumnStatistics());
-            }
+            Set<GlueColumnStatisticsProvider.PartitionStatisticsUpdate> updates = partitions.stream()
+                    .map(partitionWithStatistics -> new GlueColumnStatisticsProvider.PartitionStatisticsUpdate(
+                            partitionWithStatistics.getPartition(),
+                            partitionWithStatistics.getStatistics().getColumnStatistics()))
+                    .collect(toImmutableSet());
+            columnStatisticsProvider.updatePartitionStatistics(metastoreContext, updates);
         }
         catch (AmazonServiceException | InterruptedException | ExecutionException e) {
             if (e instanceof InterruptedException) {
