@@ -62,6 +62,7 @@ import com.amazonaws.services.glue.model.UpdateDatabaseRequest;
 import com.amazonaws.services.glue.model.UpdatePartitionRequest;
 import com.amazonaws.services.glue.model.UpdateTableRequest;
 import com.amazonaws.services.securitytoken.model.Tag;
+import com.facebook.airlift.concurrent.MoreFutures;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
@@ -129,7 +130,6 @@ import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.facebook.airlift.concurrent.MoreFutures.getFutureValue;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.convertPredicateToParts;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.createDirectory;
@@ -160,6 +160,7 @@ import static com.google.common.collect.Maps.immutableEntry;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.UnaryOperator.identity;
+import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toMap;
 
 public class GlueHiveMetastore
@@ -172,6 +173,7 @@ public class GlueHiveMetastore
     private static final String WILDCARD_EXPRESSION = "";
     private static final int BATCH_GET_PARTITION_MAX_PAGE_SIZE = 1000;
     private static final int BATCH_CREATE_PARTITION_MAX_PAGE_SIZE = 100;
+    private static final int BATCH_UPDATE_PARTITION_MAX_PAGE_SIZE = 100;
     private static final int AWS_GLUE_GET_PARTITIONS_MAX_RESULTS = 1000;
     private static final Comparator<Partition> PARTITION_COMPARATOR = comparing(Partition::getValues, lexicographical(String.CASE_INSENSITIVE_ORDER));
     public static final String AHANA = "ahana";
@@ -483,20 +485,24 @@ public class GlueHiveMetastore
             columnStatisticsUpdates.add(new GlueColumnStatisticsProvider.PartitionStatisticsUpdate(partition, updatedColumnStatistics));
         });
 
-        // Update basic statistics
-        Future<BatchUpdatePartitionResult> updatePartitionResult = glueClient.batchUpdatePartitionAsync(
-                (BatchUpdatePartitionRequest) updateAWSRequest(
-                        metastoreContext,
-                        new BatchUpdatePartitionRequest()
-                                .withCatalogId(catalogId)
-                                .withDatabaseName(databaseName)
-                                .withTableName(tableName)
-                                .withEntries(partitionUpdateRequests.build())));
+        List<List<BatchUpdatePartitionRequestEntry>> partitionUpdateRequestsPartitioned = Lists.partition(partitionUpdateRequests.build(), BATCH_UPDATE_PARTITION_MAX_PAGE_SIZE);
+        List<Future<BatchUpdatePartitionResult>> partitionUpdateRequestsFutures = new ArrayList<>();
+        partitionUpdateRequestsPartitioned.forEach(partitionUpdateRequestsPartition -> {
+            // Update basic statistics
+            partitionUpdateRequestsFutures.add(glueClient.batchUpdatePartitionAsync(
+                    (BatchUpdatePartitionRequest) updateAWSRequest(
+                            metastoreContext,
+                            new BatchUpdatePartitionRequest()
+                    .withCatalogId(catalogId)
+                    .withDatabaseName(databaseName)
+                    .withTableName(tableName)
+                    .withEntries(partitionUpdateRequestsPartition))));
+        });
         try {
             // Update column statistics
             columnStatisticsProvider.updatePartitionStatistics(metastoreContext, columnStatisticsUpdates.build());
             // Don't block on the batch update call until the column statistics have finished updating
-            getFutureValue(updatePartitionResult);
+            partitionUpdateRequestsFutures.forEach(MoreFutures::getFutureValue);
         }
         catch (AmazonServiceException e) {
             throw new PrestoException(HIVE_METASTORE_ERROR, e);
@@ -960,29 +966,45 @@ public class GlueHiveMetastore
     private List<Partition> batchGetPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
     {
         try {
-            List<Future<BatchGetPartitionResult>> batchGetPartitionFutures = new ArrayList<>();
+            List<PartitionValueList> pendingPartitions = partitionNames.stream()
+                    .map(partitionName -> new PartitionValueList().withValues(toPartitionValues(partitionName)))
+                    .collect(toCollection(ArrayList::new));
 
-            BatchGetPartitionRequest request;
-
-            for (List<String> partitionNamesBatch : Lists.partition(partitionNames, BATCH_GET_PARTITION_MAX_PAGE_SIZE)) {
-                List<PartitionValueList> partitionValuesBatch = mappedCopy(partitionNamesBatch, partitionName -> new PartitionValueList().withValues(toPartitionValues(partitionName)));
-                request = (BatchGetPartitionRequest) updateAWSRequest(
-                        metastoreContext,
-                        new BatchGetPartitionRequest()
-                                .withCatalogId(catalogId)
-                                .withDatabaseName(databaseName)
-                                .withTableName(tableName)
-                                .withPartitionsToGet(partitionValuesBatch));
-
-                batchGetPartitionFutures.add(glueClient.batchGetPartitionAsync(request, stats.getBatchGetPartitions().metricsAsyncHandler()));
-            }
-
-            GluePartitionConverter converter = new GluePartitionConverter(databaseName, tableName);
             ImmutableList.Builder<Partition> resultsBuilder = ImmutableList.builderWithExpectedSize(partitionNames.size());
-            for (Future<BatchGetPartitionResult> future : batchGetPartitionFutures) {
-                future.get().getPartitions().stream()
-                        .map(converter)
-                        .forEach(resultsBuilder::add);
+
+            // Reuse immutable field instances opportunistically between partitions
+            GluePartitionConverter converter = new GluePartitionConverter(databaseName, tableName);
+
+            while (!pendingPartitions.isEmpty()) {
+                List<Future<BatchGetPartitionResult>> batchGetPartitionFutures = new ArrayList<>();
+                for (List<PartitionValueList> partitions : Lists.partition(pendingPartitions, BATCH_GET_PARTITION_MAX_PAGE_SIZE)) {
+                    batchGetPartitionFutures.add(glueClient.batchGetPartitionAsync(
+                            (BatchGetPartitionRequest) updateAWSRequest(
+                                    metastoreContext,
+                                    new BatchGetPartitionRequest()
+                                            .withCatalogId(catalogId)
+                                            .withDatabaseName(databaseName)
+                                            .withTableName(tableName)
+                                            .withPartitionsToGet(partitions))));
+                }
+                pendingPartitions.clear();
+
+                for (Future<BatchGetPartitionResult> future : batchGetPartitionFutures) {
+                    BatchGetPartitionResult batchGetPartitionResult = future.get();
+                    List<com.amazonaws.services.glue.model.Partition> partitions = batchGetPartitionResult.getPartitions();
+                    List<PartitionValueList> unprocessedKeys = batchGetPartitionResult.getUnprocessedKeys();
+
+                    if (partitions.isEmpty()) {
+                        // In the unlikely scenario where batchGetPartition call cannot make progress on retrieving partitions, avoid infinite loop
+                        if (partitions.isEmpty() && unprocessedKeys.isEmpty()) {
+                            log.warn("Empty unprocessedKeys for non-empty BatchGetPartitionRequest and empty partitions result");
+                        }
+                    }
+                    partitions.stream()
+                            .map(converter)
+                            .forEach(resultsBuilder::add);
+                    pendingPartitions.addAll(unprocessedKeys);
+                }
             }
 
             return resultsBuilder.build();
