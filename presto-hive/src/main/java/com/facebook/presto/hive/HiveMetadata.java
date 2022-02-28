@@ -113,7 +113,10 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.airlift.slice.Slice;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.serde2.OpenCSVSerde;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -182,6 +185,7 @@ import static com.facebook.presto.hive.HiveColumnHandle.PATH_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveColumnHandle.updateRowIdHandle;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_COLUMN_ORDER_MISMATCH;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_CONCURRENT_MODIFICATION_DETECTED;
+import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PARTITION_READ_ONLY;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_TIMEZONE_MISMATCH;
@@ -198,10 +202,12 @@ import static com.facebook.presto.hive.HivePartition.UNPARTITIONED_ID;
 import static com.facebook.presto.hive.HivePartitioningHandle.createHiveCompatiblePartitioningHandle;
 import static com.facebook.presto.hive.HivePartitioningHandle.createPrestoNativePartitioningHandle;
 import static com.facebook.presto.hive.HiveSessionProperties.HIVE_STORAGE_FORMAT;
+import static com.facebook.presto.hive.HiveSessionProperties.InsertExistingPartitionsBehavior;
 import static com.facebook.presto.hive.HiveSessionProperties.RESPECT_TABLE_FORMAT;
 import static com.facebook.presto.hive.HiveSessionProperties.getBucketFunctionTypeForExchange;
 import static com.facebook.presto.hive.HiveSessionProperties.getCompressionCodec;
 import static com.facebook.presto.hive.HiveSessionProperties.getHiveStorageFormat;
+import static com.facebook.presto.hive.HiveSessionProperties.getInsertExistingPartitionsBehavior;
 import static com.facebook.presto.hive.HiveSessionProperties.getOrcCompressionCodec;
 import static com.facebook.presto.hive.HiveSessionProperties.getTemporaryTableCompressionCodec;
 import static com.facebook.presto.hive.HiveSessionProperties.getTemporaryTableSchema;
@@ -273,10 +279,12 @@ import static com.facebook.presto.hive.HiveUtil.translateHiveUnsupportedTypeForT
 import static com.facebook.presto.hive.HiveUtil.translateHiveUnsupportedTypesForTemporaryTable;
 import static com.facebook.presto.hive.HiveUtil.verifyPartitionTypeSupported;
 import static com.facebook.presto.hive.HiveWriteUtils.checkTableIsWritable;
+import static com.facebook.presto.hive.HiveWriteUtils.isFileCreatedByQuery;
 import static com.facebook.presto.hive.HiveWriteUtils.isS3FileSystem;
 import static com.facebook.presto.hive.HiveWriteUtils.isWritableType;
 import static com.facebook.presto.hive.HiveWriterFactory.computeBucketedFileName;
 import static com.facebook.presto.hive.HiveWriterFactory.getFileExtension;
+import static com.facebook.presto.hive.LocationHandle.WriteMode.DIRECT_TO_TARGET_EXISTING_DIRECTORY;
 import static com.facebook.presto.hive.PartitionUpdate.UpdateMode.APPEND;
 import static com.facebook.presto.hive.PartitionUpdate.UpdateMode.NEW;
 import static com.facebook.presto.hive.PartitionUpdate.UpdateMode.OVERWRITE;
@@ -350,6 +358,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
+import static org.apache.hadoop.hive.ql.io.AcidUtils.isTransactionalTable;
 
 public class HiveMetadata
         implements TransactionalMetadata
@@ -1916,6 +1925,13 @@ public class HiveMetadata
                 encryptionInformationProvider.getWriteEncryptionInformation(session, tableEncryptionProperties.map(identity()), tableName.getSchemaName(), tableName.getTableName()));
 
         WriteInfo writeInfo = locationService.getQueryWriteInfo(locationHandle);
+
+        if (getInsertExistingPartitionsBehavior(session) == InsertExistingPartitionsBehavior.OVERWRITE
+                && isTransactionalTable(table.getParameters())
+                && writeInfo.getWriteMode() == DIRECT_TO_TARGET_EXISTING_DIRECTORY) {
+            throw new PrestoException(NOT_SUPPORTED, "Overwriting existing partition in transactional tables doesn't support DIRECT_TO_TARGET_EXISTING_DIRECTORY write mode");
+        }
+
         metastore.declareIntentionToWrite(
                 new HdfsContext(session, tableName.getSchemaName(), tableName.getTableName(), table.getStorage().getLocation(), false),
                 metastoreContext,
@@ -2065,10 +2081,7 @@ public class HiveMetadata
                     throw new PrestoException(HIVE_CONCURRENT_MODIFICATION_DETECTED, "Partition format changed during insert");
                 }
                 if (existingPartitions.contains(partitionUpdate.getName())) {
-                    if (partitionUpdate.getUpdateMode() == OVERWRITE) {
-                        metastore.dropPartition(session, handle.getSchemaName(), handle.getTableName(), handle.getLocationHandle().getTargetPath().toString(), partition.getValues());
-                    }
-                    else {
+                    if (partitionUpdate.getUpdateMode() != OVERWRITE) {
                         throw new PrestoException(HIVE_PARTITION_READ_ONLY, "Cannot insert into an existing partition of Hive table: " + partitionUpdate.getName());
                     }
                 }
@@ -2077,15 +2090,36 @@ public class HiveMetadata
                         partitionUpdate.getStatistics(),
                         columnTypes,
                         getColumnStatistics(partitionComputedStatistics, partition.getValues()));
-                metastore.addPartition(
-                        session,
-                        handle.getSchemaName(),
-                        handle.getTableName(),
-                        table.getStorage().getLocation(),
-                        false,
-                        partition,
-                        partitionUpdate.getWritePath(),
-                        partitionStatistics);
+
+                // Overwriting an existing partition
+                if (existingPartitions.contains(partitionUpdate.getName())) {
+                    if (handle.getLocationHandle().getWriteMode() == DIRECT_TO_TARGET_EXISTING_DIRECTORY) {
+                        removeNonCurrentQueryFiles(session, partitionUpdate.getTargetPath());
+                    }
+                    else {
+                        metastore.dropPartition(session, handle.getSchemaName(), handle.getTableName(), handle.getLocationHandle().getTargetPath().toString(), partition.getValues());
+                        metastore.addPartition(
+                                session,
+                                handle.getSchemaName(),
+                                handle.getTableName(),
+                                table.getStorage().getLocation(),
+                                false,
+                                partition,
+                                partitionUpdate.getWritePath(),
+                                partitionStatistics);
+                    }
+                }
+                else { // New partition
+                    metastore.addPartition(
+                            session,
+                            handle.getSchemaName(),
+                            handle.getTableName(),
+                            table.getStorage().getLocation(),
+                            false,
+                            partition,
+                            partitionUpdate.getWritePath(),
+                            partitionStatistics);
+                }
             }
             else {
                 throw new IllegalArgumentException(format("Unsupported update mode: %s", partitionUpdate.getUpdateMode()));
@@ -2097,6 +2131,27 @@ public class HiveMetadata
                         .map(PartitionUpdate::getName)
                         .map(name -> name.isEmpty() ? UNPARTITIONED_ID : name)
                         .collect(toList())));
+    }
+
+    private void removeNonCurrentQueryFiles(ConnectorSession session, Path partitionPath)
+    {
+        String queryId = session.getQueryId();
+        try {
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(new HdfsContext(session), partitionPath);
+            RemoteIterator<LocatedFileStatus> iterator = fileSystem.listFiles(partitionPath, false);
+            while (iterator.hasNext()) {
+                Path file = iterator.next().getPath();
+                if (!isFileCreatedByQuery(file.getName(), queryId)) {
+                    fileSystem.delete(file, false);
+                }
+            }
+        }
+        catch (Exception ex) {
+            throw new PrestoException(
+                    HIVE_FILESYSTEM_ERROR,
+                    format("Failed to delete partition %s files during overwrite", partitionPath),
+                    ex);
+        }
     }
 
     private static boolean isTempPathRequired(ConnectorSession session, Optional<HiveBucketProperty> bucketProperty, List<SortingColumn> preferredOrderingColumns)

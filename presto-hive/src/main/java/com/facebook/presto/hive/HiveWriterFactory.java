@@ -546,7 +546,6 @@ public class HiveWriterFactory
         // * No partition writable check is required.
         // * Table schema and storage format is used for the new partition (instead of existing partition schema and storage format).
         WriteInfo writeInfo = locationService.getPartitionWriteInfo(locationHandle, Optional.empty(), partitionName);
-        checkState(writeInfo.getWriteMode() != DIRECT_TO_TARGET_EXISTING_DIRECTORY, "Overwriting existing partition doesn't support DIRECT_TO_TARGET_EXISTING_DIRECTORY write mode");
         return new WriterParameters(
                 UpdateMode.OVERWRITE,
                 getHiveSchema(table),

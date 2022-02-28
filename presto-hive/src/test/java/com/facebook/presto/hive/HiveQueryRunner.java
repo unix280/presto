@@ -23,6 +23,7 @@ import com.facebook.presto.hive.TestHiveEventListenerPlugin.TestingHiveEventList
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.Database;
+import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.file.FileHiveMetastore;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.security.PrincipalType;
@@ -128,6 +129,21 @@ public final class HiveQueryRunner
             Optional<BiFunction<Integer, URI, Process>> externalWorkerLauncher)
             throws Exception
     {
+        return createQueryRunner(tables, extraProperties, extraCoordinatorProperties, security, extraHiveProperties, workerCount, baseDataDir, externalWorkerLauncher, Optional.empty());
+    }
+
+    public static DistributedQueryRunner createQueryRunner(
+            Iterable<TpchTable<?>> tables,
+            Map<String, String> extraProperties,
+            Map<String, String> extraCoordinatorProperties,
+            String security,
+            Map<String, String> extraHiveProperties,
+            Optional<Integer> workerCount,
+            Optional<Path> baseDataDir,
+            Optional<BiFunction<Integer, URI, Process>> externalWorkerLauncher,
+            Optional<ExtendedHiveMetastore> externalMetastore)
+            throws Exception
+    {
         assertEquals(DateTimeZone.getDefault(), TIME_ZONE, "Timezone not configured correctly. Add -Duser.timezone=America/Bahia_Banderas to your JVM arguments");
         setupLogging();
 
@@ -153,14 +169,8 @@ public final class HiveQueryRunner
             queryRunner.installPlugin(new JmxPlugin());
             queryRunner.createCatalog("jmx", "jmx");
 
-            File baseDir = queryRunner.getCoordinator().getBaseDataDir().resolve("hive_data").toFile();
-
-            HiveClientConfig hiveClientConfig = new HiveClientConfig();
-            MetastoreClientConfig metastoreClientConfig = new MetastoreClientConfig();
-            HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveClientConfig, metastoreClientConfig), ImmutableSet.of());
-            HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
-
-            FileHiveMetastore metastore = new FileHiveMetastore(hdfsEnvironment, baseDir.toURI().toString(), "test");
+            ExtendedHiveMetastore metastore;
+            metastore = externalMetastore.orElse(getFileHiveMetastore(queryRunner));
             queryRunner.installPlugin(new TestingHivePlugin(metastore));
 
             Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
@@ -209,6 +219,16 @@ public final class HiveQueryRunner
             queryRunner.close();
             throw e;
         }
+    }
+
+    private static ExtendedHiveMetastore getFileHiveMetastore(DistributedQueryRunner queryRunner)
+    {
+        File baseDir = queryRunner.getCoordinator().getBaseDataDir().resolve("hive_data").toFile();
+        HiveClientConfig hiveClientConfig = new HiveClientConfig();
+        MetastoreClientConfig metastoreClientConfig = new MetastoreClientConfig();
+        HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveClientConfig, metastoreClientConfig), ImmutableSet.of());
+        HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
+        return new FileHiveMetastore(hdfsEnvironment, baseDir.toURI().toString(), "test");
     }
 
     public static DistributedQueryRunner createMaterializingQueryRunner(Iterable<TpchTable<?>> tables)

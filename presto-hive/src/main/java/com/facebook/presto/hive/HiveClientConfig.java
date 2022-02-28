@@ -36,10 +36,15 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.hive.BucketFunctionType.HIVE_COMPATIBLE;
+import static com.facebook.presto.hive.HiveSessionProperties.InsertExistingPartitionsBehavior;
+import static com.facebook.presto.hive.HiveSessionProperties.InsertExistingPartitionsBehavior.APPEND;
+import static com.facebook.presto.hive.HiveSessionProperties.InsertExistingPartitionsBehavior.ERROR;
+import static com.facebook.presto.hive.HiveSessionProperties.InsertExistingPartitionsBehavior.OVERWRITE;
 import static com.facebook.presto.hive.HiveStorageFormat.ORC;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.NO_PREFERENCE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
@@ -92,6 +97,7 @@ public class HiveClientConfig
     private boolean createEmptyBucketFiles = true;
     private boolean insertOverwriteImmutablePartitions;
     private boolean failFastOnInsertIntoImmutablePartitionsEnabled = true;
+    private Optional<InsertExistingPartitionsBehavior> insertExistingPartitionsBehavior = Optional.empty();
     private int maxPartitionsPerWriter = 100;
     private int maxOpenSortFiles = 50;
     private int writeValidationThreads = 16;
@@ -580,6 +586,19 @@ public class HiveClientConfig
     public HiveClientConfig setInsertOverwriteImmutablePartitionEnabled(boolean insertOverwriteImmutablePartitions)
     {
         this.insertOverwriteImmutablePartitions = insertOverwriteImmutablePartitions;
+        return this;
+    }
+
+    public InsertExistingPartitionsBehavior getInsertExistingPartitionsBehavior()
+    {
+        return insertExistingPartitionsBehavior.orElse(immutablePartitions ? (isInsertOverwriteImmutablePartitionEnabled() ? OVERWRITE : ERROR) : APPEND);
+    }
+
+    @Config("hive.insert-existing-partitions-behavior")
+    @ConfigDescription("Default value for insert existing partitions behavior")
+    public HiveClientConfig setInsertExistingPartitionsBehavior(InsertExistingPartitionsBehavior insertExistingPartitionsBehavior)
+    {
+        this.insertExistingPartitionsBehavior = Optional.ofNullable(insertExistingPartitionsBehavior);
         return this;
     }
 
