@@ -462,6 +462,30 @@ jobs:
 
       - persist_test_results
 
+  hive_dockerized_tests:
+    executor: openjdk-test
+    resource_class: xlarge
+    steps:
+      - checkout
+
+      - set_java_to_8
+
+      - restore_package_cache
+
+      - run:
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Install test dependencies
+          command: ./mvnw install $MAVEN_FAST_INSTALL -pl presto-hive -am
+
+      - run:
+          name: Test hive dockerized tests
+          command: ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B -pl presto-hive -P test-hive-insert-overwrite
+
+      - persist_test_results
+
   kudu_tests:
     executor: openjdk
     resource_class: large
@@ -974,7 +998,12 @@ workflows:
             - prestodb_staging
           requires:
             - start_test_suite
-#      - kudu_tests:
+      - hive_dockerized_tests:
+          context:
+            - docker_hub
+          requires:
+            - start_test_suite
+      #      - kudu_tests:
 #          context:
 #            - docker_hub
 #          requires:
@@ -1022,6 +1051,7 @@ workflows:
             # - product_test_specific_environment_2
             - hive_tests
             - hive_s3_tests
+            - hive_dockerized_tests
             # - kudu_tests
             # - spark_integration_tests
       - tag_version:
