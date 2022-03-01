@@ -7,7 +7,7 @@ orbs:
 executors:
   openjdk-test:
     machine:
-      image: ubuntu-1604:202004-01
+      image: ubuntu-2004:202111-02
     working_directory: ~/prestodb
     environment:
       MAVEN_OPTS: "-Xmx2G -Xms1G -XX:+ExitOnOutOfMemoryError"
@@ -16,7 +16,7 @@ executors:
 
   openjdk-s3-test:
     machine:
-      image: ubuntu-1604:202004-01
+      image: ubuntu-2004:202111-02
     working_directory: ~/prestodb
     environment:
       MAVEN_OPTS: "-Xmx2G -Xms1G -XX:+ExitOnOutOfMemoryError"
@@ -39,6 +39,12 @@ executors:
       MAVEN_FAST_INSTALL: "-DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -B -q -T C1"
 
 commands:
+  set_java_to_8:
+    steps:
+      - run:
+          name: Set java version to 8
+          command: sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
+
   save_package_cache:
     steps:
       - run:
@@ -285,6 +291,8 @@ jobs:
     steps:
       - checkout
 
+      - set_java_to_8
+
       - restore_package_cache
 
       - run:
@@ -412,6 +420,8 @@ jobs:
     steps:
       - checkout
 
+      - set_java_to_8
+
       - restore_package_cache
 
       - run:
@@ -433,6 +443,8 @@ jobs:
     resource_class: large
     steps:
       - checkout
+
+      - set_java_to_8
 
       - restore_package_cache
 
