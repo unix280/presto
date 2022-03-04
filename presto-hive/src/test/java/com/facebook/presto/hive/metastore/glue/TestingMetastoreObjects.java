@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
 import static com.facebook.presto.hive.metastore.PrestoTableType.EXTERNAL_TABLE;
+import static com.facebook.presto.hive.metastore.PrestoTableType.MATERIALIZED_VIEW;
 
 public final class TestingMetastoreObjects
 {
@@ -116,6 +117,21 @@ public final class TestingMetastoreObjects
                 .setOwner("owner")
                 .setParameters(ImmutableMap.of())
                 .setTableType(EXTERNAL_TABLE)
+                .setDataColumns(ImmutableList.of(getPrestoTestColumn()))
+                .setPartitionColumns(ImmutableList.of(getPrestoTestColumn()))
+                .setViewOriginalText(Optional.of("originalText"))
+                .setViewExpandedText(Optional.of("expandedText"))
+                .withStorage(STORAGE_CONSUMER).build();
+    }
+
+    public static com.facebook.presto.hive.metastore.Table getPrestoMaterializedView(String dbName)
+    {
+        return com.facebook.presto.hive.metastore.Table.builder()
+                .setDatabaseName(dbName)
+                .setTableName("test-mv" + generateRandom())
+                .setOwner("owner")
+                .setParameters(ImmutableMap.of())
+                .setTableType(MATERIALIZED_VIEW)
                 .setDataColumns(ImmutableList.of(getPrestoTestColumn()))
                 .setPartitionColumns(ImmutableList.of(getPrestoTestColumn()))
                 .setViewOriginalText(Optional.of("originalText"))

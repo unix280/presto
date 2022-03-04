@@ -36,6 +36,7 @@ import java.util.Optional;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.updateStatisticsParameters;
 import static com.facebook.presto.hive.metastore.PrestoTableType.EXTERNAL_TABLE;
 import static com.facebook.presto.hive.metastore.PrestoTableType.MANAGED_TABLE;
+import static com.facebook.presto.hive.metastore.PrestoTableType.MATERIALIZED_VIEW;
 import static com.facebook.presto.hive.metastore.PrestoTableType.VIRTUAL_VIEW;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -60,7 +61,7 @@ public final class GlueInputConverter
         TableInput input = new TableInput();
         input.setName(table.getTableName());
         input.setOwner(table.getOwner());
-        checkArgument(EnumSet.of(MANAGED_TABLE, EXTERNAL_TABLE, VIRTUAL_VIEW).contains(table.getTableType()), "Invalid table type: %s", table.getTableType());
+        checkArgument(EnumSet.of(MANAGED_TABLE, EXTERNAL_TABLE, VIRTUAL_VIEW, MATERIALIZED_VIEW).contains(table.getTableType()), "Invalid table type: %s", table.getTableType());
         input.setTableType(table.getTableType().toString());
         input.setStorageDescriptor(convertStorage(table.getStorage(), table.getDataColumns()));
         input.setPartitionKeys(table.getPartitionColumns().stream().map(GlueInputConverter::convertColumn).collect(toList()));
