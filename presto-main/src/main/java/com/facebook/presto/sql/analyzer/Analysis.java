@@ -791,9 +791,9 @@ public class Analysis
         return tableColumnReferences;
     }
 
-    public void addUtilizedTableColumnReferences(AccessControlInfo accessControlInfo, Map<QualifiedObjectName, Set<String>> utilizedTableColumms)
+    public void addUtilizedTableColumnReferences(AccessControlInfo accessControlInfo, Map<QualifiedObjectName, Set<String>> utilizedTableColumns)
     {
-        utilizedTableColumnReferences.put(accessControlInfo, utilizedTableColumms);
+        utilizedTableColumnReferences.put(accessControlInfo, utilizedTableColumns);
     }
 
     public Map<AccessControlInfo, Map<QualifiedObjectName, Set<String>>> getUtilizedTableColumnReferences()
