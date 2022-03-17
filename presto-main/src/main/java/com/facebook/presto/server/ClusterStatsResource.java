@@ -43,7 +43,9 @@ import javax.ws.rs.core.UriInfo;
 import java.net.URI;
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.Set;
 
+import static com.facebook.presto.server.ServerConfig.NodeType.SPOT;
 import static com.facebook.presto.server.security.RoleType.ADMIN;
 import static com.facebook.presto.server.security.RoleType.USER;
 import static com.google.common.base.Preconditions.checkState;
@@ -103,7 +105,10 @@ public class ClusterStatsResource
         long blockedQueries = 0;
         long queuedQueries = 0;
 
-        long activeNodes = nodeManager.getNodes(NodeState.ACTIVE).size();
+        Set<InternalNode> activeNodeList = nodeManager.getNodes(NodeState.ACTIVE);
+        long activeNodes = activeNodeList.size();
+        long activeSpotNodes = activeNodeList.stream().filter(n -> n.getNodeType() == SPOT).count();
+
         if (!isIncludeCoordinator) {
             activeNodes -= 1;
         }
@@ -145,6 +150,7 @@ public class ClusterStatsResource
                 blockedQueries,
                 queuedQueries,
                 activeNodes,
+                activeSpotNodes,
                 runningDrivers,
                 runningTasks,
                 memoryReservation,
@@ -209,6 +215,7 @@ public class ClusterStatsResource
         private final long queuedQueries;
 
         private final long activeWorkers;
+        private final long activeSpotWorkers;
         private final long runningDrivers;
         private final long runningTasks;
         private final double reservedMemory;
@@ -224,6 +231,7 @@ public class ClusterStatsResource
                 @JsonProperty("blockedQueries") long blockedQueries,
                 @JsonProperty("queuedQueries") long queuedQueries,
                 @JsonProperty("activeWorkers") long activeWorkers,
+                @JsonProperty("activeSpotWorkers") long activeSpotWorkers,
                 @JsonProperty("runningDrivers") long runningDrivers,
                 @JsonProperty("runningTasks") long runningTasks,
                 @JsonProperty("reservedMemory") double reservedMemory,
@@ -236,6 +244,7 @@ public class ClusterStatsResource
             this.blockedQueries = blockedQueries;
             this.queuedQueries = queuedQueries;
             this.activeWorkers = activeWorkers;
+            this.activeSpotWorkers = activeSpotWorkers;
             this.runningDrivers = runningDrivers;
             this.runningTasks = runningTasks;
             this.reservedMemory = reservedMemory;
@@ -267,6 +276,12 @@ public class ClusterStatsResource
         public long getActiveWorkers()
         {
             return activeWorkers;
+        }
+
+        @JsonProperty
+        public long getActiveSpotWorkers()
+        {
+            return activeSpotWorkers;
         }
 
         @JsonProperty

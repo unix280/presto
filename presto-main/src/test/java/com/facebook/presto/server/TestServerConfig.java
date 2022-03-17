@@ -22,6 +22,8 @@ import java.util.Map;
 
 import static com.facebook.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static com.facebook.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
+import static com.facebook.presto.server.ServerConfig.NodeType.NORMAL;
+import static com.facebook.presto.server.ServerConfig.NodeType.SPOT;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class TestServerConfig
@@ -38,7 +40,8 @@ public class TestServerConfig
                 .setEnhancedErrorReporting(true)
                 .setQueryResultsCompressionEnabled(true)
                 .setResourceManagerEnabled(false)
-                .setResourceManager(false));
+                .setResourceManager(false)
+                .setNodeType(NORMAL));
     }
 
     @Test
@@ -54,6 +57,7 @@ public class TestServerConfig
                 .put("query-results.compression-enabled", "false")
                 .put("resource-manager-enabled", "true")
                 .put("resource-manager", "true")
+                .put("node.type", "spot")
                 .build();
 
         ServerConfig expected = new ServerConfig()
@@ -65,7 +69,8 @@ public class TestServerConfig
                 .setEnhancedErrorReporting(false)
                 .setQueryResultsCompressionEnabled(false)
                 .setResourceManagerEnabled(true)
-                .setResourceManager(true);
+                .setResourceManager(true)
+                .setNodeType(SPOT);
 
         assertFullMapping(properties, expected);
     }

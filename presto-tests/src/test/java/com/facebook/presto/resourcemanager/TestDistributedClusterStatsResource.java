@@ -57,6 +57,7 @@ public class TestDistributedClusterStatsResource
 {
     private static final String RESOURCE_GROUPS_CONFIG_FILE = "resource_groups_config_simple.json";
     private static final int COORDINATOR_COUNT = 2;
+    private static final int SPOT_NODE_COUNT = 2;
     private static final String RESOURCE_GROUP_GLOBAL = "global";
     private HttpClient client;
     private TestingPrestoServer coordinator1;
@@ -78,7 +79,8 @@ public class TestDistributedClusterStatsResource
                         "resource-group-runtimeinfo-refresh-interval", "100ms",
                         "concurrency-threshold-to-enable-resource-group-refresh", "0.1"),
                 ImmutableMap.of(),
-                COORDINATOR_COUNT);
+                COORDINATOR_COUNT,
+                SPOT_NODE_COUNT);
         coordinator1 = runner.getCoordinator(0);
         coordinator2 = runner.getCoordinator(1);
         Optional<TestingPrestoServer> resourceManager = runner.getResourceManager();
@@ -123,6 +125,7 @@ public class TestDistributedClusterStatsResource
         ClusterStatsResource.ClusterStats clusterStats = getClusterStats(true, coordinator1);
         assertNotNull(clusterStats);
         assertTrue(clusterStats.getActiveWorkers() > 0);
+        assertTrue(clusterStats.getActiveSpotWorkers() > 0);
         assertEquals(clusterStats.getRunningQueries(), 3);
         assertEquals(clusterStats.getBlockedQueries(), 0);
         assertEquals(clusterStats.getQueuedQueries(), 1);

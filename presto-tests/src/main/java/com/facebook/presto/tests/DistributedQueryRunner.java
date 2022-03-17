@@ -130,7 +130,7 @@ public class DistributedQueryRunner
     public DistributedQueryRunner(Session defaultSession, int nodeCount, Map<String, String> extraProperties)
             throws Exception
     {
-        this(false, defaultSession, nodeCount, 1, extraProperties, ImmutableMap.of(), ImmutableMap.of(), DEFAULT_SQL_PARSER_OPTIONS, ENVIRONMENT, Optional.empty(), Optional.empty(), ImmutableList.of());
+        this(false, defaultSession, nodeCount, 1, 0, extraProperties, ImmutableMap.of(), ImmutableMap.of(), DEFAULT_SQL_PARSER_OPTIONS, ENVIRONMENT, Optional.empty(), Optional.empty(), ImmutableList.of());
     }
 
     public static Builder builder(Session defaultSession)
@@ -143,6 +143,7 @@ public class DistributedQueryRunner
             Session defaultSession,
             int nodeCount,
             int coordinatorCount,
+            int spotNodeCount,
             Map<String, String> extraProperties,
             Map<String, String> coordinatorProperties,
             Map<String, String> resourceManagerProperties,
@@ -154,6 +155,7 @@ public class DistributedQueryRunner
             throws Exception
     {
         requireNonNull(defaultSession, "defaultSession is null");
+        checkArgument(spotNodeCount >= 0 && spotNodeCount <= nodeCount, "spotNodeCount must be between 0 and nodeCount");
         this.extraModules = requireNonNull(extraModules, "extraModules is null");
 
         try {
@@ -188,7 +190,13 @@ public class DistributedQueryRunner
                 externalWorkers = ImmutableList.of();
 
                 for (int i = (coordinatorCount + (resourceManagerEnabled ? 1 : 0)); i < nodeCount; i++) {
-                    TestingPrestoServer worker = closer.register(createTestingPrestoServer(discoveryUrl, false, resourceManagerEnabled, false, extraProperties, parserOptions, environment, baseDataDir, extraModules));
+                    ImmutableMap.Builder newExtraProperties = new ImmutableMap.Builder<>()
+                            .putAll(extraProperties);
+                    if (spotNodeCount > 0) {
+                        newExtraProperties.put("node.type", "spot");
+                        spotNodeCount--;
+                    }
+                    TestingPrestoServer worker = closer.register(createTestingPrestoServer(discoveryUrl, false, resourceManagerEnabled, false, newExtraProperties.build(), parserOptions, environment, baseDataDir, extraModules));
                     servers.add(worker);
                 }
             }
@@ -700,6 +708,7 @@ public class DistributedQueryRunner
         private Optional<BiFunction<Integer, URI, Process>> externalWorkerLauncher = Optional.empty();
         private boolean resourceManagerEnabled;
         private List<Module> extraModules = ImmutableList.of();
+        private int spotNodeCount;
 
         protected Builder(Session defaultSession)
         {
@@ -799,10 +808,16 @@ public class DistributedQueryRunner
             return this;
         }
 
+        public Builder setSpotNodeCount(int spotNodeCount)
+        {
+            this.spotNodeCount = spotNodeCount;
+            return this;
+        }
+
         public DistributedQueryRunner build()
                 throws Exception
         {
-            return new DistributedQueryRunner(resourceManagerEnabled, defaultSession, nodeCount, coordinatorCount, extraProperties, coordinatorProperties, resourceManagerProperties, parserOptions, environment, baseDataDir, externalWorkerLauncher, extraModules);
+            return new DistributedQueryRunner(resourceManagerEnabled, defaultSession, nodeCount, coordinatorCount, spotNodeCount, extraProperties, coordinatorProperties, resourceManagerProperties, parserOptions, environment, baseDataDir, externalWorkerLauncher, extraModules);
         }
     }
 }

@@ -22,6 +22,15 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class ServerConfig
 {
+    public enum NodeType
+    {
+        NORMAL,
+        // Spot instances are spare compute capacity available on all major cloud service providers available for use
+        // at high discounts compared to other instance types like on-demand or reserved instances. For more info, AWS
+        // spot instances are described at https://aws.amazon.com/ec2/spot/
+        SPOT
+    }
+
     private boolean resourceManager;
     private boolean resourceManagerEnabled;
     private boolean coordinator = true;
@@ -31,6 +40,7 @@ public class ServerConfig
     private Duration gracePeriod = new Duration(2, MINUTES);
     private boolean enhancedErrorReporting = true;
     private boolean queryResultsCompressionEnabled = true;
+    private NodeType nodeType = NodeType.NORMAL;
 
     public boolean isResourceManager()
     {
@@ -143,6 +153,18 @@ public class ServerConfig
     public ServerConfig setQueryResultsCompressionEnabled(boolean queryResultsCompressionEnabled)
     {
         this.queryResultsCompressionEnabled = queryResultsCompressionEnabled;
+        return this;
+    }
+
+    public NodeType getNodeType()
+    {
+        return nodeType;
+    }
+
+    @Config("node.type")
+    public ServerConfig setNodeType(NodeType nodeType)
+    {
+        this.nodeType = nodeType;
         return this;
     }
 }

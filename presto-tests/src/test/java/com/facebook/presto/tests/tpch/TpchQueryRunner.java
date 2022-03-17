@@ -35,14 +35,27 @@ public final class TpchQueryRunner
     public static DistributedQueryRunner createQueryRunner(Map<String, String> extraProperties, int coordinatorCount)
             throws Exception
     {
+        return createQueryRunner(extraProperties, true, coordinatorCount, 0);
+    }
+
+    public static DistributedQueryRunner createQueryRunner(Map<String, String> extraProperties, boolean resourceManagerEnabled, int coordinatorCount, int spotNodeCount)
+            throws Exception
+    {
         return TpchQueryRunnerBuilder.builder()
                 .setExtraProperties(extraProperties)
-                .setResourceManagerEnabled(true)
+                .setResourceManagerEnabled(resourceManagerEnabled)
                 .setCoordinatorCount(coordinatorCount)
+                .setSpotNodeCount(spotNodeCount)
                 .build();
     }
 
     public static DistributedQueryRunner createQueryRunner(Map<String, String> resourceManagerProperties, Map<String, String> coordinatorProperties, Map<String, String> extraProperties, int coordinatorCount)
+            throws Exception
+    {
+        return createQueryRunner(resourceManagerProperties, coordinatorProperties, extraProperties, coordinatorCount, 0);
+    }
+
+    public static DistributedQueryRunner createQueryRunner(Map<String, String> resourceManagerProperties, Map<String, String> coordinatorProperties, Map<String, String> extraProperties, int coordinatorCount, int spotNodeCount)
             throws Exception
     {
         return TpchQueryRunnerBuilder.builder()
@@ -51,6 +64,7 @@ public final class TpchQueryRunner
                 .setExtraProperties(extraProperties)
                 .setResourceManagerEnabled(true)
                 .setCoordinatorCount(coordinatorCount)
+                .setSpotNodeCount(spotNodeCount)
                 .build();
     }
 

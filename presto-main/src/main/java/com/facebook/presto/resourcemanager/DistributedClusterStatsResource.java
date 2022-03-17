@@ -15,6 +15,7 @@ package com.facebook.presto.resourcemanager;
 
 import com.facebook.presto.execution.QueryState;
 import com.facebook.presto.execution.scheduler.NodeSchedulerConfig;
+import com.facebook.presto.metadata.InternalNode;
 import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.server.BasicQueryInfo;
 import com.facebook.presto.server.ClusterStatsResource;
@@ -31,7 +32,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import java.util.Map;
+import java.util.Set;
 
+import static com.facebook.presto.server.ServerConfig.NodeType.SPOT;
 import static com.facebook.presto.server.security.RoleType.ADMIN;
 import static com.facebook.presto.server.security.RoleType.USER;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
@@ -62,7 +65,9 @@ public class DistributedClusterStatsResource
         long blockedQueries = 0;
         long queuedQueries = 0;
 
-        long activeNodes = internalNodeManager.getNodes(NodeState.ACTIVE).size();
+        Set<InternalNode> activeNodeList = internalNodeManager.getNodes(NodeState.ACTIVE);
+        long activeNodes = activeNodeList.size();
+        long activeSpotNodes = activeNodeList.stream().filter(n -> n.getNodeType() == SPOT).count();
         if (!isIncludeCoordinator) {
             activeNodes -= internalNodeManager.getCoordinators().size();
         }
@@ -105,6 +110,7 @@ public class DistributedClusterStatsResource
                 blockedQueries,
                 queuedQueries,
                 activeNodes,
+                activeSpotNodes,
                 runningDrivers,
                 runningTasks,
                 memoryReservation,

@@ -25,6 +25,7 @@ import com.facebook.presto.connector.system.GlobalSystemConnector;
 import com.facebook.presto.failureDetector.FailureDetector;
 import com.facebook.presto.server.InternalCommunicationConfig;
 import com.facebook.presto.server.InternalCommunicationConfig.CommunicationProtocol;
+import com.facebook.presto.server.ServerConfig.NodeType;
 import com.facebook.presto.server.thrift.ThriftServerInfoClient;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.NodeState;
@@ -66,6 +67,7 @@ import static com.facebook.airlift.concurrent.Threads.threadsNamed;
 import static com.facebook.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static com.facebook.presto.metadata.InternalNode.NodeStatus.ALIVE;
 import static com.facebook.presto.metadata.InternalNode.NodeStatus.DEAD;
+import static com.facebook.presto.server.ServerConfig.NodeType.NORMAL;
 import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.facebook.presto.spi.NodeState.INACTIVE;
 import static com.facebook.presto.spi.NodeState.SHUTTING_DOWN;
@@ -161,8 +163,9 @@ public final class DiscoveryNodeManager
             URI uri = getHttpUri(service, httpsRequired);
             OptionalInt thriftPort = getThriftServerPort(service);
             NodeVersion nodeVersion = getNodeVersion(service);
+            NodeType nodeType = getNodeType(service);
             if (uri != null && nodeVersion != null) {
-                InternalNode node = new InternalNode(service.getNodeId(), uri, thriftPort, nodeVersion, isCoordinator(service), isResourceManager(service), ALIVE);
+                InternalNode node = new InternalNode(service.getNodeId(), uri, thriftPort, nodeVersion, isCoordinator(service), isResourceManager(service), ALIVE, nodeType);
 
                 if (node.getNodeIdentifier().equals(currentNodeId)) {
                     checkState(
@@ -279,12 +282,13 @@ public final class DiscoveryNodeManager
             URI uri = getHttpUri(service, httpsRequired);
             OptionalInt thriftPort = getThriftServerPort(service);
             NodeVersion nodeVersion = getNodeVersion(service);
+            NodeType nodeType = getNodeType(service);
             // Currently, a node may have the roles of both a coordinator and a worker.  In the future, a resource manager may also
             // take the form of a coordinator, hence these flags are not exclusive.
             boolean coordinator = isCoordinator(service);
             boolean resourceManager = isResourceManager(service);
             if (uri != null && nodeVersion != null) {
-                InternalNode node = new InternalNode(service.getNodeId(), uri, thriftPort, nodeVersion, coordinator, resourceManager, ALIVE);
+                InternalNode node = new InternalNode(service.getNodeId(), uri, thriftPort, nodeVersion, coordinator, resourceManager, ALIVE, nodeType);
                 NodeState nodeState = getNodeState(node);
 
                 switch (nodeState) {
@@ -348,7 +352,7 @@ public final class DiscoveryNodeManager
                 InternalNode deadNode = nodes.get(nodeId);
                 Set<ConnectorId> deadNodeConnectorIds = connectorIdsByNodeId.get(nodeId);
                 for (ConnectorId id : deadNodeConnectorIds) {
-                    byConnectorIdBuilder.put(id, new InternalNode(deadNode.getNodeIdentifier(), deadNode.getInternalUri(), deadNode.getThriftPort(), deadNode.getNodeVersion(), deadNode.isCoordinator(), deadNode.isResourceManager(), DEAD));
+                    byConnectorIdBuilder.put(id, new InternalNode(deadNode.getNodeIdentifier(), deadNode.getInternalUri(), deadNode.getThriftPort(), deadNode.getNodeVersion(), deadNode.isCoordinator(), deadNode.isResourceManager(), DEAD, deadNode.getNodeType()));
                 }
             }
         }
@@ -511,6 +515,12 @@ public final class DiscoveryNodeManager
     {
         String nodeVersion = descriptor.getProperties().get("node_version");
         return nodeVersion == null ? null : new NodeVersion(nodeVersion);
+    }
+
+    private static NodeType getNodeType(ServiceDescriptor descriptor)
+    {
+        String nodeType = descriptor.getProperties().get("node_type");
+        return nodeType == null ? NORMAL : NodeType.valueOf(nodeType);
     }
 
     private static boolean isCoordinator(ServiceDescriptor service)

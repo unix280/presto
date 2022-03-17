@@ -51,7 +51,7 @@ public class TestClusterStatsResource
             throws Exception
     {
         client = new JettyHttpClient();
-        DistributedQueryRunner runner = createQueryRunner(ImmutableMap.of("query.client.timeout", "10s"));
+        DistributedQueryRunner runner = createQueryRunner(ImmutableMap.of("query.client.timeout", "10s"), false, 1, 2);
         server = runner.getCoordinator();
         server.getResourceGroupManager().get().addConfigurationManagerFactory(new FileResourceGroupConfigurationManagerFactory());
         server.getResourceGroupManager().get()
@@ -96,6 +96,7 @@ public class TestClusterStatsResource
 
         assertNotNull(clusterStats);
         assertEquals(clusterStats.getActiveWorkers(), 4);
+        assertEquals(clusterStats.getActiveSpotWorkers(), 2);
         assertEquals(clusterStats.getRunningTasks(), 5);
         assertTrue(clusterStats.getRunningDrivers() > 0);
         assertEquals(clusterStats.getRunningQueries(), 1);
