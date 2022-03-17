@@ -134,6 +134,7 @@ import static com.facebook.presto.hive.metastore.MetastoreUtil.toPartitionValues
 import static com.facebook.presto.hive.metastore.MetastoreUtil.updateStatisticsParameters;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.verifyCanDropColumn;
 import static com.facebook.presto.hive.metastore.PrestoTableType.MANAGED_TABLE;
+import static com.facebook.presto.hive.metastore.PrestoTableType.MATERIALIZED_VIEW;
 import static com.facebook.presto.hive.metastore.PrestoTableType.VIRTUAL_VIEW;
 import static com.facebook.presto.hive.metastore.glue.GlueExpressionUtil.buildGlueExpression;
 import static com.facebook.presto.hive.metastore.glue.converter.GlueInputConverter.convertColumn;
@@ -619,7 +620,7 @@ public class GlueHiveMetastore
 
     private static boolean isManagedTable(Table table)
     {
-        return table.getTableType().equals(MANAGED_TABLE);
+        return table.getTableType().equals(MANAGED_TABLE) || table.getTableType().equals(MATERIALIZED_VIEW);
     }
 
     private static void deleteDir(HdfsContext context, HdfsEnvironment hdfsEnvironment, Path path, boolean recursive)
