@@ -21,7 +21,9 @@ import java.io.File;
 import java.util.UUID;
 
 import static com.facebook.presto.hive.HiveTestUtils.SESSION;
+import static com.facebook.presto.hive.HiveTestUtils.SESSION_CACHE;
 import static com.facebook.presto.hive.HiveTestUtils.createTestHdfsEnvironment;
+import static com.facebook.presto.hive.HiveTestUtils.createTestHiveCachingHdfsEnvironment;
 import static com.facebook.presto.hive.HiveWriteUtils.createTemporaryPath;
 import static com.facebook.presto.hive.HiveWriteUtils.isS3FileSystem;
 import static com.facebook.presto.hive.HiveWriteUtils.isViewFileSystem;
@@ -33,6 +35,7 @@ import static org.testng.Assert.fail;
 public class TestHiveWriteUtils
 {
     private static final HdfsContext CONTEXT = new HdfsContext(SESSION, "test_schema");
+    private static final HdfsContext CONTEXT_CACHE = new HdfsContext(SESSION_CACHE, "test_schema");
 
     @Test
     public void testIsS3FileSystem()
@@ -40,6 +43,10 @@ public class TestHiveWriteUtils
         HdfsEnvironment hdfsEnvironment = createTestHdfsEnvironment(new HiveClientConfig(), new MetastoreClientConfig());
         assertTrue(isS3FileSystem(CONTEXT, hdfsEnvironment, new Path("s3://test-bucket/test-folder")));
         assertFalse(isS3FileSystem(CONTEXT, hdfsEnvironment, new Path("/test-dir/test-folder")));
+
+        hdfsEnvironment = createTestHiveCachingHdfsEnvironment(new HiveClientConfig(), new MetastoreClientConfig());
+        assertTrue(isS3FileSystem(CONTEXT_CACHE, hdfsEnvironment, new Path("s3://test-bucket/test-folder")));
+        assertFalse(isS3FileSystem(CONTEXT_CACHE, hdfsEnvironment, new Path("/test-dir/test-folder")));
     }
 
     @Test

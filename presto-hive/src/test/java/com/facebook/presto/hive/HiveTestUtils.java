@@ -17,6 +17,10 @@ import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.json.smile.SmileCodec;
 import com.facebook.presto.PagesIndexPageSorter;
 import com.facebook.presto.cache.CacheConfig;
+import com.facebook.presto.cache.CacheFactory;
+import com.facebook.presto.cache.NoOpCacheManager;
+import com.facebook.presto.cache.alluxio.AlluxioCacheConfig;
+import com.facebook.presto.cache.alluxio.AlluxioCachingConfigurationProvider;
 import com.facebook.presto.common.block.BlockEncodingManager;
 import com.facebook.presto.common.type.ArrayType;
 import com.facebook.presto.common.type.MapType;
@@ -30,6 +34,7 @@ import com.facebook.presto.cost.FilterStatsCalculator;
 import com.facebook.presto.cost.ScalarStatsCalculator;
 import com.facebook.presto.cost.StatsNormalizer;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
+import com.facebook.presto.hive.cache.HiveCachingHdfsConfiguration;
 import com.facebook.presto.hive.datasink.OutputStreamDataSinkFactory;
 import com.facebook.presto.hive.gcs.HiveGcsConfig;
 import com.facebook.presto.hive.gcs.HiveGcsConfigurationInitializer;
@@ -79,6 +84,7 @@ import java.util.Set;
 
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
 import static com.facebook.airlift.json.smile.SmileCodec.smileCodec;
+import static com.facebook.presto.cache.CacheType.ALLUXIO;
 import static com.facebook.presto.common.type.Decimals.encodeScaledValue;
 import static com.facebook.presto.hive.HiveDwrfEncryptionProvider.NO_ENCRYPTION;
 import static java.util.stream.Collectors.toList;
@@ -94,6 +100,13 @@ public final class HiveTestUtils
 
     public static final ConnectorSession SESSION = new TestingConnectorSession(
             new HiveSessionProperties(new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig(), new CacheConfig()).getSessionProperties());
+
+    public static final ConnectorSession SESSION_CACHE = new TestingConnectorSession(
+            new HiveSessionProperties(new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig(),
+                    new CacheConfig()
+                            .setCachingEnabled(true)
+                            .setCacheType(ALLUXIO))
+                    .getSessionProperties());
 
     public static final MetadataManager METADATA = MetadataManager.createTestMetadataManager();
 
@@ -218,6 +231,27 @@ public final class HiveTestUtils
                         new HiveGcsConfigurationInitializer(new HiveGcsConfig()),
                         ImmutableSet.of()),
                 ImmutableSet.of());
+        return new HdfsEnvironment(hdfsConfig, metastoreClientConfig, new NoHdfsAuthentication());
+    }
+
+    public static HdfsEnvironment createTestHiveCachingHdfsEnvironment(HiveClientConfig config, MetastoreClientConfig metastoreClientConfig)
+    {
+        CacheConfig cacheConfig = new CacheConfig()
+                .setCachingEnabled(true)
+                .setCacheType(ALLUXIO);
+
+        HdfsConfiguration hdfsConfig = new HiveCachingHdfsConfiguration(new HiveHdfsConfiguration(
+                        new HdfsConfigurationInitializer(
+                                config,
+                                metastoreClientConfig,
+                                new PrestoS3ConfigurationUpdater(new HiveS3Config()),
+                                new HiveGcsConfigurationInitializer(new HiveGcsConfig()),
+                                ImmutableSet.of()),
+                        ImmutableSet.of(new AlluxioCachingConfigurationProvider(cacheConfig, new AlluxioCacheConfig()))),
+                cacheConfig,
+                new NoOpCacheManager(),
+                new CacheFactory());
+
         return new HdfsEnvironment(hdfsConfig, metastoreClientConfig, new NoHdfsAuthentication());
     }
 
