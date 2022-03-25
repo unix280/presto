@@ -77,9 +77,12 @@ public class CachingDirectoryLister
             PathFilter pathFilter,
             HiveDirectoryContext hiveDirectoryContext)
     {
-        List<HiveFileInfo> files = cache.getIfPresent(path);
-        if (files != null) {
-            return files.iterator();
+        // Read from file list cache only when it is enabled.
+        if (hiveDirectoryContext.isCacheable()) {
+            List<HiveFileInfo> files = cache.getIfPresent(path);
+            if (files != null) {
+                return files.iterator();
+            }
         }
 
         Iterator<HiveFileInfo> iterator = delegate.list(fileSystem, table, path, namenodeStats, pathFilter, hiveDirectoryContext);

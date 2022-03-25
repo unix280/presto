@@ -64,6 +64,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.facebook.airlift.concurrent.Threads.daemonThreadsNamed;
 import static com.facebook.presto.common.type.IntegerType.INTEGER;
@@ -391,14 +392,17 @@ public class TestBackgroundHiveSplitLoader
             assertEquals(future.get().size(), TEST_FILES.size());
         }
 
-        assertEquals(cachingDirectoryLister.getRequestCount(), totalCount);
         if (fileStatusCacheTables.length() == 0) {
+            // Cache is effectively disabled, so we don't probe the cache at all,
+            // all counters will be 0
             assertEquals(cachingDirectoryLister.getHitCount(), 0);
-            assertEquals(cachingDirectoryLister.getMissCount(), totalCount);
+            assertEquals(cachingDirectoryLister.getMissCount(), 0);
+            assertEquals(cachingDirectoryLister.getRequestCount(), 0);
         }
         else {
             assertEquals(cachingDirectoryLister.getHitCount(), totalCount - 1);
             assertEquals(cachingDirectoryLister.getMissCount(), 1);
+            assertEquals(cachingDirectoryLister.getRequestCount(), totalCount);
         }
     }
 
@@ -615,7 +619,7 @@ public class TestBackgroundHiveSplitLoader
                 .build();
     }
 
-    private static LocatedFileStatus locatedFileStatus(Path path, long fileSize)
+    public static LocatedFileStatus locatedFileStatus(Path path, long fileSize)
     {
         return new LocatedFileStatus(
                 fileSize,
@@ -670,10 +674,10 @@ public class TestBackgroundHiveSplitLoader
         }
     }
 
-    private static class TestingHdfsFileSystem
+    public static class TestingHdfsFileSystem
             extends ExtendedFileSystem
     {
-        private final List<LocatedFileStatus> files;
+        private List<LocatedFileStatus> files;
 
         public TestingHdfsFileSystem(List<LocatedFileStatus> files)
         {
@@ -683,7 +687,8 @@ public class TestBackgroundHiveSplitLoader
         @Override
         public boolean delete(Path f, boolean recursive)
         {
-            throw new UnsupportedOperationException();
+            files = files.stream().filter(file -> file.getPath() != f).collect(Collectors.toList());
+            return true;
         }
 
         @Override
