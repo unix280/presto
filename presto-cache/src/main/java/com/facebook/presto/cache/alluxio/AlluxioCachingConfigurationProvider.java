@@ -46,6 +46,7 @@ public class AlluxioCachingConfigurationProvider
                 configuration.set("alluxio.user.client.cache.dir", cacheConfig.getBaseDirectory().getPath());
             }
             configuration.set("alluxio.user.client.cache.size", alluxioCacheConfig.getMaxCacheSize().toString());
+            configuration.set("alluxio.user.client.cache.page.size", alluxioCacheConfig.getMaxCachePageSize().toString());
             configuration.set("alluxio.user.client.cache.async.write.enabled", String.valueOf(alluxioCacheConfig.isAsyncWriteEnabled()));
             configuration.set("alluxio.user.metrics.collection.enabled", String.valueOf(alluxioCacheConfig.isMetricsCollectionEnabled()));
             configuration.set("alluxio.user.client.cache.eviction.retries", String.valueOf(alluxioCacheConfig.getEvictionRetries()));

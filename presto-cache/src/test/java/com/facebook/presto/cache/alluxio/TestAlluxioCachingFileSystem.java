@@ -63,7 +63,8 @@ import static org.testng.Assert.assertTrue;
 public class TestAlluxioCachingFileSystem
 {
     private static final int DATA_LENGTH = (int) new DataSize(20, KILOBYTE).toBytes();
-    private static final int PAGE_SIZE = (int) new DataSize(1, KILOBYTE).toBytes();
+    private static final DataSize DEFAULT_CACHE_PAGE_SIZE = new DataSize(1, KILOBYTE);
+    private static final int PAGE_SIZE = (int) DEFAULT_CACHE_PAGE_SIZE.toBytes();
     private final byte[] data = new byte[DATA_LENGTH];
     private URI cacheDirectory;
     private String testFilePath;
@@ -116,7 +117,7 @@ public class TestAlluxioCachingFileSystem
                 .setCachingEnabled(true)
                 .setBaseDirectory(cacheDirectory)
                 .setValidationEnabled(validationEnabled);
-        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig();
+        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig().setMaxCachePageSize(DEFAULT_CACHE_PAGE_SIZE);
         Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
         AlluxioCachingFileSystem fileSystem = cachingFileSystem(configuration);
         byte[] buffer = new byte[PAGE_SIZE * 2];
@@ -186,7 +187,8 @@ public class TestAlluxioCachingFileSystem
                 .setCachingEnabled(true)
                 .setBaseDirectory(cacheDirectory);
         AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig()
-                .setMaxCacheSize(new DataSize(10, KILOBYTE));
+                .setMaxCacheSize(new DataSize(10, KILOBYTE))
+                .setMaxCachePageSize(DEFAULT_CACHE_PAGE_SIZE);
         Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
         AlluxioCachingFileSystem cachingFileSystem = cachingFileSystem(configuration);
         stressTest(data, (position, buffer, offset, length) -> {
@@ -197,6 +199,26 @@ public class TestAlluxioCachingFileSystem
                 e.printStackTrace();
             }
         });
+    }
+
+    @Test
+    public void testCachePageSize() throws Exception
+    {
+        CacheConfig cacheConfig = new CacheConfig()
+                .setCacheType(ALLUXIO)
+                .setCachingEnabled(true)
+                .setBaseDirectory(cacheDirectory);
+        DataSize cachePageSize = new DataSize(2, KILOBYTE);
+        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig()
+                .setMaxCacheSize(new DataSize(10, KILOBYTE))
+                .setMaxCachePageSize(cachePageSize);
+        Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
+        AlluxioCachingFileSystem cachingFileSystem = cachingFileSystem(configuration);
+        byte[] buffer = new byte[PAGE_SIZE * 2];
+
+        readFully(cachingFileSystem, 10, buffer, 0, 100);
+        File cacheDir = new File(cacheDirectory.getPath() + "/LOCAL/" + cachePageSize.toBytes());
+        assertTrue(cacheDir.exists() && cacheDir.isDirectory());
     }
 
     @Test(timeOut = 30_000, expectedExceptions = {IOException.class})
@@ -210,7 +232,7 @@ public class TestAlluxioCachingFileSystem
                 .setCacheType(ALLUXIO)
                 .setCachingEnabled(true)
                 .setBaseDirectory(badCacheDirectory);
-        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig();
+        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig().setMaxCachePageSize(DEFAULT_CACHE_PAGE_SIZE);
         Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
         try {
             cachingFileSystem(configuration);
@@ -230,7 +252,7 @@ public class TestAlluxioCachingFileSystem
                 .setCacheType(ALLUXIO)
                 .setCachingEnabled(true)
                 .setBaseDirectory(this.cacheDirectory);
-        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig();
+        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig().setMaxCachePageSize(DEFAULT_CACHE_PAGE_SIZE);
         Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
         configuration.set("alluxio.user.client.cache.async.restore.enabled", String.valueOf(true));
         try {
@@ -314,7 +336,9 @@ public class TestAlluxioCachingFileSystem
                 .setBaseDirectory(cacheDirectory)
                 .setValidationEnabled(false)
                 .setCacheQuotaScope(TABLE);
-        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig().setCacheQuotaEnabled(true);
+        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig()
+                .setCacheQuotaEnabled(true)
+                .setMaxCachePageSize(DEFAULT_CACHE_PAGE_SIZE);
         Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
         AlluxioCachingFileSystem fileSystem = cachingFileSystem(configuration);
 
@@ -350,7 +374,9 @@ public class TestAlluxioCachingFileSystem
                 .setBaseDirectory(cacheDirectory)
                 .setValidationEnabled(false)
                 .setCacheQuotaScope(TABLE);
-        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig().setCacheQuotaEnabled(true);
+        AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig()
+                .setCacheQuotaEnabled(true)
+                .setMaxCachePageSize(DEFAULT_CACHE_PAGE_SIZE);
         Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
         AlluxioCachingFileSystem fileSystem = cachingFileSystem(configuration);
 
@@ -389,6 +415,7 @@ public class TestAlluxioCachingFileSystem
                 .setCacheQuotaScope(TABLE);
         AlluxioCacheConfig alluxioCacheConfig = new AlluxioCacheConfig()
                 .setMaxCacheSize(new DataSize(10, KILOBYTE))
+                .setMaxCachePageSize(DEFAULT_CACHE_PAGE_SIZE)
                 .setCacheQuotaEnabled(true);
         Configuration configuration = getHdfsConfiguration(cacheConfig, alluxioCacheConfig);
         AlluxioCachingFileSystem cachingFileSystem = cachingFileSystem(configuration);
@@ -480,8 +507,7 @@ public class TestAlluxioCachingFileSystem
         Configuration configuration = new Configuration();
         provider.updateConfiguration(configuration, null /* ignored */, null /* ignored */);
         if (cacheConfig.isCachingEnabled() && cacheConfig.getCacheType() == ALLUXIO) {
-            // we don't have corresponding Presto properties for these two, set them manually
-            configuration.set("alluxio.user.client.cache.page.size", Integer.toString(PAGE_SIZE));
+            // we don't have corresponding Presto property for the below config, set it manually
             configuration.set("alluxio.user.client.cache.async.restore.enabled", String.valueOf(false));
         }
         return configuration;

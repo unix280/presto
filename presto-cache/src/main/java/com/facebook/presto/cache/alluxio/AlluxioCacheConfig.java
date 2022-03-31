@@ -19,6 +19,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
+import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class AlluxioCacheConfig
@@ -28,6 +29,7 @@ public class AlluxioCacheConfig
     private String jmxClass = "alluxio.metrics.sink.JmxSink";
     private String metricsDomain = "com.facebook.alluxio";
     private DataSize maxCacheSize = new DataSize(2, GIGABYTE);
+    private DataSize maxCachePageSize = new DataSize(1, MEGABYTE);
     private boolean configValidationEnabled;
     private boolean timeoutEnabled = true;
     private boolean cacheQuotaEnabled;
@@ -98,6 +100,19 @@ public class AlluxioCacheConfig
     public AlluxioCacheConfig setMaxCacheSize(DataSize maxCacheSize)
     {
         this.maxCacheSize = maxCacheSize;
+        return this;
+    }
+
+    public DataSize getMaxCachePageSize()
+    {
+        return maxCachePageSize;
+    }
+
+    @Config("cache.alluxio.max-cache-page-size")
+    @ConfigDescription("The maximum cache page size for alluxio cache")
+    public AlluxioCacheConfig setMaxCachePageSize(DataSize maxCachePageSize)
+    {
+        this.maxCachePageSize = maxCachePageSize;
         return this;
     }
 
