@@ -40,6 +40,12 @@ public class CacheStatsMBean
     }
 
     @Managed
+    public long getEvictionCount()
+    {
+        return cache.stats().evictionCount();
+    }
+
+    @Managed
     public long getMissCount()
     {
         return cache.stats().missCount();
