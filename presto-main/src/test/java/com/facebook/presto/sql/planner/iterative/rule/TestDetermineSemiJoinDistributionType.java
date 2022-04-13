@@ -319,15 +319,15 @@ public class TestDetermineSemiJoinDistributionType
 
         PlanNodeStatsEstimate probeSideStatsEstimate = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(aRows)
-                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("A1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression(Optional.empty(), "A1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
                 .build();
         PlanNodeStatsEstimate buildSideStatsEstimate = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(bRows)
-                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("B1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression(Optional.empty(), "B1", symbolType), new VariableStatsEstimate(0, 100, 0, 640000d * 10000, 10)))
                 .build();
         PlanNodeStatsEstimate buildSideSourceStatsEstimate = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(bRows)
-                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression("B1", symbolType), new VariableStatsEstimate(0, 100, 0, 64, 10)))
+                .addVariableStatistics(ImmutableMap.of(new VariableReferenceExpression(Optional.empty(), "B1", symbolType), new VariableStatsEstimate(0, 100, 0, 64, 10)))
                 .build();
 
         // build side exceeds AUTOMATIC_RESTRICTED limit but source plan nodes are small

@@ -128,7 +128,8 @@ public final class QueryEventListener
                 Optional.of(""),
                 queryCreatedEvent.getMetadata().getJsonPlan(),
                 Optional.of(""),
-                queryCreatedEvent.getMetadata().getRuntimeOptimizedStages());
+                queryCreatedEvent.getMetadata().getRuntimeOptimizedStages(),
+                queryCreatedEvent.getMetadata().getTracingId());
 
         QueryCreatedEvent queryCreatedEvent1 = new QueryCreatedEvent(
                 queryCreatedEvent.getCreateTime(),
@@ -169,7 +170,8 @@ public final class QueryEventListener
                 Optional.of(""),
                 queryCompletedEvent.getMetadata().getJsonPlan(),
                 Optional.of(""),
-                queryCompletedEvent.getMetadata().getRuntimeOptimizedStages());
+                queryCompletedEvent.getMetadata().getRuntimeOptimizedStages(),
+                queryCompletedEvent.getMetadata().getTracingId());
 
         QueryCompletedEvent queryCompletedEvent1 = new QueryCompletedEvent(
                 queryMetadata,

@@ -52,6 +52,13 @@ public class ConsistentHashingNodeProvider
         this.candidates = requireNonNull(candidates, "candidates is null");
     }
 
+    // TODO Revisit ConsistentHashing with SOFT_AFFINITY_BY_SPLIT node selection strategy
+    @Override
+    public List<HostAddress> get(String identifier, int count, long start, long fileSize)
+    {
+        return get(identifier, count);
+    }
+
     @Override
     public List<HostAddress> get(String key, int count)
     {

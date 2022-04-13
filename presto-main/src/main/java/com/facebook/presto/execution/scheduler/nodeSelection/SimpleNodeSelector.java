@@ -54,7 +54,6 @@ import static com.facebook.presto.execution.scheduler.NodeScheduler.selectExactN
 import static com.facebook.presto.execution.scheduler.NodeScheduler.selectNodes;
 import static com.facebook.presto.execution.scheduler.NodeScheduler.toWhenHasSplitQueueSpaceFuture;
 import static com.facebook.presto.execution.scheduler.NodeSelectionHashStrategy.MODULAR_HASHING;
-import static com.facebook.presto.execution.scheduler.nodeSelection.NodeSelectionUtils.sortedNodes;
 import static com.facebook.presto.metadata.InternalNode.NodeStatus.DEAD;
 import static com.facebook.presto.spi.StandardErrorCode.NODE_SELECTION_NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;

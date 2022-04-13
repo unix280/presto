@@ -385,6 +385,7 @@ public abstract class ParquetDereferencePushDown
             }
 
             TableScanNode newTableScan = new TableScanNode(
+                    tableScan.getSourceLocation(),
                     idAllocator.getNextId(),
                     tableScan.getTable(),
                     newOutputVariables,
@@ -398,7 +399,7 @@ public abstract class ParquetDereferencePushDown
                 newProjectAssignmentBuilder.put(entry.getKey(), newExpression);
             }
 
-            return new ProjectNode(idAllocator.getNextId(), newTableScan, newProjectAssignmentBuilder.build(), project.getLocality());
+            return new ProjectNode(tableScan.getSourceLocation(), idAllocator.getNextId(), newTableScan, newProjectAssignmentBuilder.build(), project.getLocality());
         }
     }
 }

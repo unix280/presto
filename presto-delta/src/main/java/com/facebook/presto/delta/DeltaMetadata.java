@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.delta.DeltaColumnHandle.ColumnType.PARTITION;
 import static com.facebook.presto.delta.DeltaColumnHandle.ColumnType.REGULAR;
 import static com.facebook.presto.delta.DeltaExpressionUtils.splitPredicate;
+import static com.facebook.presto.hive.HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Collections.emptyList;
 import static java.util.Locale.US;
@@ -283,7 +284,9 @@ public class DeltaMetadata
                 session.getQueryId(),
                 session.getClientInfo(),
                 session.getSource(),
-                Optional.empty());
+                Optional.empty(),
+                false,
+                DEFAULT_COLUMN_CONVERTER_PROVIDER);
     }
 
     private void checkConnectorId(DeltaTableHandle tableHandle)

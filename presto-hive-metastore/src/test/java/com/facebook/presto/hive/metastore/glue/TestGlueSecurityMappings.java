@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.glue;
 
+import com.facebook.presto.hive.HiveColumnConverterProvider;
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import org.testng.annotations.Test;
@@ -70,7 +71,7 @@ public class TestGlueSecurityMappings
         {
             return new MetastoreContext(
                     new ConnectorIdentity(user, Optional.empty(), Optional.empty(), Collections.emptyMap(), Collections.emptyMap()),
-                    PRESTO_QUERY_ID_NAME, Optional.empty());
+                    PRESTO_QUERY_ID_NAME, Optional.empty(), HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
         }
     }
 

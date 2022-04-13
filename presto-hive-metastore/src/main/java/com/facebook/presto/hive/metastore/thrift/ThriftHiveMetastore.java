@@ -16,7 +16,6 @@ package com.facebook.presto.hive.metastore.thrift;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
-import com.facebook.presto.hive.ColumnConverter;
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveBasicStatistics;

@@ -39,7 +39,7 @@ public abstract class AbstractTestHiveClientLocal
         extends AbstractTestHiveClient
 {
     private static final String DEFAULT_TEST_DB_NAME = "test";
-    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty());
+    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty(), HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
 
     private File tempDir;
     private String testDbName;

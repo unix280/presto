@@ -14,8 +14,8 @@
 package com.facebook.presto.hive.metastore.thrift;
 
 import com.facebook.presto.common.predicate.Domain;
-import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.HiveColumnConverterProvider;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.PartitionNameWithVersion;
 import com.google.common.collect.ImmutableList;

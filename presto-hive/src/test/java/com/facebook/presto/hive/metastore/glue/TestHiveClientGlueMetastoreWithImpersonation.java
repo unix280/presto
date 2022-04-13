@@ -19,6 +19,7 @@ import com.facebook.presto.hive.HdfsConfiguration;
 import com.facebook.presto.hive.HdfsConfigurationInitializer;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveClientConfig;
+import com.facebook.presto.hive.HiveColumnConverterProvider;
 import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.HiveStorageFormat;
 import com.facebook.presto.hive.MetastoreClientConfig;
@@ -154,6 +155,6 @@ public class TestHiveClientGlueMetastoreWithImpersonation
 
         String queryId = "test_queryId";
 
-        return new MetastoreContext(connectorIdentity, queryId, Optional.empty());
+        return new MetastoreContext(connectorIdentity, queryId, Optional.empty(), HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
     }
 }

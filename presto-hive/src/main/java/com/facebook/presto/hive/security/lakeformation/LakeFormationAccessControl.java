@@ -29,6 +29,7 @@ import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataRequest;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
 import com.amazonaws.services.securitytoken.model.Tag;
 import com.facebook.airlift.log.Logger;
+import com.facebook.presto.hive.HiveColumnConverterProvider;
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.MetastoreConfig;
 import com.facebook.presto.hive.metastore.glue.GlueHiveMetastoreConfig;
@@ -687,7 +688,7 @@ public class LakeFormationAccessControl
         LFPolicyCacheKey lfPolicyCacheKey;
 
         if (impersonationEnabled) {
-            String iamRole = getGlueIamRole(new MetastoreContext(identity, queryId, Optional.empty()));
+            String iamRole = getGlueIamRole(new MetastoreContext(identity, queryId, Optional.empty(), HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER));
             lfPolicyCacheKey = new LFPolicyCacheKey(tableName, iamRole);
         }
         else {

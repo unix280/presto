@@ -305,7 +305,7 @@ public class PlanBuilder
 
     public FilterNode filter(PlanNodeId planNodeId, PlanNode source, RowExpression predicate)
     {
-        return new FilterNode(planNodeId, source, predicate);
+        return new FilterNode(source.getSourceLocation(), planNodeId, source, predicate);
     }
 
     public AggregationNode aggregation(Consumer<AggregationBuilder> aggregationBuilderConsumer)

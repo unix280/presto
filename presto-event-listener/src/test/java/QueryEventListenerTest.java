@@ -143,7 +143,8 @@ public class QueryEventListenerTest
                 Optional.of(""),
                 Optional.of("plan"),
                 Optional.of(""),
-                new ArrayList<>());
+                new ArrayList<>(),
+                Optional.empty());
     }
 
     private QueryContext prepareQueryContext()

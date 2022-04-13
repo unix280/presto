@@ -19,6 +19,7 @@ import com.facebook.presto.hive.HdfsConfiguration;
 import com.facebook.presto.hive.HdfsConfigurationInitializer;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveClientConfig;
+import com.facebook.presto.hive.HiveColumnConverterProvider;
 import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.HiveStorageFormat;
 import com.facebook.presto.hive.MetastoreClientConfig;
@@ -49,7 +50,7 @@ import static org.testng.Assert.assertTrue;
 public class TestHiveClientGlueMetastore
         extends AbstractTestHiveClientLocal
 {
-    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty());
+    private static final MetastoreContext METASTORE_CONTEXT = new MetastoreContext(SESSION, Optional.empty(), HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
 
     public TestHiveClientGlueMetastore()
     {
