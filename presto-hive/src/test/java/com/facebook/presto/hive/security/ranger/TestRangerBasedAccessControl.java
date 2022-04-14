@@ -127,6 +127,26 @@ public class TestRangerBasedAccessControl
     }
 
     @Test
+    public void testViewOperations()
+            throws IOException
+    {
+        ConnectorAccessControl accessControl = createRangerAccessControl("default-schema-level-access.json", "user_groups.json", "user_roles.json");
+        // 'etladmin' group have all access {group - etladmin, user - alice}
+        accessControl.checkCanCreateView(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "testView"));
+        accessControl.checkCanCreateViewWithSelectFromColumns(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "testView"), ImmutableSet.of("column2"));
+
+        // 'analyst' group have all but drop access {group - analyst, user - joe}
+        accessControl.checkCanCreateView(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "testView"));
+        assertDenied(() -> accessControl.checkCanDropView(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "testView")));
+        accessControl.checkCanCreateViewWithSelectFromColumns(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "testView"), ImmutableSet.of("column1"));
+
+        //  Access denied to others {group - readall, user - bob}
+        assertDenied(() -> accessControl.checkCanCreateView(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "testView")));
+        assertDenied(() -> accessControl.checkCanDropView(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "testView")));
+        assertDenied(() -> accessControl.checkCanCreateViewWithSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "testView"), ImmutableSet.of("column2")));
+    }
+
+    @Test
     public void testSelectUpdateAccess()
             throws IOException
     {

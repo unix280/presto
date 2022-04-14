@@ -507,7 +507,7 @@ public class RangerBasedAccessControl
     @Override
     public void checkCanCreateView(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName viewName)
     {
-        if (!checkAccess(identity, null, null, HiveAccessType.CREATE)) {
+        if (!checkAccess(identity, viewName, null, HiveAccessType.CREATE)) {
             denyCreateView(viewName.getTableName(), format("Access denied - User [ %s ] does not have [CREATE] " +
                     "privilege on [ %s/%s ] ", identity.getUser(), viewName.getSchemaName(), viewName.getTableName()));
         }
