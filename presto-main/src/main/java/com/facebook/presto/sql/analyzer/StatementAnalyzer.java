@@ -2301,7 +2301,7 @@ class StatementAnalyzer
                     // expand * and T.*
                     Optional<QualifiedName> starPrefix = ((AllColumns) item).getPrefix();
 
-                    for (Field field : sourceScope.getRelationType().resolveFieldsWithPrefix(starPrefix)) {
+                    for (Field field : filterUnauthorizedFields(sourceScope.getRelationType().resolveFieldsWithPrefix(starPrefix))) {
                         outputFields.add(Field.newUnqualified(node.getSelect().getLocation(), field.getName(), field.getType(), field.getOriginTable(), field.getOriginColumnName(), false));
                     }
                 }

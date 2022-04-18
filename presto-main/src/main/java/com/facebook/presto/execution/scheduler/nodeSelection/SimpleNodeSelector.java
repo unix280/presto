@@ -168,7 +168,7 @@ public class SimpleNodeSelector
                     if (nodeSelectionHashStrategy == MODULAR_HASHING) {
                         nodeProvider = new ModularHashingNodeProvider(nodeMap.getAllNodes());
                     }
-                    candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(new ModularHashingNodeProvider(nodeMap.getAllNodes())), includeCoordinator);
+                    candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(nodeProvider), includeCoordinator);
                     preferredNodeCount = OptionalInt.of(candidateNodes.size());
                     candidateNodes = ImmutableList.<InternalNode>builder()
                             .addAll(candidateNodes)
