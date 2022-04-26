@@ -30,11 +30,13 @@ import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.procedure.Procedure;
 import com.facebook.presto.spi.relation.RowExpressionService;
+import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import com.google.common.collect.ImmutableSet;
 
 import javax.inject.Inject;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,6 +46,7 @@ import static com.facebook.presto.spi.connector.ConnectorCapabilities.NOT_NULL_C
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static com.facebook.presto.spi.transaction.IsolationLevel.checkConnectorSupports;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Sets.immutableEnumSet;
 import static java.util.Objects.requireNonNull;
 
@@ -65,6 +68,7 @@ public class JdbcConnector
     private final StandardFunctionResolution functionResolution;
     private final RowExpressionService rowExpressionService;
     private final JdbcClient jdbcClient;
+    private final List<PropertyMetadata<?>> sessionProperties;
 
     @Inject
     public JdbcConnector(
@@ -78,7 +82,8 @@ public class JdbcConnector
             FunctionMetadataManager functionManager,
             StandardFunctionResolution functionResolution,
             RowExpressionService rowExpressionService,
-            JdbcClient jdbcClient)
+            JdbcClient jdbcClient,
+            Set<JdbcSessionPropertiesProvider> sessionPropertiesProviders)
     {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.jdbcMetadataFactory = requireNonNull(jdbcMetadataFactory, "jdbcMetadataFactory is null");
@@ -91,6 +96,9 @@ public class JdbcConnector
         this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
         this.rowExpressionService = requireNonNull(rowExpressionService, "rowExpressionService is null");
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
+        this.sessionProperties = requireNonNull(sessionPropertiesProviders, "sessionProperties is null").stream()
+                .flatMap(sessionPropertiesProvider -> sessionPropertiesProvider.getSessionProperties().stream())
+                .collect(toImmutableList());
     }
 
     @Override
@@ -169,6 +177,12 @@ public class JdbcConnector
     public Set<Procedure> getProcedures()
     {
         return procedures;
+    }
+
+    @Override
+    public List<PropertyMetadata<?>> getSessionProperties()
+    {
+        return sessionProperties;
     }
 
     @Override
