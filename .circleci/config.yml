@@ -5,7 +5,7 @@ orbs:
   jq: circleci/jq@2.2.0
 
 executors:
-  openjdk-test:
+  openjdk-machine-executor:
     machine:
       image: ubuntu-2004:202111-02
     working_directory: ~/prestodb
@@ -119,29 +119,63 @@ commands:
         type: string
         default: centos:7
     steps:
-      - setup_remote_docker:
-          version: 19.03.13
-          docker_layer_caching: true
+      - run:
+          name: Setup qemu
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y qemu-user-static
+            sudo apt-get install -y binfmt-support
 
       - run:
-          name: Build << parameters.repo_name >> docker image
-          command: docker build -f docker/<< parameters.repo_name >>/Dockerfile -t ahanaio/<< parameters.repo_name >>:latest --build-arg PRESTO_VERSION=$PRESTO_VERSION --build-arg BASE_OS=<< parameters.base_os >> --label "tagversion=$CIRCLE_TAG" .
+          name: Check versions
+          command: |
+            qemu-aarch64-static --version
+            update-binfmts --version
 
       - run:
           name: Login to Docker
           command: aws ecr get-login-password --region << parameters.aws_region >> --profile default | docker login --username AWS --password-stdin << parameters.aws_ecr_account_url >>
 
       - run:
-          name: Tag with version and 'latest'
-          command: |
-            docker tag ahanaio/<< parameters.repo_name >>:latest << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest
-            docker tag ahanaio/<< parameters.repo_name >>:latest << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
+          name: Build << parameters.repo_name >> docker image for amd64
+          command: docker build -f docker/<< parameters.repo_name >>/Dockerfile -t ahanaio/<< parameters.repo_name >>:latest-linux-amd64 --build-arg PRESTO_VERSION=$PRESTO_VERSION --build-arg BASE_OS=<< parameters.base_os >> --label "tagversion=$CIRCLE_TAG" .
 
       - run:
-          name: Push latest and version tag
+          name: Tag with version and 'latest' for amd64
           command: |
-            docker push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest
-            docker push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
+            docker tag ahanaio/<< parameters.repo_name >>:latest-linux-amd64 << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest-linux-amd64
+            docker tag ahanaio/<< parameters.repo_name >>:latest-linux-amd64 << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION-linux-amd64
+
+      - run:
+          name: Push latest and version tag for amd64
+          command: |
+            docker push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest-linux-amd64
+            docker push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION-linux-amd64
+
+      - run:
+          name: Create docker buildx builder
+          command: |
+            export DOCKER_CLI_EXPERIMENTAL=enabled
+            docker buildx create --name arm64-builder --use
+            docker buildx inspect --bootstrap
+
+      - run:
+          name: Build, tag and push << parameters.repo_name >> docker image for arm64
+          command: docker buildx build --push --platform linux/arm64 -f docker/<< parameters.repo_name >>/Dockerfile -t << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest-linux-arm64 -t << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION-linux-arm64 --build-arg PRESTO_VERSION=$PRESTO_VERSION --build-arg BASE_OS=<< parameters.base_os >> --label "tagversion=$CIRCLE_TAG" .
+
+      - run:
+          name: Create and Push Manifest for latest tag
+          command: |
+            docker manifest create --amend << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest-linux-amd64 << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest-linux-arm64
+            docker manifest inspect << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest
+            docker manifest push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:latest
+
+      - run:
+          name: Create and Push Manifest for version tag
+          command: |
+            docker manifest create --amend << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION-linux-amd64 << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION-linux-arm64
+            docker manifest inspect << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
+            docker manifest push << parameters.aws_ecr_account_url >>/ahanaio/<< parameters.repo_name >>:$PRESTO_VERSION
 
 jobs:
   build:
@@ -286,7 +320,7 @@ jobs:
       - persist_test_results
 
   product_test_basic_environment:
-    executor: openjdk-test
+    executor: openjdk-machine-executor
     resource_class: large
     steps:
       - checkout
@@ -415,7 +449,7 @@ jobs:
       - persist_test_results
 
   hive_tests:
-    executor: openjdk-test
+    executor: openjdk-machine-executor
     resource_class: large
     steps:
       - checkout
@@ -463,7 +497,7 @@ jobs:
       - persist_test_results
 
   hive_dockerized_tests:
-    executor: openjdk-test
+    executor: openjdk-machine-executor
     resource_class: xlarge
     steps:
       - checkout
@@ -628,11 +662,14 @@ jobs:
     parameters:
       aws_ecr_account_url:
         type: string
-    executor: openjdk
+    executor: openjdk-machine-executor
+    resource_class: xlarge
     steps:
       - aws-cli/setup
 
       - checkout
+
+      - set_java_to_8
 
       - run:
           name: Install Maven Wrapper
