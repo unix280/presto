@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+    name: "kaniko-${BUILD_VERSION}-${BUILD_NUMBER}"
+    namespace: jenkins-agent
+    labels:
+        containers: kaniko
+spec:
+    serviceAccountName: jenkins-agent
+    containers:
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.8.1
+      env:
+      - name: HTTP_PROXY
+        value: null
+      - name: HTTPS_PROXY
+        value: null
+      - name: AWS_REGION
+        value: us-east-1
+      - name: AWS_ACCESS_KEY_ID
+        value: ${AWS_ACCESS_KEY_ID}
+      - name: AWS_SECRET_ACCESS_KEY
+        value: ${AWS_SECRET_ACCESS_KEY}
+      args:
+      - "--context=s3://ahana-jenkins/kaniko-image-context/prestodb/prestodb-${BUILD_VERSION}.tar.gz"
+      - "--dockerfile=docker/prestodb/Dockerfile"
+      - "--destination=299095523242.dkr.ecr.us-east-1.amazonaws.com/ahanaio/prestodb:${BUILD_VERSION}"
+      - "--build-arg=PRESTO_VERSION=${PRESTO_VERSION}"
