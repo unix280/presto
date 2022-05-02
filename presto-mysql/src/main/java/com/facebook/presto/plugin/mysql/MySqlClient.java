@@ -18,6 +18,7 @@ import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.plugin.jdbc.BaseJdbcClient;
 import com.facebook.presto.plugin.jdbc.BaseJdbcConfig;
+import com.facebook.presto.plugin.jdbc.ColumnMapping;
 import com.facebook.presto.plugin.jdbc.ConnectionFactory;
 import com.facebook.presto.plugin.jdbc.DriverConnectionFactory;
 import com.facebook.presto.plugin.jdbc.JdbcColumnHandle;
@@ -27,7 +28,8 @@ import com.facebook.presto.plugin.jdbc.JdbcSplit;
 import com.facebook.presto.plugin.jdbc.JdbcTableHandle;
 import com.facebook.presto.plugin.jdbc.JdbcTypeHandle;
 import com.facebook.presto.plugin.jdbc.QueryBuilder;
-import com.facebook.presto.plugin.jdbc.ReadMapping;
+import com.facebook.presto.plugin.jdbc.SliceWriteFunction;
+import com.facebook.presto.plugin.jdbc.WriteMapping;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.PrestoException;
@@ -64,6 +66,10 @@ import static com.facebook.presto.geospatial.serde.EsriGeometrySerde.serialize;
 import static com.facebook.presto.geospatial.serde.JtsGeometrySerde.deserialize;
 import static com.facebook.presto.plugin.jdbc.DriverConnectionFactory.basicConnectionProperties;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
+import static com.facebook.presto.plugin.jdbc.StandardColumnMappings.realWriteFunction;
+import static com.facebook.presto.plugin.jdbc.StandardColumnMappings.timestampWriteFunction;
+import static com.facebook.presto.plugin.jdbc.StandardColumnMappings.varbinaryWriteFunction;
+import static com.facebook.presto.plugin.jdbc.StandardColumnMappings.varcharWriteFunction;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -174,38 +180,42 @@ public class MySqlClient
     }
 
     @Override
-    protected String toSqlType(Type type)
+    public WriteMapping toWriteMapping(Type type)
     {
         if (REAL.equals(type)) {
-            return "float";
+            return WriteMapping.longMapping("float", realWriteFunction());
         }
         if (TIME_WITH_TIME_ZONE.equals(type) || TIMESTAMP_WITH_TIME_ZONE.equals(type)) {
             throw new PrestoException(NOT_SUPPORTED, "Unsupported column type: " + type.getDisplayName());
         }
         if (TIMESTAMP.equals(type)) {
-            return "datetime";
+            return WriteMapping.longMapping("datetime", timestampWriteFunction());
         }
         if (VARBINARY.equals(type)) {
-            return "mediumblob";
+            return WriteMapping.sliceMapping("mediumblob", varbinaryWriteFunction());
         }
         if (isVarcharType(type)) {
             VarcharType varcharType = (VarcharType) type;
+            String dataType;
             if (varcharType.isUnbounded()) {
-                return "longtext";
+                dataType = "longtext";
             }
-            if (varcharType.getLengthSafe() <= 255) {
-                return "tinytext";
+            else if (varcharType.getLengthSafe() <= 255) {
+                dataType = "tinytext";
             }
-            if (varcharType.getLengthSafe() <= 65535) {
-                return "text";
+            else if (varcharType.getLengthSafe() <= 65535) {
+                dataType = "text";
             }
-            if (varcharType.getLengthSafe() <= 16777215) {
-                return "mediumtext";
+            else if (varcharType.getLengthSafe() <= 16777215) {
+                dataType = "mediumtext";
             }
-            return "longtext";
+            else {
+                dataType = "longtext";
+            }
+            return WriteMapping.sliceMapping(dataType, varcharWriteFunction());
         }
 
-        return super.toSqlType(type);
+        return super.toWriteMapping(type);
     }
 
     @Override
@@ -238,7 +248,7 @@ public class MySqlClient
     }
 
     @Override
-    public Optional<ReadMapping> toPrestoType(ConnectorSession session, JdbcTypeHandle typeHandle)
+    public Optional<ColumnMapping> toPrestoType(ConnectorSession session, JdbcTypeHandle typeHandle)
     {
         String typeName = typeHandle.getJdbcTypeName();
 
@@ -248,10 +258,19 @@ public class MySqlClient
         return super.toPrestoType(session, typeHandle);
     }
 
-    private ReadMapping geometryReadMapping()
+    private ColumnMapping geometryReadMapping()
     {
-        return ReadMapping.sliceReadMapping(VarcharType.VARCHAR,
-                (resultSet, columnIndex) -> getAsText(stGeomFromBinary(wrappedBuffer(resultSet.getBytes(columnIndex)))));
+        return ColumnMapping.sliceMapping(VarcharType.VARCHAR,
+                (resultSet, columnIndex) -> getAsText(stGeomFromBinary(wrappedBuffer(resultSet.getBytes(columnIndex)))),
+                geometryWriteFunction());
+    }
+
+    private SliceWriteFunction geometryWriteFunction()
+    {
+        //TODO: see if this can be implemented in some way.
+        return ((statement, index, value) -> {
+            throw new UnsupportedOperationException();
+        });
     }
 
     private static Slice getAsText(Slice input)

@@ -399,6 +399,31 @@ jobs:
 
       - persist_test_results
 
+  product_jdbc_tests:
+    executor: openjdk-machine-executor
+    resource_class: large
+    steps:
+      - checkout
+      - set_java_to_8
+      - restore_package_cache
+      - run:
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Install test dependencies
+          command: ./mvnw install $MAVEN_FAST_INSTALL -pl '!presto-docs,!presto-server-rpm,!presto-spark-package,!presto-spark-launcher,!presto-spark-testing'
+
+      - run:
+          name: Test mysql
+          command: presto-product-tests/bin/run_on_docker.sh singlenode-mysql -g mysql_connector,mysql
+
+      - run:
+          name: Test postgres
+          command: presto-product-tests/bin/run_on_docker.sh singlenode-postgresql -g postgresql_connector
+
+      - persist_test_results
+
   product_test_specific_environment_2:
     executor: openjdk
     resource_class: large
@@ -1014,6 +1039,11 @@ workflows:
             - docker_hub
           requires:
             - start_test_suite
+      - product_jdbc_tests:
+          context:
+            - docker_hub
+          requires:
+            - start_test_suite
 #      - product_test_specific_environment:
 #          context:
 #            - docker_hub
@@ -1084,6 +1114,7 @@ workflows:
             - test_specific_module_presto_spark_base
             # - test_other_modules
             - product_test_basic_environment
+            - product_jdbc_tests
             # - product_test_specific_environment
             # - product_test_specific_environment_2
             - hive_tests

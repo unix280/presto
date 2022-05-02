@@ -17,6 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.common.type.ArrayType;
 import com.facebook.presto.common.type.CharType;
 import com.facebook.presto.common.type.DecimalType;
+import com.facebook.presto.common.type.JsonType;
 import com.facebook.presto.common.type.RowType;
 import com.facebook.presto.common.type.TimestampType;
 import com.facebook.presto.common.type.Type;
@@ -77,6 +78,7 @@ import static com.facebook.presto.common.type.TinyintType.TINYINT;
 import static com.facebook.presto.common.type.UnknownType.UNKNOWN;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.common.type.Varchars.isVarcharType;
+import static com.facebook.presto.operator.scalar.JsonFunctions.jsonParse;
 import static com.facebook.presto.tpch.TpchMetadata.TINY_SCHEMA_NAME;
 import static com.facebook.presto.tpch.TpchRecordSet.createTpchRecordSet;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -84,6 +86,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.padEnd;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.newArrayList;
+import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.tpch.TpchTable.LINE_ITEM;
 import static io.airlift.tpch.TpchTable.NATION;
 import static io.airlift.tpch.TpchTable.ORDERS;
@@ -241,6 +244,10 @@ public class H2QueryRunner
                 else if (DOUBLE.equals(type)) {
                     double doubleValue = resultSet.getDouble(position);
                     return resultSet.wasNull() ? null : doubleValue;
+                }
+                else if (JsonType.JSON.equals(type)) {
+                    String stringValue = resultSet.getString(position);
+                    return resultSet.wasNull() ? null : jsonParse(utf8Slice(stringValue)).toStringUtf8();
                 }
                 else if (isVarcharType(type)) {
                     String stringValue = resultSet.getString(position);

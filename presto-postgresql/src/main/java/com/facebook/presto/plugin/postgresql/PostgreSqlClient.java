@@ -22,6 +22,7 @@ import com.facebook.presto.common.type.TypeSignature;
 import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.plugin.jdbc.BaseJdbcClient;
 import com.facebook.presto.plugin.jdbc.BaseJdbcConfig;
+import com.facebook.presto.plugin.jdbc.ColumnMapping;
 import com.facebook.presto.plugin.jdbc.DriverConnectionFactory;
 import com.facebook.presto.plugin.jdbc.JdbcColumnHandle;
 import com.facebook.presto.plugin.jdbc.JdbcConnectorId;
@@ -29,7 +30,9 @@ import com.facebook.presto.plugin.jdbc.JdbcIdentity;
 import com.facebook.presto.plugin.jdbc.JdbcSplit;
 import com.facebook.presto.plugin.jdbc.JdbcTypeHandle;
 import com.facebook.presto.plugin.jdbc.QueryBuilder;
-import com.facebook.presto.plugin.jdbc.ReadMapping;
+import com.facebook.presto.plugin.jdbc.SliceWriteFunction;
+import com.facebook.presto.plugin.jdbc.StandardColumnMappings;
+import com.facebook.presto.plugin.jdbc.WriteMapping;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.PrestoException;
@@ -43,6 +46,7 @@ import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import org.postgresql.Driver;
+import org.postgresql.util.PGobject;
 
 import javax.inject.Inject;
 
@@ -66,7 +70,7 @@ import static com.facebook.presto.geospatial.GeometryUtils.wktFromJtsGeometry;
 import static com.facebook.presto.geospatial.serde.EsriGeometrySerde.serialize;
 import static com.facebook.presto.geospatial.serde.JtsGeometrySerde.deserialize;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
-import static com.facebook.presto.plugin.jdbc.StandardReadMappings.varcharReadMapping;
+import static com.facebook.presto.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.fasterxml.jackson.core.JsonFactory.Feature.CANONICALIZE_FIELD_NAMES;
@@ -117,17 +121,20 @@ public class PostgreSqlClient
     }
 
     @Override
-    protected String toSqlType(Type type)
+    public WriteMapping toWriteMapping(Type type)
     {
         if (VARBINARY.equals(type)) {
-            return "bytea";
+            return WriteMapping.sliceMapping("bytea", StandardColumnMappings.varbinaryWriteFunction());
+        }
+        if (type.getTypeSignature().getBase().equals(StandardTypes.JSON)) {
+            return WriteMapping.sliceMapping("jsonb", jsonWriteFunction());
         }
 
-        return super.toSqlType(type);
+        return super.toWriteMapping(type);
     }
 
     @Override
-    public Optional<ReadMapping> toPrestoType(ConnectorSession session, JdbcTypeHandle typeHandle)
+    public Optional<ColumnMapping> toPrestoType(ConnectorSession session, JdbcTypeHandle typeHandle)
     {
         String typeName = typeHandle.getJdbcTypeName();
         int columnSize = typeHandle.getColumnSize();
@@ -135,9 +142,9 @@ public class PostgreSqlClient
         switch (typeName) {
             case "uuid":
                 if (columnSize > VarcharType.MAX_LENGTH) {
-                    return Optional.of(varcharReadMapping(createUnboundedVarcharType()));
+                    return Optional.of(varcharColumnMapping(createUnboundedVarcharType()));
                 }
-                return Optional.of(varcharReadMapping(createVarcharType(columnSize)));
+                return Optional.of(varcharColumnMapping(createVarcharType(columnSize)));
             case "geometry":
                 return Optional.of(geometryColumnMapping());
             case "jsonb":
@@ -201,11 +208,22 @@ public class PostgreSqlClient
         }
     }
 
-    private ReadMapping jsonColumnMapping()
+    private ColumnMapping jsonColumnMapping()
     {
-        return ReadMapping.sliceReadMapping(
+        return ColumnMapping.sliceMapping(
                 jsonType,
-                (resultSet, columnIndex) -> jsonParse(utf8Slice(resultSet.getString(columnIndex))));
+                (resultSet, columnIndex) -> jsonParse(utf8Slice(resultSet.getString(columnIndex))),
+                jsonWriteFunction());
+    }
+
+    private SliceWriteFunction jsonWriteFunction()
+    {
+        return ((statement, index, value) -> {
+            PGobject pgObject = new PGobject();
+            pgObject.setType("json");
+            pgObject.setValue(value.toStringUtf8());
+            statement.setObject(index, pgObject);
+        });
     }
 
     public static Slice jsonParse(Slice slice)
@@ -232,11 +250,20 @@ public class PostgreSqlClient
         return factory.createParser(new InputStreamReader(json.getInput(), UTF_8));
     }
 
-    private ReadMapping geometryColumnMapping()
+    private ColumnMapping geometryColumnMapping()
     {
-        return ReadMapping.sliceReadMapping(
+        return ColumnMapping.sliceMapping(
                 VARCHAR,
-                (resultSet, columnIndex) -> getAsText(getGeomFromBinary(wrappedBuffer(resultSet.getBytes(columnIndex)))));
+                (resultSet, columnIndex) -> getAsText(getGeomFromBinary(wrappedBuffer(resultSet.getBytes(columnIndex)))),
+                geometryWriteFunction());
+    }
+
+    private SliceWriteFunction geometryWriteFunction()
+    {
+        //TODO: see if this can be implemented in some way.
+        return ((statement, index, value) -> {
+            throw new UnsupportedOperationException();
+        });
     }
 
     private static Slice getAsText(Slice input)
