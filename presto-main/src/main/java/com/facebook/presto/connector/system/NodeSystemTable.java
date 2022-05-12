@@ -52,6 +52,7 @@ public class NodeSystemTable
             .column("node_version", createUnboundedVarcharType())
             .column("coordinator", BOOLEAN)
             .column("state", createUnboundedVarcharType())
+            .column("node_type", createUnboundedVarcharType())
             .build();
 
     private final InternalNodeManager nodeManager;
@@ -88,7 +89,7 @@ public class NodeSystemTable
     private void addRows(Builder table, Set<InternalNode> nodes, NodeState state)
     {
         for (InternalNode node : nodes) {
-            table.addRow(node.getNodeIdentifier(), node.getInternalUri().toString(), getNodeVersion(node), isCoordinator(node), state.toString().toLowerCase(Locale.ENGLISH));
+            table.addRow(node.getNodeIdentifier(), node.getInternalUri().toString(), getNodeVersion(node), isCoordinator(node), state.toString().toLowerCase(Locale.ENGLISH), node.getNodeType().toString());
         }
     }
 
