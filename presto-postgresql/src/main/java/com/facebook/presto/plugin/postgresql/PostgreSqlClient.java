@@ -146,6 +146,7 @@ public class PostgreSqlClient
                 }
                 return Optional.of(varcharColumnMapping(createVarcharType(columnSize)));
             case "geometry":
+            case "geography":
                 return Optional.of(geometryColumnMapping());
             case "jsonb":
             case "json":
@@ -160,7 +161,8 @@ public class PostgreSqlClient
         ImmutableMap.Builder<String, String> columnExpressions = ImmutableMap.builder();
         for (JdbcColumnHandle column : columnHandles) {
             JdbcTypeHandle jdbcTypeHandle = column.getJdbcTypeHandle();
-            if (jdbcTypeHandle.getJdbcTypeName().equalsIgnoreCase("geometry")) {
+            if (jdbcTypeHandle.getJdbcTypeName().equalsIgnoreCase("geometry") ||
+                    jdbcTypeHandle.getJdbcTypeName().equalsIgnoreCase("geography")) {
                 String columnName = column.getColumnName();
                 columnExpressions.put(columnName, "ST_AsBinary(\"" + columnName + "\")");
             }
