@@ -108,7 +108,7 @@ public class TestGlueToPrestoConverter
     @Test
     public void testConvertPartition()
     {
-        GluePartitionConverter converter = new GluePartitionConverter(testPartition.getDatabaseName(), testPartition.getTableName());
+        GluePartitionConverter converter = new GluePartitionConverter(GlueToPrestoConverter.convertTable(testTbl, testTbl.getDatabaseName()));
         com.facebook.presto.hive.metastore.Partition prestoPartition = converter.apply(testPartition);
         assertEquals(prestoPartition.getDatabaseName(), testPartition.getDatabaseName());
         assertEquals(prestoPartition.getTableName(), testPartition.getTableName());
@@ -133,7 +133,7 @@ public class TestGlueToPrestoConverter
         partitionTwo.getStorageDescriptor().setOutputFormat("" + testPartition.getStorageDescriptor().getOutputFormat());
         partitionTwo.getStorageDescriptor().setParameters(new HashMap<>(testPartition.getStorageDescriptor().getParameters()));
 
-        GluePartitionConverter converter = new GluePartitionConverter(testDb.getName(), testTbl.getName());
+        GluePartitionConverter converter = new GluePartitionConverter(GlueToPrestoConverter.convertTable(testTbl, testTbl.getDatabaseName()));
         com.facebook.presto.hive.metastore.Partition prestoPartition = converter.apply(testPartition);
         com.facebook.presto.hive.metastore.Partition prestoPartition2 = converter.apply(partitionTwo);
 
@@ -174,7 +174,7 @@ public class TestGlueToPrestoConverter
     public void testPartitionNullParameters()
     {
         testPartition.setParameters(null);
-        assertNotNull(new GluePartitionConverter(testDb.getName(), testTbl.getName()).apply(testPartition).getParameters());
+        assertNotNull(new GluePartitionConverter(GlueToPrestoConverter.convertTable(testTbl, testTbl.getDatabaseName())).apply(testPartition).getParameters());
     }
 
     @Test

@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.hive.metastore;
 
-import com.facebook.presto.hive.ColumnConverter;
 import com.facebook.presto.hive.HiveColumnConverterProvider;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.MockHiveMetastore;
@@ -26,6 +25,8 @@ import com.facebook.presto.hive.metastore.thrift.HiveMetastoreClient;
 import com.facebook.presto.hive.metastore.thrift.MockHiveMetastoreClient;
 import com.facebook.presto.hive.metastore.thrift.ThriftHiveMetastore;
 import com.facebook.presto.hive.metastore.thrift.ThriftHiveMetastoreStats;
+import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.TableNotFoundException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -69,7 +70,6 @@ public class TestCachingHiveMetastore
     private MockHiveMetastoreClient mockClient;
     private CachingHiveMetastore metastore;
     private ThriftHiveMetastoreStats stats;
-    public static final MetastoreClientConfig METASTORE_CLIENT_CONFIG = new MetastoreClientConfig();
 
     @BeforeMethod
     public void setUp()
@@ -77,7 +77,6 @@ public class TestCachingHiveMetastore
         mockClient = new MockHiveMetastoreClient();
         MockHiveCluster mockHiveCluster = new MockHiveCluster(mockClient);
         ListeningExecutorService executor = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("test-%s")));
-        ColumnConverter hiveColumnConverter = new HiveColumnConverter();
         ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(mockHiveCluster, new MetastoreClientConfig(), null);
         PartitionMutator hivePartitionMutator = new HivePartitionMutator();
         metastore = new CachingHiveMetastore(
@@ -151,26 +150,33 @@ public class TestCachingHiveMetastore
         assertNotNull(stats.getGetTable().getTime());
     }
 
+    private Table getTableOrElseThrow()
+    {
+        return metastore.getTable(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE)
+                .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(TEST_DATABASE, TEST_TABLE)));
+    }
+
     @Test
     public void testGetPartitionNames()
     {
         ImmutableList<String> expectedPartitions = ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2);
         assertEquals(mockClient.getAccessCount(), 0);
-        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE).get(), expectedPartitions);
+        Table table = getTableOrElseThrow();
+        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, table).get(), expectedPartitions);
         assertEquals(mockClient.getAccessCount(), 1);
-        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE).get(), expectedPartitions);
+        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, table).get(), expectedPartitions);
         assertEquals(mockClient.getAccessCount(), 1);
 
         metastore.flushCache();
 
-        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE).get(), expectedPartitions);
+        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, table).get(), expectedPartitions);
         assertEquals(mockClient.getAccessCount(), 2);
     }
 
     @Test
     public void testInvalidGetPartitionNames()
     {
-        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, BAD_DATABASE, TEST_TABLE).get(), ImmutableList.of());
+        assertEquals(metastore.getPartitionNames(METASTORE_CONTEXT, getTableOrElseThrow()).get(), ImmutableList.of());
     }
 
     @Test
@@ -217,7 +223,6 @@ public class TestCachingHiveMetastore
         ListeningExecutorService executor = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("partition-versioning-test-%s")));
         MockHiveMetastore mockHiveMetastore = new MockHiveMetastore(mockHiveCluster);
         PartitionMutator mockPartitionMutator = new MockPartitionMutator(identity());
-        ColumnConverter hiveColumnConverter = new HiveColumnConverter();
         CachingHiveMetastore partitionCachingEnabledmetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, mockPartitionMutator),
                 executor,
@@ -236,20 +241,21 @@ public class TestCachingHiveMetastore
         assertEquals(mockClient.getAccessCount(), 2);
 
         // Select all of the available partitions and load them into the cache
-        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        Table table = getTableOrElseThrow();
+        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
         assertEquals(mockClient.getAccessCount(), 3);
 
         // Now if we fetch any or both of them, they should hit the cache
-        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1)).size(), 1);
-        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION2)).size(), 1);
-        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1)).size(), 1);
+        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION2)).size(), 1);
+        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
         assertEquals(mockClient.getAccessCount(), 3);
 
         // This call should NOT invalidate the partition cache because partition version is same as before
         assertEquals(partitionCachingEnabledmetastore.getPartitionNamesByFilter(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableMap.of()), EXPECTED_PARTITIONS);
         assertEquals(mockClient.getAccessCount(), 4);
 
-        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
         // Assert that its a cache hit
         assertEquals(mockClient.getAccessCount(), 4);
 
@@ -263,7 +269,6 @@ public class TestCachingHiveMetastore
         MockHiveCluster mockHiveCluster = new MockHiveCluster(mockClient);
         ListeningExecutorService executor = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("partition-versioning-test-%s")));
         MockHiveMetastore mockHiveMetastore = new MockHiveMetastore(mockHiveCluster);
-        ColumnConverter hiveColumnConverter = new HiveColumnConverter();
         CachingHiveMetastore partitionCachingEnabledmetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, partitionMutator),
                 executor,
@@ -278,7 +283,7 @@ public class TestCachingHiveMetastore
         for (int i = 0; i < 100; i++) {
             assertEquals(partitionCachingEnabledmetastore.getPartitionNamesByFilter(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableMap.of()), EXPECTED_PARTITIONS);
             assertEquals(mockClient.getAccessCount(), ++clientAccessCount);
-            assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+            assertEquals(partitionCachingEnabledmetastore.getPartitionsByNames(METASTORE_CONTEXT, getTableOrElseThrow(), ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
             // Assert that we did not hit cache
             assertEquals(mockClient.getAccessCount(), ++clientAccessCount);
         }
@@ -297,7 +302,6 @@ public class TestCachingHiveMetastore
         ListeningExecutorService executor = listeningDecorator(newCachedThreadPool(daemonThreadsNamed("partition-versioning-test-%s")));
         MockHiveMetastore mockHiveMetastore = new MockHiveMetastore(mockHiveCluster);
         PartitionMutator mockPartitionMutator = new MockPartitionMutator(identity());
-        ColumnConverter hiveColumnConverter = new HiveColumnConverter();
         CachingHiveMetastore partitionCacheVerificationEnabledMetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, mockPartitionMutator),
                 executor,
@@ -309,41 +313,42 @@ public class TestCachingHiveMetastore
                 100.0);
 
         // Warmup the cache
-        partitionCacheVerificationEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2));
+        Table table = getTableOrElseThrow();
+        partitionCacheVerificationEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2));
 
         // Each of the following calls will be a cache hit and verification will be done.
-        partitionCacheVerificationEnabledMetastore.getPartition(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, TEST_PARTITION_VALUES1);
-        partitionCacheVerificationEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1));
-        partitionCacheVerificationEnabledMetastore.getPartition(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, TEST_PARTITION_VALUES2);
-        partitionCacheVerificationEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION2));
+        partitionCacheVerificationEnabledMetastore.getPartition(TEST_METASTORE_CONTEXT, table, TEST_PARTITION_VALUES1);
+        partitionCacheVerificationEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1));
+        partitionCacheVerificationEnabledMetastore.getPartition(TEST_METASTORE_CONTEXT, table, TEST_PARTITION_VALUES2);
+        partitionCacheVerificationEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION2));
     }
 
     @Test
     public void testGetPartitionsByNames()
     {
         assertEquals(mockClient.getAccessCount(), 0);
-        metastore.getTable(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE);
+        Table table = getTableOrElseThrow();
         assertEquals(mockClient.getAccessCount(), 1);
 
         // Select half of the available partitions and load them into the cache
-        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1)).size(), 1);
+        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1)).size(), 1);
         assertEquals(mockClient.getAccessCount(), 2);
 
         // Now select all of the partitions
-        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
         // There should be one more access to fetch the remaining partition
         assertEquals(mockClient.getAccessCount(), 3);
 
         // Now if we fetch any or both of them, they should not hit the client
-        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1)).size(), 1);
-        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION2)).size(), 1);
-        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1)).size(), 1);
+        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION2)).size(), 1);
+        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
         assertEquals(mockClient.getAccessCount(), 3);
 
         metastore.flushCache();
 
         // Fetching both should only result in one batched access
-        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(metastore.getPartitionsByNames(METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
         assertEquals(mockClient.getAccessCount(), 4);
     }
 
@@ -377,7 +382,7 @@ public class TestCachingHiveMetastore
 
     public void testInvalidGetPartitionsByNames()
     {
-        Map<String, Optional<Partition>> partitionsByNames = metastore.getPartitionsByNames(METASTORE_CONTEXT, BAD_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1));
+        Map<String, Optional<Partition>> partitionsByNames = metastore.getPartitionsByNames(METASTORE_CONTEXT, getTableOrElseThrow(), ImmutableList.of(TEST_PARTITION1));
         assertEquals(partitionsByNames.size(), 1);
         Optional<Partition> onlyElement = Iterables.getOnlyElement(partitionsByNames.values());
         assertFalse(onlyElement.isPresent());

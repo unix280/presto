@@ -389,7 +389,7 @@ public class GlueHiveMetastore
     {
         Table table = getTable(metastoreContext, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
-        return getPartitionStatistics(metastoreContext, getExistingPartitionsByNames(metastoreContext, databaseName, tableName, ImmutableList.copyOf(partitionNames)))
+        return getPartitionStatistics(metastoreContext, getExistingPartitionsByNames(metastoreContext, databaseName, tableName, ImmutableList.copyOf(partitionNames), table))
                 .entrySet()
                 .stream()
                 .collect(toImmutableMap(
@@ -397,9 +397,9 @@ public class GlueHiveMetastore
                         Entry::getValue));
     }
 
-    private List<Partition> getExistingPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
+    private List<Partition> getExistingPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames, Table table)
     {
-        Map<String, Partition> partitions = getPartitionsByNames(metastoreContext, databaseName, tableName, partitionNames).entrySet().stream()
+        Map<String, Partition> partitions = getPartitionsByNames(metastoreContext, table, partitionNames).entrySet().stream()
                 .map(entry -> immutableEntry(entry.getKey(), entry.getValue().orElseThrow(() ->
                         new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), toPartitionValues(entry.getKey())))))
                 .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -462,7 +462,8 @@ public class GlueHiveMetastore
         Map<List<String>, String> partitionValuesToName = updates.keySet().stream()
                 .collect(toImmutableMap(MetastoreUtil::toPartitionValues, identity()));
 
-        List<Partition> partitions = batchGetPartition(metastoreContext, databaseName, tableName, ImmutableList.copyOf(updates.keySet()));
+        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
+        List<Partition> partitions = batchGetPartition(metastoreContext, ImmutableList.copyOf(updates.keySet()), table);
         Map<Partition, Map<String, HiveColumnStatistics>> statisticsPerPartition = columnStatisticsProvider.getPartitionColumnStatistics(metastoreContext, partitions);
 
         statisticsPerPartition.forEach((partition, columnStatistics) -> {
@@ -791,20 +792,21 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues)
+    public Optional<Partition> getPartition(MetastoreContext metastoreContext, Table table, List<String> partitionValues)
     {
         GetPartitionRequest request = (GetPartitionRequest) updateAWSRequest(
                 metastoreContext,
                 new GetPartitionRequest()
                         .withCatalogId(catalogId)
-                        .withDatabaseName(databaseName)
-                        .withTableName(tableName)
+                        .withDatabaseName(table.getDatabaseName())
+                        .withTableName(table.getTableName())
                         .withPartitionValues(partitionValues));
 
         return stats.getGetPartition().record(() -> {
             try {
                 GetPartitionResult result = glueClient.getPartition(request);
-                return Optional.of(new GluePartitionConverter(databaseName, tableName).apply(result.getPartition()));
+                return Optional.of(new GluePartitionConverter(table)
+                        .apply(result.getPartition()));
             }
             catch (EntityNotFoundException e) {
                 return Optional.empty();
@@ -816,10 +818,9 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
     {
-        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
-        List<Partition> partitions = getPartitions(metastoreContext, databaseName, tableName, WILDCARD_EXPRESSION);
+        List<Partition> partitions = getPartitions(metastoreContext, WILDCARD_EXPRESSION, table);
         return Optional.of(buildPartitionNames(table.getPartitionColumns(), partitions));
     }
 
@@ -846,7 +847,7 @@ public class GlueHiveMetastore
         Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
         List<String> parts = convertPredicateToParts(partitionPredicates);
         String expression = buildGlueExpression(table.getPartitionColumns(), parts);
-        List<Partition> partitions = getPartitions(metastoreContext, databaseName, tableName, expression);
+        List<Partition> partitions = getPartitions(metastoreContext, expression, table);
         return buildPartitionNames(table.getPartitionColumns(), partitions);
     }
 
@@ -860,17 +861,17 @@ public class GlueHiveMetastore
         throw new UnsupportedOperationException();
     }
 
-    private List<Partition> getPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, String expression)
+    private List<Partition> getPartitions(MetastoreContext metastoreContext, String expression, Table table)
     {
         if (partitionSegments == 1) {
-            return getPartitions(metastoreContext, databaseName, tableName, expression, null);
+            return getPartitions(metastoreContext, expression, null, table);
         }
 
         // Do parallel partition fetch.
         CompletionService<List<Partition>> completionService = new ExecutorCompletionService<>(partitionsReadExecutor);
         for (int i = 0; i < partitionSegments; i++) {
             Segment segment = new Segment().withSegmentNumber(i).withTotalSegments(partitionSegments);
-            completionService.submit(() -> getPartitions(metastoreContext, databaseName, tableName, expression, segment));
+            completionService.submit(() -> getPartitions(metastoreContext, expression, segment, table));
         }
 
         List<Partition> partitions = new ArrayList<>();
@@ -891,18 +892,18 @@ public class GlueHiveMetastore
         return partitions;
     }
 
-    private List<Partition> getPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, String expression, @Nullable Segment segment)
+    private List<Partition> getPartitions(MetastoreContext metastoreContext, String expression, @Nullable Segment segment, Table table)
     {
         try {
-            GluePartitionConverter converter = new GluePartitionConverter(databaseName, tableName);
+            GluePartitionConverter converter = new GluePartitionConverter(table);
             ArrayList<Partition> partitions = new ArrayList<>();
 
             GetPartitionsRequest request = (GetPartitionsRequest) updateAWSRequest(
                     metastoreContext,
                     new GetPartitionsRequest()
                             .withCatalogId(catalogId)
-                            .withDatabaseName(databaseName)
-                            .withTableName(tableName)
+                            .withDatabaseName(table.getDatabaseName())
+                            .withTableName(table.getTableName())
                             .withExpression(expression)
                             .withSegment(segment)
                             .withMaxResults(AWS_GLUE_GET_PARTITIONS_MAX_RESULTS));
@@ -941,14 +942,14 @@ public class GlueHiveMetastore
      * @return Mapping of partition name to partition object
      */
     @Override
-    public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
+    public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, Table table, List<String> partitionNames)
     {
         requireNonNull(partitionNames, "partitionNames is null");
         if (partitionNames.isEmpty()) {
             return ImmutableMap.of();
         }
 
-        List<Partition> partitions = batchGetPartition(metastoreContext, databaseName, tableName, partitionNames);
+        List<Partition> partitions = batchGetPartition(metastoreContext, partitionNames, table);
 
         Map<String, List<String>> partitionNameToPartitionValuesMap = partitionNames.stream()
                 .collect(toMap(identity(), MetastoreUtil::toPartitionValues));
@@ -963,7 +964,7 @@ public class GlueHiveMetastore
         return resultBuilder.build();
     }
 
-    private List<Partition> batchGetPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
+    private List<Partition> batchGetPartition(MetastoreContext metastoreContext, List<String> partitionNames, Table table)
     {
         try {
             List<PartitionValueList> pendingPartitions = partitionNames.stream()
@@ -973,7 +974,7 @@ public class GlueHiveMetastore
             ImmutableList.Builder<Partition> resultsBuilder = ImmutableList.builderWithExpectedSize(partitionNames.size());
 
             // Reuse immutable field instances opportunistically between partitions
-            GluePartitionConverter converter = new GluePartitionConverter(databaseName, tableName);
+            GluePartitionConverter converter = new GluePartitionConverter(table);
 
             while (!pendingPartitions.isEmpty()) {
                 List<Future<BatchGetPartitionResult>> batchGetPartitionFutures = new ArrayList<>();
@@ -983,8 +984,8 @@ public class GlueHiveMetastore
                                     metastoreContext,
                                     new BatchGetPartitionRequest()
                                             .withCatalogId(catalogId)
-                                            .withDatabaseName(databaseName)
-                                            .withTableName(tableName)
+                                            .withDatabaseName(table.getDatabaseName())
+                                            .withTableName(table.getTableName())
                                             .withPartitionsToGet(partitions))));
                 }
                 pendingPartitions.clear();
@@ -1078,7 +1079,7 @@ public class GlueHiveMetastore
     public void dropPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> parts, boolean deleteData)
     {
         Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
-        Partition partition = getPartition(metastoreContext, databaseName, tableName, parts)
+        Partition partition = getPartition(metastoreContext, table, parts)
                 .orElseThrow(() -> new PartitionNotFoundException(new SchemaTableName(databaseName, tableName), parts));
 
         try {

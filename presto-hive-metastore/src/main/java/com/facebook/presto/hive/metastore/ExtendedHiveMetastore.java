@@ -81,9 +81,9 @@ public interface ExtendedHiveMetastore
 
     void dropColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName);
 
-    Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues);
+    Optional<Partition> getPartition(MetastoreContext metastoreContext, Table table, List<String> partitionValues);
 
-    Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName);
+    Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table);
 
     List<String> getPartitionNamesByFilter(
             MetastoreContext metastoreContext,
@@ -97,7 +97,7 @@ public interface ExtendedHiveMetastore
             String tableName,
             Map<Column, Domain> partitionPredicates);
 
-    Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames);
+    Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, Table table, List<String> partitionNames);
 
     void addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitions);
 

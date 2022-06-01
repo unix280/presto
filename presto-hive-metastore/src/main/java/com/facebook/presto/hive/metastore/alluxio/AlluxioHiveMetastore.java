@@ -147,7 +147,7 @@ public class AlluxioHiveMetastore
     {
         Table table = getTable(metastoreContext, databaseName, tableName).orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
 
-        Map<String, HiveBasicStatistics> partitionBasicStatistics = getPartitionsByNames(metastoreContext, databaseName, tableName, ImmutableList.copyOf(partitionNames)).entrySet().stream()
+        Map<String, HiveBasicStatistics> partitionBasicStatistics = getPartitionsByNames(metastoreContext, table, ImmutableList.copyOf(partitionNames)).entrySet().stream()
                 .filter(entry -> entry.getValue().isPresent())
                 .collect(toImmutableMap(
                         entry -> MetastoreUtil.makePartName(table.getPartitionColumns(), entry.getValue().get().getValues()),
@@ -277,16 +277,16 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues)
+    public Optional<Partition> getPartition(MetastoreContext metastoreContext, Table table, List<String> partitionValues)
     {
         throw new UnsupportedOperationException("getPartition is not supported in AlluxioHiveMetastore");
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
     {
         try {
-            List<PartitionInfo> partitionInfos = AlluxioProtoUtils.toPartitionInfoList(client.readTable(databaseName, tableName, Constraint.getDefaultInstance()));
+            List<PartitionInfo> partitionInfos = AlluxioProtoUtils.toPartitionInfoList(client.readTable(table.getDatabaseName(), table.getTableName(), Constraint.getDefaultInstance()));
             return Optional.of(partitionInfos.stream().map(PartitionInfo::getPartitionName).collect(toImmutableList()));
         }
         catch (AlluxioStatusException e) {
@@ -351,7 +351,7 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
+    public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, Table table, List<String> partitionNames)
     {
         if (partitionNames.isEmpty()) {
             return ImmutableMap.of();
@@ -359,10 +359,10 @@ public class AlluxioHiveMetastore
 
         try {
             // Get all partitions
-            List<PartitionInfo> partitionInfos = AlluxioProtoUtils.toPartitionInfoList(client.readTable(databaseName, tableName, Constraint.getDefaultInstance()));
+            List<PartitionInfo> partitionInfos = AlluxioProtoUtils.toPartitionInfoList(client.readTable(table.getDatabaseName(), table.getTableName(), Constraint.getDefaultInstance()));
 
             // TODO also check for database name equality
-            partitionInfos = partitionInfos.stream().filter(p -> p.getTableName().equals(tableName)).collect(toImmutableList());
+            partitionInfos = partitionInfos.stream().filter(p -> p.getTableName().equals(table.getTableName())).collect(toImmutableList());
             return partitionInfos.stream()
                     .filter(p -> partitionNames.stream().anyMatch(p.getPartitionName()::equals))
                     .collect(toImmutableMap(PartitionInfo::getPartitionName, partitionInfo -> Optional.of(AlluxioProtoUtils.fromProto(partitionInfo))));

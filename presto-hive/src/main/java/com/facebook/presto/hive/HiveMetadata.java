@@ -83,7 +83,6 @@ import com.facebook.presto.spi.plan.FilterStatsCalculatorService;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.RowExpressionService;
 import com.facebook.presto.spi.relation.SpecialFormExpression;
-import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.GrantInfo;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.Privilege;
@@ -2022,7 +2021,7 @@ public class HiveMetadata
                 .collect(toImmutableMap(HiveColumnHandle::getName, column -> column.getHiveType().getType(typeManager)));
         Map<List<String>, ComputedStatistics> partitionComputedStatistics = createComputedStatisticsToPartitionMap(computedStatistics, partitionedBy, columnTypes);
 
-        Set<String> existingPartitions = getExistingPartitionNames(session.getIdentity(), metastoreContext, handle.getSchemaName(), handle.getTableName(), partitionUpdates);
+        Set<String> existingPartitions = getExistingPartitionNames(metastoreContext, table, partitionUpdates);
 
         for (PartitionUpdate partitionUpdate : partitionUpdates) {
             if (partitionUpdate.getName().isEmpty()) {
@@ -2213,7 +2212,7 @@ public class HiveMetadata
                 .orElse(ImmutableMap.of());
     }
 
-    private Set<String> getExistingPartitionNames(ConnectorIdentity identity, MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionUpdate> partitionUpdates)
+    private Set<String> getExistingPartitionNames(MetastoreContext metastoreContext, Table table, List<PartitionUpdate> partitionUpdates)
     {
         ImmutableSet.Builder<String> existingPartitions = ImmutableSet.builder();
         ImmutableSet.Builder<String> potentiallyNewPartitions = ImmutableSet.builder();
@@ -2234,7 +2233,7 @@ public class HiveMetadata
 
         // try to load potentially new partitions in batches to check if any of them exist
         Lists.partition(ImmutableList.copyOf(potentiallyNewPartitions.build()), maxPartitionBatchSize).stream()
-                .flatMap(partitionNames -> metastore.getPartitionsByNames(metastoreContext, databaseName, tableName, partitionNames).entrySet().stream()
+                .flatMap(partitionNames -> metastore.getPartitionsByNames(metastoreContext, table, partitionNames).entrySet().stream()
                         .filter(entry -> entry.getValue().isPresent())
                         .map(Map.Entry::getKey))
                 .forEach(existingPartitions::add);
