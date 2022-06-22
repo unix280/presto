@@ -66,6 +66,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TimeZone;
@@ -398,6 +399,28 @@ public class TestHiveFileFormats
                 .withWriteColumns(TEST_COLUMNS)
                 .withRowsCount(rowCount)
                 .withReadColumns(Lists.reverse(TEST_COLUMNS))
+                .withSession(session)
+                .isReadableByPageSource(new OrcBatchPageSourceFactory(FUNCTION_AND_TYPE_MANAGER, FUNCTION_RESOLUTION, true, HDFS_ENVIRONMENT, STATS, 100, new StorageOrcFileTailSource(), StripeMetadataSourceFactory.of(new StorageStripeMetadataSource())));
+    }
+
+    @Test(dataProvider = "rowCount")
+    public void testOrcUseColumnNameLowerCaseConversion(int rowCount)
+            throws Exception
+    {
+        TestingConnectorSession session = new TestingConnectorSession(new HiveSessionProperties(
+                new HiveClientConfig(),
+                new OrcFileWriterConfig(),
+                new ParquetFileWriterConfig(),
+                new CacheConfig()).getSessionProperties());
+
+        List<TestColumn> testColumnsUpperCase = TEST_COLUMNS.stream()
+                .map(testColumn -> new TestColumn(testColumn.getName().toUpperCase(Locale.ENGLISH), testColumn.getObjectInspector(), testColumn.getWriteValue(), testColumn.getExpectedValue(), testColumn.isPartitionKey()))
+                .collect(toList());
+
+        assertThatFileFormat(ORC)
+                .withWriteColumns(testColumnsUpperCase)
+                .withRowsCount(rowCount)
+                .withReadColumns(TEST_COLUMNS)
                 .withSession(session)
                 .isReadableByPageSource(new OrcBatchPageSourceFactory(FUNCTION_AND_TYPE_MANAGER, FUNCTION_RESOLUTION, true, HDFS_ENVIRONMENT, STATS, 100, new StorageOrcFileTailSource(), StripeMetadataSourceFactory.of(new StorageStripeMetadataSource())));
     }

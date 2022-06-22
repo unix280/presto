@@ -103,6 +103,7 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -1147,7 +1148,8 @@ public final class HiveUtil
 
         int ordinal = 0;
         for (String physicalColumnName : columnNames) {
-            physicalNameOrdinalMap.put(physicalColumnName, ordinal);
+            // Convert column names read from ORC files to lower case to be consistent with those stored in Hive Metastore
+            physicalNameOrdinalMap.put(physicalColumnName.toLowerCase(Locale.ENGLISH), ordinal);
             ordinal++;
         }
 
