@@ -426,6 +426,8 @@ public final class HiveWriteUtils
 
     public static boolean isFileCreatedByQuery(String fileName, String queryId)
     {
+        // For normal files, the queryId is at the beginning of the file name.
+        // For bucketed files, the queryId is at the end of the file name.
         return fileName.startsWith(queryId) || fileName.endsWith(queryId);
     }
 

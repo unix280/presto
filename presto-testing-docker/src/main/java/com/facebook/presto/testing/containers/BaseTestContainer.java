@@ -39,7 +39,7 @@ import static org.testcontainers.utility.MountableFile.forHostPath;
 public abstract class BaseTestContainer
         implements AutoCloseable
 {
-    private final Logger log;
+    private static final Logger log = Logger.get(BaseTestContainer.class);
 
     private final String hostName;
     private final Set<Integer> ports;
@@ -48,7 +48,7 @@ public abstract class BaseTestContainer
     private final Optional<Network> network;
     private final int startupRetryLimit;
 
-    private GenericContainer<?> container;
+    private final GenericContainer<?> container;
 
     protected BaseTestContainer(
             String image,
@@ -60,7 +60,6 @@ public abstract class BaseTestContainer
             int startupRetryLimit)
     {
         checkArgument(startupRetryLimit > 0, "startupRetryLimit needs to be greater or equal to 0");
-        this.log = Logger.get(this.getClass());
         this.container = new GenericContainer<>(requireNonNull(image, "image is null"));
         this.ports = requireNonNull(ports, "ports is null");
         this.hostName = requireNonNull(hostName, "hostName is null");

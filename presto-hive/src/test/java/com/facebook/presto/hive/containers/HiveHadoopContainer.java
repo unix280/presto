@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.containers;
 
+import com.facebook.airlift.log.Logger;
 import com.facebook.presto.testing.containers.BaseTestContainer;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
@@ -22,9 +23,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-public class HiveHadoop
+import static java.lang.String.format;
+
+public class HiveHadoopContainer
         extends BaseTestContainer
 {
+    private static final Logger log = Logger.get(HiveHadoopContainer.class);
+
     private static final String IMAGE_VERSION = "10";
     public static final String DEFAULT_IMAGE = "prestodb/hdp2.6-hive:" + IMAGE_VERSION;
     public static final String HIVE3_IMAGE = "prestodb/hive3.1-hive:" + IMAGE_VERSION;
@@ -40,7 +45,7 @@ public class HiveHadoop
         return new Builder();
     }
 
-    private HiveHadoop(
+    private HiveHadoopContainer(
             String image,
             String hostName,
             Set<Integer> ports,
@@ -59,6 +64,17 @@ public class HiveHadoop
                 startupRetryLimit);
     }
 
+    @Override
+    protected void startContainer()
+    {
+        super.startContainer();
+        log.info(format(
+                "HiveHadoop container started with address for HiveServer: http://%s, HiveMetastore: http://%s and SocksProxy: http://%s",
+                getHiveServerEndpoint().toString(),
+                getHiveMetastoreEndpoint().toString(),
+                getMappedHdfsSocksProxy().toString()));
+    }
+
     public HostAndPort getMappedHdfsSocksProxy()
     {
         return getMappedHostAndPortForExposedPort(PROXY_PORT);
@@ -75,7 +91,7 @@ public class HiveHadoop
     }
 
     public static class Builder
-            extends BaseTestContainer.Builder<HiveHadoop.Builder, HiveHadoop>
+            extends BaseTestContainer.Builder<HiveHadoopContainer.Builder, HiveHadoopContainer>
     {
         private Builder()
         {
@@ -88,9 +104,9 @@ public class HiveHadoop
         }
 
         @Override
-        public HiveHadoop build()
+        public HiveHadoopContainer build()
         {
-            return new HiveHadoop(image, hostName, exposePorts, filesToMount, envVars, network, startupRetryLimit);
+            return new HiveHadoopContainer(image, hostName, exposePorts, filesToMount, envVars, network, startupRetryLimit);
         }
     }
 }

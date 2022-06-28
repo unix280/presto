@@ -25,10 +25,10 @@ import java.util.Set;
 
 import static java.lang.String.format;
 
-public class Minio
+public class MinIOContainer
         extends BaseTestContainer
 {
-    private static final Logger log = Logger.get(Minio.class);
+    private static final Logger log = Logger.get(MinIOContainer.class);
 
     public static final String DEFAULT_IMAGE = "minio/minio:RELEASE.2021-07-15T22-27-34Z";
     public static final String DEFAULT_HOST_NAME = "minio";
@@ -41,7 +41,7 @@ public class Minio
         return new Builder();
     }
 
-    private Minio(
+    private MinIOContainer(
             String image,
             String hostName,
             Set<Integer> exposePorts,
@@ -93,7 +93,7 @@ public class Minio
     }
 
     public static class Builder
-            extends BaseTestContainer.Builder<Minio.Builder, Minio>
+            extends BaseTestContainer.Builder<MinIOContainer.Builder, MinIOContainer>
     {
         private Builder()
         {
@@ -106,9 +106,9 @@ public class Minio
         }
 
         @Override
-        public Minio build()
+        public MinIOContainer build()
         {
-            return new Minio(image, hostName, exposePorts, filesToMount, envVars, network, startupRetryLimit);
+            return new MinIOContainer(image, hostName, exposePorts, filesToMount, envVars, network, startupRetryLimit);
         }
     }
 }

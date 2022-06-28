@@ -13,13 +13,13 @@
  */
 package com.facebook.presto.hive;
 
-import com.facebook.presto.hive.containers.HiveHadoop;
+import com.facebook.presto.hive.containers.HiveHadoopContainer;
 
 public class TestHive2InsertOverwrite
         extends BaseTestHiveInsertOverwrite
 {
     public TestHive2InsertOverwrite()
     {
-        super(HiveHadoop.DEFAULT_IMAGE);
+        super(HiveHadoopContainer.DEFAULT_IMAGE);
     }
 }

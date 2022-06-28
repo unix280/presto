@@ -174,6 +174,7 @@ import static com.facebook.presto.hive.HiveBasicStatistics.createZeroStatistics;
 import static com.facebook.presto.hive.HiveBucketHandle.createVirtualBucketHandle;
 import static com.facebook.presto.hive.HiveBucketing.HiveBucketFilter;
 import static com.facebook.presto.hive.HiveBucketing.getHiveBucketHandle;
+import static com.facebook.presto.hive.HiveClientConfig.InsertExistingPartitionsBehavior;
 import static com.facebook.presto.hive.HiveColumnHandle.BUCKET_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
@@ -202,7 +203,6 @@ import static com.facebook.presto.hive.HivePartition.UNPARTITIONED_ID;
 import static com.facebook.presto.hive.HivePartitioningHandle.createHiveCompatiblePartitioningHandle;
 import static com.facebook.presto.hive.HivePartitioningHandle.createPrestoNativePartitioningHandle;
 import static com.facebook.presto.hive.HiveSessionProperties.HIVE_STORAGE_FORMAT;
-import static com.facebook.presto.hive.HiveSessionProperties.InsertExistingPartitionsBehavior;
 import static com.facebook.presto.hive.HiveSessionProperties.RESPECT_TABLE_FORMAT;
 import static com.facebook.presto.hive.HiveSessionProperties.getBucketFunctionTypeForExchange;
 import static com.facebook.presto.hive.HiveSessionProperties.getCompressionCodec;
@@ -2087,8 +2087,21 @@ public class HiveMetadata
                 if (!partition.getStorage().getStorageFormat().getInputFormat().equals(handle.getPartitionStorageFormat().getInputFormat()) && isRespectTableFormat(session)) {
                     throw new PrestoException(HIVE_CONCURRENT_MODIFICATION_DETECTED, "Partition format changed during insert");
                 }
-                if (existingPartitions.contains(partitionUpdate.getName())) {
-                    if (partitionUpdate.getUpdateMode() != OVERWRITE) {
+
+                boolean existingPartition = existingPartitions.contains(partitionUpdate.getName());
+                if (existingPartition) {
+                    // Overwriting an existing partition
+                    if (partitionUpdate.getUpdateMode() == OVERWRITE) {
+                        if (handle.getLocationHandle().getWriteMode() == DIRECT_TO_TARGET_EXISTING_DIRECTORY) {
+                            // In this writeMode, the new files will be written to the same directory. Since this is
+                            // an overwrite operation, we must remove all the old files not written by current query.
+                            removeNonCurrentQueryFiles(session, partitionUpdate.getTargetPath());
+                        }
+                        else {
+                            metastore.dropPartition(session, handle.getSchemaName(), handle.getTableName(), handle.getLocationHandle().getTargetPath().toString(), partition.getValues());
+                        }
+                    }
+                    else {
                         throw new PrestoException(HIVE_PARTITION_READ_ONLY, "Cannot insert into an existing partition of Hive table: " + partitionUpdate.getName());
                     }
                 }
@@ -2098,25 +2111,8 @@ public class HiveMetadata
                         columnTypes,
                         getColumnStatistics(partitionComputedStatistics, partition.getValues()));
 
-                // Overwriting an existing partition
-                if (existingPartitions.contains(partitionUpdate.getName())) {
-                    if (handle.getLocationHandle().getWriteMode() == DIRECT_TO_TARGET_EXISTING_DIRECTORY) {
-                        removeNonCurrentQueryFiles(session, partitionUpdate.getTargetPath());
-                    }
-                    else {
-                        metastore.dropPartition(session, handle.getSchemaName(), handle.getTableName(), handle.getLocationHandle().getTargetPath().toString(), partition.getValues());
-                        metastore.addPartition(
-                                session,
-                                handle.getSchemaName(),
-                                handle.getTableName(),
-                                table.getStorage().getLocation(),
-                                false,
-                                partition,
-                                partitionUpdate.getWritePath(),
-                                partitionStatistics);
-                    }
-                }
-                else { // New partition
+                // New partition or overwriting existing partition by staging and moving the new partition
+                if (!existingPartition || handle.getLocationHandle().getWriteMode() != DIRECT_TO_TARGET_EXISTING_DIRECTORY) {
                     metastore.addPartition(
                             session,
                             handle.getSchemaName(),
@@ -2140,6 +2136,14 @@ public class HiveMetadata
                         .collect(toList())));
     }
 
+    /**
+     * Deletes all the files not written by the current query from the given partition path.
+     * This is required when we are overwriting the partitions by directly writing the new
+     * files to the existing directory, where files written by older queries may be present too.
+     *
+     * @param  session  the ConnectorSession object
+     * @param  partitionPath the path of the partition from where the older files are to be deleted
+     */
     private void removeNonCurrentQueryFiles(ConnectorSession session, Path partitionPath)
     {
         String queryId = session.getQueryId();
