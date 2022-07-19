@@ -474,7 +474,7 @@ final class ShowQueriesRewrite
 
                 accessControl.checkCanShowCreateTable(session.getRequiredTransactionId(), session.getIdentity(), session.getAccessControlContext(), objectName);
 
-                String sql = formatSql(new CreateView(getQualifiedName(node, objectName), query, false, Optional.empty()), Optional.of(parameters)).trim();
+                String sql = formatSql(new CreateView(createQualifiedName(objectName), query, false, Optional.empty()), Optional.of(parameters)).trim();
                 return singleValueQuery("Create View", sql);
             }
 

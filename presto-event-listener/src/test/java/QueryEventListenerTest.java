@@ -138,6 +138,7 @@ public class QueryEventListenerTest
         return new QueryMetadata(
                 "queryId", Optional.empty(),
                 "query",
+                Optional.of("query"),
                 "queryState",
                 URI.create("http://localhost"),
                 Optional.of(""),

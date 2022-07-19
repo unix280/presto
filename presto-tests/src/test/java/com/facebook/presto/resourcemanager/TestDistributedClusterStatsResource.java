@@ -80,7 +80,8 @@ public class TestDistributedClusterStatsResource
                         "concurrency-threshold-to-enable-resource-group-refresh", "0.1"),
                 ImmutableMap.of(),
                 COORDINATOR_COUNT,
-                SPOT_NODE_COUNT);
+                SPOT_NODE_COUNT,
+                false);
         coordinator1 = runner.getCoordinator(0);
         coordinator2 = runner.getCoordinator(1);
         Optional<TestingPrestoServer> resourceManager = runner.getResourceManager();

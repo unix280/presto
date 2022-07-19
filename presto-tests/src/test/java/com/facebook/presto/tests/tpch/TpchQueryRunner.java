@@ -54,20 +54,24 @@ public final class TpchQueryRunner
                 .setCoordinatorCount(coordinatorCount)
                 .setSpotNodeCount(spotNodeCount)
                 .build();
-        queryRunner.waitForClusterToGetReady();
-        return queryRunner;
+    }
+
+    public static DistributedQueryRunner createQueryRunnerWithNoClusterReadyCheck(Map<String, String> resourceManagerProperties, Map<String, String> coordinatorProperties, Map<String, String> extraProperties, int coordinatorCount)
+            throws Exception
+    {
+        return createQueryRunner(resourceManagerProperties, coordinatorProperties, extraProperties, coordinatorCount, 0, true);
     }
 
     public static DistributedQueryRunner createQueryRunner(Map<String, String> resourceManagerProperties, Map<String, String> coordinatorProperties, Map<String, String> extraProperties, int coordinatorCount)
             throws Exception
     {
-        return createQueryRunner(resourceManagerProperties, coordinatorProperties, extraProperties, coordinatorCount, 0);
+        return createQueryRunner(resourceManagerProperties, coordinatorProperties, extraProperties, coordinatorCount, 0, false);
     }
 
-    public static DistributedQueryRunner createQueryRunner(Map<String, String> resourceManagerProperties, Map<String, String> coordinatorProperties, Map<String, String> extraProperties, int coordinatorCount, int spotNodeCount)
+    public static DistributedQueryRunner createQueryRunner(Map<String, String> resourceManagerProperties, Map<String, String> coordinatorProperties, Map<String, String> extraProperties, int coordinatorCount, int spotNodeCount, boolean skipClusterReadyCheck)
             throws Exception
     {
-        return TpchQueryRunnerBuilder.builder()
+        DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder()
                 .setResourceManagerProperties(resourceManagerProperties)
                 .setCoordinatorProperties(coordinatorProperties)
                 .setExtraProperties(extraProperties)
@@ -75,6 +79,7 @@ public final class TpchQueryRunner
                 .setCoordinatorCount(coordinatorCount)
                 .setSpotNodeCount(spotNodeCount)
                 .build();
+
         if (!skipClusterReadyCheck) {
             queryRunner.waitForClusterToGetReady();
         }

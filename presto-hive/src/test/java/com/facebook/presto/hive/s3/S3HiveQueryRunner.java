@@ -45,7 +45,7 @@ public final class S3HiveQueryRunner
             Map<String, String> additionalHiveProperties)
             throws Exception
     {
-        return HiveQueryRunner.createQueryRunner(ImmutableList.of(), ImmutableMap.of(), ImmutableMap.of(), "sql-standard",
+        return HiveQueryRunner.createQueryRunner(ImmutableList.of(), ImmutableList.of(), ImmutableMap.of(), ImmutableMap.of(), "sql-standard",
                 ImmutableMap.<String, String>builder()
                         .put("hive.s3.endpoint", "http://" + s3Endpoint)
                         .put("hive.s3.aws-access-key", s3AccessKey)

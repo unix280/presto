@@ -288,12 +288,6 @@ public class ClusterStatsResource
         }
 
         @JsonProperty
-        public long getActiveSpotWorkers()
-        {
-            return activeSpotWorkers;
-        }
-
-        @JsonProperty
         @ThriftField(5)
         public long getRunningDrivers()
         {
@@ -340,6 +334,13 @@ public class ClusterStatsResource
         public long getAdjustedQueueSize()
         {
             return adjustedQueueSize;
+        }
+
+        @JsonProperty
+        @ThriftField(12)
+        public long getActiveSpotWorkers()
+        {
+            return activeSpotWorkers;
         }
     }
 }

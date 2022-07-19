@@ -39,6 +39,7 @@ public class TestThriftClusterStats
     public static final long BLOCKED_QUERIES = 21;
     public static final long QUEUED_QUERIES = 22;
     public static final long ACTIVE_WORKERS = 12;
+    public static final long ACTIVE_SPOT_WORKERS = 0;
     public static final long RUNNING_DRIVERS = 13;
     public static final long RUNNING_TASKS = 101;
     public static final double RESERVED_MEMORY = 1001.5;
@@ -128,6 +129,7 @@ public class TestThriftClusterStats
                 BLOCKED_QUERIES,
                 QUEUED_QUERIES,
                 ACTIVE_WORKERS,
+                ACTIVE_SPOT_WORKERS,
                 RUNNING_DRIVERS,
                 RUNNING_TASKS,
                 RESERVED_MEMORY,

@@ -765,7 +765,7 @@
             <dependency>
                 <groupId>com.facebook.presto.hadoop</groupId>
                 <artifactId>hadoop-apache2</artifactId>
-                <version>2.7.4-9</version>
+                <version>2.7.4-9.3</version>
             </dependency>
 
             <dependency>
@@ -2430,7 +2430,7 @@
                             <!-- This is actually the time when the build was done -->
                             <Build-Time>${git.build.time}</Build-Time>
                             <Git-Commit-Id>${git.commit.id}</Git-Commit-Id>
-                            <Implementation-Version>${project.version}-${git.commit.id.abbrev}</Implementation-Version>
+                            <Implementation-Version>${project.version}</Implementation-Version>
                         </manifestEntries>
                     </archive>
                 </configuration>

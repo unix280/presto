@@ -293,7 +293,6 @@ public class TestHiveClientConfig
                 .put("hive.user-defined-type-encoding-enabled", "true")
                 .put("hive.minimum-assigned-split-weight", "1.0")
                 .put("hive.use-record-page-source-for-custom-split", "false")
-                .put("hive.hudi-metadata-enabled", "true")
                 .put("hive.file-splittable", "false")
                 .put("hive.hudi-metadata-enabled", "true")
                 .build();

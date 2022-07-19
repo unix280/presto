@@ -33,8 +33,6 @@ import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
-import com.facebook.presto.hive.metastore.MetastoreContext;
-import com.facebook.presto.hive.metastore.MetastoreUtil;
 import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.PartitionWithStatistics;
 import com.facebook.presto.spi.PrestoException;
@@ -84,8 +82,8 @@ import org.weakref.jmx.Managed;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
-import java.net.InetAddress;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
