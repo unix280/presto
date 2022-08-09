@@ -167,7 +167,7 @@
 
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt</artifactId>
+            <artifactId>jjwt-api</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
