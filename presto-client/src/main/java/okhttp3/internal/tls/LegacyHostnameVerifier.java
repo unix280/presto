@@ -11,8 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+//CHECKSTYLE:OFF
 package okhttp3.internal.tls;
-
+//CHECKSTYLE:ON
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
