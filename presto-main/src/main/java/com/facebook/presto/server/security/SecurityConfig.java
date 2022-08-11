@@ -40,7 +40,8 @@ public class SecurityConfig
         KERBEROS,
         PASSWORD,
         JWT,
-        OAUTH2
+        OAUTH2,
+        TEST_EXTERNAL
     }
 
     @NotNull
