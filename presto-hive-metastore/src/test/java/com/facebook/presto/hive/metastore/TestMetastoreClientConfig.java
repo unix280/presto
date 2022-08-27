@@ -15,6 +15,7 @@ package com.facebook.presto.hive.metastore;
 
 import com.facebook.airlift.configuration.testing.ConfigAssertions;
 import com.facebook.presto.hive.MetastoreClientConfig;
+import com.facebook.presto.hive.MetastoreClientConfig.HiveMetastoreAuthenticationType;
 import com.facebook.presto.hive.metastore.CachingHiveMetastore.MetastoreCacheScope;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
@@ -46,7 +47,10 @@ public class TestMetastoreClientConfig
                 .setPartitionVersioningEnabled(false)
                 .setMetastoreCacheScope(MetastoreCacheScope.ALL)
                 .setMetastoreImpersonationEnabled(false)
-                .setPartitionCacheValidationPercentage(0));
+                .setPartitionCacheValidationPercentage(0)
+                .setPartitionCacheColumnCountLimit(500)
+                .setHiveMetastoreAuthenticationType(HiveMetastoreAuthenticationType.NONE)
+                .setDeleteFilesOnTableDrop(false));
     }
 
     @Test
@@ -70,6 +74,9 @@ public class TestMetastoreClientConfig
                 .put("hive.metastore.thrift.delete-files-on-drop", "true")
                 .put("hive.metastore-impersonation-enabled", "true")
                 .put("hive.partition-cache-validation-percentage", "60.0")
+                .put("hive.partition-cache-column-count-limit", "50")
+                .put("hive.metastore.authentication.type", "KERBEROS")
+                .put("hive.metastore.thrift.delete-files-on-table-drop", "true")
                 .build();
 
         MetastoreClientConfig expected = new MetastoreClientConfig()
@@ -89,7 +96,10 @@ public class TestMetastoreClientConfig
                 .setPartitionVersioningEnabled(true)
                 .setMetastoreCacheScope(MetastoreCacheScope.PARTITION)
                 .setMetastoreImpersonationEnabled(true)
-                .setPartitionCacheValidationPercentage(60.0);
+                .setPartitionCacheValidationPercentage(60.0)
+                .setPartitionCacheColumnCountLimit(50)
+                .setHiveMetastoreAuthenticationType(HiveMetastoreAuthenticationType.KERBEROS)
+                .setDeleteFilesOnTableDrop(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

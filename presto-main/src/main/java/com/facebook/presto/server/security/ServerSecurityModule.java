@@ -16,6 +16,7 @@ package com.facebook.presto.server.security;
 import com.facebook.airlift.configuration.AbstractConfigurationAwareModule;
 import com.facebook.airlift.http.server.Authenticator;
 import com.facebook.airlift.http.server.CertificateAuthenticator;
+import com.facebook.airlift.http.server.HttpServer.ClientCertificate;
 import com.facebook.airlift.http.server.JsonWebTokenAuthenticator;
 import com.facebook.airlift.http.server.JsonWebTokenConfig;
 import com.facebook.airlift.http.server.KerberosAuthenticator;
@@ -31,11 +32,13 @@ import javax.servlet.Filter;
 import java.util.List;
 
 import static com.facebook.airlift.configuration.ConfigBinder.configBinder;
+import static com.facebook.airlift.http.server.HttpServer.ClientCertificate.REQUESTED;
 import static com.facebook.presto.server.security.SecurityConfig.AuthenticationType.CERTIFICATE;
 import static com.facebook.presto.server.security.SecurityConfig.AuthenticationType.JWT;
 import static com.facebook.presto.server.security.SecurityConfig.AuthenticationType.KERBEROS;
 import static com.facebook.presto.server.security.SecurityConfig.AuthenticationType.PASSWORD;
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
+import static com.google.inject.multibindings.OptionalBinder.newOptionalBinder;
 
 public class ServerSecurityModule
         extends AbstractConfigurationAwareModule
@@ -53,6 +56,7 @@ public class ServerSecurityModule
 
         for (AuthenticationType authType : authTypes) {
             if (authType == CERTIFICATE) {
+                newOptionalBinder(binder, ClientCertificate.class).setBinding().toInstance(REQUESTED);
                 authBinder.addBinding().to(CertificateAuthenticator.class).in(Scopes.SINGLETON);
             }
             else if (authType == KERBEROS) {

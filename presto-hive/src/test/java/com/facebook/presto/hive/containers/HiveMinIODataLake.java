@@ -39,8 +39,8 @@ public class HiveMinIODataLake
     public static final String SECRET_KEY = "secretkey";
 
     private final String bucketName;
-    private final MinIOContainer minio;
-    private final HiveHadoopContainer hiveHadoop;
+    private final MinIOContainer minIOContainer;
+    private final HiveHadoopContainer hiveHadoopContainer;
 
     private final AtomicBoolean isStarted = new AtomicBoolean(false);
     private final AutoCloseableCloser closer = AutoCloseableCloser.create();
@@ -54,7 +54,7 @@ public class HiveMinIODataLake
     {
         this.bucketName = requireNonNull(bucketName, "bucketName is null");
         Network network = closer.register(newNetwork());
-        this.minio = closer.register(
+        this.minIOContainer = closer.register(
                 MinIOContainer.builder()
                         .withNetwork(network)
                         .withEnvVars(ImmutableMap.<String, String>builder()
@@ -73,7 +73,7 @@ public class HiveMinIODataLake
         }
         filesToMount.put("hive_s3_insert_overwrite/hadoop-core-site.xml", hadoopCoreSitePath);
 
-        this.hiveHadoop = closer.register(
+        this.hiveHadoopContainer = closer.register(
                 HiveHadoopContainer.builder()
                         .withFilesToMount(filesToMount.build())
                         .withImage(hiveHadoopImage)
@@ -87,12 +87,12 @@ public class HiveMinIODataLake
             return;
         }
         try {
-            this.minio.start();
-            this.hiveHadoop.start();
+            this.minIOContainer.start();
+            this.hiveHadoopContainer.start();
             AmazonS3 s3Client = AmazonS3ClientBuilder
                     .standard()
                     .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
-                            "http://localhost:" + minio.getMinioApiEndpoint().getPort(),
+                            "http://localhost:" + minIOContainer.getMinioApiEndpoint().getPort(),
                             "us-east-1"))
                     .withPathStyleAccessEnabled(true)
                     .withCredentials(new AWSStaticCredentialsProvider(
@@ -128,12 +128,12 @@ public class HiveMinIODataLake
 
     public MinIOContainer getMinio()
     {
-        return minio;
+        return minIOContainer;
     }
 
     public HiveHadoopContainer getHiveHadoop()
     {
-        return hiveHadoop;
+        return hiveHadoopContainer;
     }
 
     @Override

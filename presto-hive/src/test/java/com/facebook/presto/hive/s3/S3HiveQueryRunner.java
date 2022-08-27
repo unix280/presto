@@ -13,13 +13,8 @@
  */
 package com.facebook.presto.hive.s3;
 
-import com.facebook.presto.hive.HdfsConfigurationInitializer;
-import com.facebook.presto.hive.HdfsEnvironment;
-import com.facebook.presto.hive.HiveClientConfig;
-import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.HiveQueryRunner;
 import com.facebook.presto.hive.MetastoreClientConfig;
-import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.HivePartitionMutator;
 import com.facebook.presto.hive.metastore.thrift.BridgingHiveMetastore;
 import com.facebook.presto.hive.metastore.thrift.TestingHiveCluster;
@@ -27,11 +22,12 @@ import com.facebook.presto.hive.metastore.thrift.ThriftHiveMetastore;
 import com.facebook.presto.tests.DistributedQueryRunner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
 
 import java.util.Map;
 import java.util.Optional;
+
+import static com.facebook.presto.hive.HiveTestUtils.HDFS_ENVIRONMENT;
 
 public final class S3HiveQueryRunner
 {
@@ -45,7 +41,8 @@ public final class S3HiveQueryRunner
             Map<String, String> additionalHiveProperties)
             throws Exception
     {
-        return HiveQueryRunner.createQueryRunner(ImmutableList.of(), ImmutableList.of(), ImmutableMap.of(), ImmutableMap.of(), "sql-standard",
+        return HiveQueryRunner.createQueryRunner(ImmutableList.of(), ImmutableList.of(), ImmutableMap.of(),
+                ImmutableMap.of(), "sql-standard",
                 ImmutableMap.<String, String>builder()
                         .put("hive.s3.endpoint", "http://" + s3Endpoint)
                         .put("hive.s3.aws-access-key", s3AccessKey)
@@ -62,13 +59,7 @@ public final class S3HiveQueryRunner
                                         hiveEndpoint.getHost(),
                                         hiveEndpoint.getPort()),
                                 new MetastoreClientConfig(),
-                                new HdfsEnvironment(new HiveHdfsConfiguration(
-                                        new HdfsConfigurationInitializer(
-                                                new HiveClientConfig(),
-                                                new MetastoreClientConfig()),
-                                        ImmutableSet.of()),
-                                        new MetastoreClientConfig(),
-                                        new NoHdfsAuthentication())),
+                                HDFS_ENVIRONMENT),
                         new HivePartitionMutator())));
     }
 }

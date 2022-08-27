@@ -15,6 +15,7 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.hive.containers.HiveMinIODataLake;
 import com.facebook.presto.hive.s3.S3HiveQueryRunner;
+import com.facebook.presto.testing.MaterializedResult;
 import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.tests.AbstractTestQueryFramework;
 import com.google.common.collect.ImmutableMap;
@@ -30,6 +31,8 @@ import static com.facebook.presto.tests.sql.TestTable.randomTableSuffix;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public abstract class BaseTestHiveInsertOverwrite
         extends AbstractTestQueryFramework
@@ -139,12 +142,24 @@ public abstract class BaseTestHiveInsertOverwrite
                         "('CZECH', 'Test Data', 26, 5)",
                 testTable));
 
+        String oldPartitionPath = getPartitionPath(testTable);
         assertQuery(format("SELECT count(*) FROM %s WHERE regionkey = 5", testTable), "SELECT 2");
 
         computeActual(format("INSERT INTO %s values('POLAND', 'Overwrite', 25, 5)", testTable));
+
+        String newPartitionPath = getPartitionPath(testTable);
         assertQuery(format("SELECT count(*) FROM %s WHERE regionkey = 5", testTable), "SELECT 1");
 
+        assertEquals(oldPartitionPath, newPartitionPath);
         computeActual(format("DROP TABLE %s", testTable));
+    }
+
+    private String getPartitionPath(String testTable)
+    {
+        MaterializedResult result = computeActual(format("SELECT \"$PATH\" from %s where regionkey = 5", testTable));
+        assertTrue(result.getMaterializedRows().size() > 0);
+        String path = result.getMaterializedRows().get(0).getField(0).toString();
+        return path.substring(0, path.lastIndexOf("/"));
     }
 
     protected String getTestTableName()

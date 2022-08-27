@@ -15,7 +15,6 @@ package com.facebook.presto.hive;
 
 import com.facebook.airlift.configuration.testing.ConfigAssertions;
 import com.facebook.presto.hive.HiveClientConfig.HdfsAuthenticationType;
-import com.facebook.presto.hive.HiveClientConfig.HiveMetastoreAuthenticationType;
 import com.facebook.presto.hive.s3.S3FileSystemType;
 import com.facebook.presto.orc.OrcWriteValidation.OrcWriteValidationMode;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
@@ -103,7 +102,6 @@ public class TestHiveClientConfig
                 .setOrcOptimizedWriterEnabled(true)
                 .setOrcWriterValidationPercentage(0.0)
                 .setOrcWriterValidationMode(OrcWriteValidationMode.BOTH)
-                .setHiveMetastoreAuthenticationType(HiveMetastoreAuthenticationType.NONE)
                 .setHdfsAuthenticationType(HdfsAuthenticationType.NONE)
                 .setHdfsImpersonationEnabled(false)
                 .setSkipDeletionForAlter(false)
@@ -126,7 +124,7 @@ public class TestHiveClientConfig
                 .setPartitionStatisticsBasedOptimizationEnabled(false)
                 .setS3SelectPushdownEnabled(false)
                 .setS3SelectPushdownMaxConnections(500)
-                .setStreamingAggregationEnabled(false)
+                .setOrderBasedExecutionEnabled(false)
                 .setTemporaryStagingDirectoryEnabled(true)
                 .setTemporaryStagingDirectoryPath("/tmp/presto-${USER}")
                 .setTemporaryTableSchema("default")
@@ -230,7 +228,6 @@ public class TestHiveClientConfig
                 .put("hive.orc.optimized-writer.enabled", "false")
                 .put("hive.orc.writer.validation-percentage", "0.16")
                 .put("hive.orc.writer.validation-mode", "DETAILED")
-                .put("hive.metastore.authentication.type", "KERBEROS")
                 .put("hive.hdfs.authentication.type", "KERBEROS")
                 .put("hive.hdfs.impersonation.enabled", "true")
                 .put("hive.skip-deletion-for-alter", "true")
@@ -254,7 +251,7 @@ public class TestHiveClientConfig
                 .put("hive.partition-statistics-based-optimization-enabled", "true")
                 .put("hive.s3select-pushdown.enabled", "true")
                 .put("hive.s3select-pushdown.max-connections", "1234")
-                .put("hive.streaming-aggregation-enabled", "true")
+                .put("hive.order-based-execution-enabled", "true")
                 .put("hive.temporary-staging-directory-enabled", "false")
                 .put("hive.temporary-staging-directory-path", "updated")
                 .put("hive.temporary-table-schema", "other")
@@ -352,7 +349,6 @@ public class TestHiveClientConfig
                 .setOrcOptimizedWriterEnabled(false)
                 .setOrcWriterValidationPercentage(0.16)
                 .setOrcWriterValidationMode(OrcWriteValidationMode.DETAILED)
-                .setHiveMetastoreAuthenticationType(HiveMetastoreAuthenticationType.KERBEROS)
                 .setHdfsAuthenticationType(HdfsAuthenticationType.KERBEROS)
                 .setHdfsImpersonationEnabled(true)
                 .setSkipDeletionForAlter(true)
@@ -376,7 +372,7 @@ public class TestHiveClientConfig
                 .setPartitionStatisticsBasedOptimizationEnabled(true)
                 .setS3SelectPushdownEnabled(true)
                 .setS3SelectPushdownMaxConnections(1234)
-                .setStreamingAggregationEnabled(true)
+                .setOrderBasedExecutionEnabled(true)
                 .setTemporaryStagingDirectoryEnabled(false)
                 .setTemporaryStagingDirectoryPath("updated")
                 .setTemporaryTableSchema("other")

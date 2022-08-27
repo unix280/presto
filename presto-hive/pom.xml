@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.272</version>
+        <version>0.273</version>
     </parent>
 
     <artifactId>presto-hive</artifactId>
@@ -892,13 +892,13 @@
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-testing-docker</artifactId>
+            <artifactId>presto-tpcds</artifactId>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-tpcds</artifactId>
+            <artifactId>presto-testing-docker</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.plugin.base.security;
 
+import com.facebook.presto.common.Subfield;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -147,9 +148,9 @@ public abstract class ForwardingConnectorAccessControl
     }
 
     @Override
-    public void checkCanSelectFromColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, Set<String> columnNames)
+    public void checkCanSelectFromColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, Set<Subfield> columnOrSubfieldNames)
     {
-        delegate().checkCanSelectFromColumns(transactionHandle, identity, context, tableName, columnNames);
+        delegate().checkCanSelectFromColumns(transactionHandle, identity, context, tableName, columnOrSubfieldNames);
     }
 
     @Override
@@ -162,6 +163,12 @@ public abstract class ForwardingConnectorAccessControl
     public void checkCanDeleteFromTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
     {
         delegate().checkCanDeleteFromTable(transactionHandle, identity, context, tableName);
+    }
+
+    @Override
+    public void checkCanTruncateTable(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName)
+    {
+        delegate().checkCanTruncateTable(transactionHandle, identity, context, tableName);
     }
 
     @Override
