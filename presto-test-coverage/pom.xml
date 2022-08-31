@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.273</version>
+        <version>0.274</version>
     </parent>
 
     <artifactId>presto-test-coverage</artifactId>
@@ -14,7 +14,6 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
 
-        <maven.deploy.skip>true</maven.deploy.skip>
         <air.check.skip-enforcer>true</air.check.skip-enforcer>
         <air.check.skip-enforcer>true</air.check.skip-enforcer>
         <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>

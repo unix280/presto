@@ -17,8 +17,10 @@ import com.facebook.presto.Session;
 import com.facebook.presto.spi.plan.AggregationNode;
 import com.facebook.presto.spi.plan.DistinctLimitNode;
 import com.facebook.presto.spi.plan.FilterNode;
+import com.facebook.presto.spi.plan.LimitNode;
 import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.spi.plan.TableScanNode;
+import com.facebook.presto.spi.plan.TopNNode;
 import com.facebook.presto.spi.plan.ValuesNode;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
@@ -36,6 +38,7 @@ import com.facebook.presto.sql.planner.plan.IndexJoinNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LateralJoinNode;
 import com.facebook.presto.sql.planner.plan.SemiJoinNode;
+import com.facebook.presto.sql.planner.plan.SortNode;
 import com.facebook.presto.sql.planner.plan.StatisticsWriterNode;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.tests.QueryTemplate;
@@ -51,6 +54,7 @@ import java.util.function.Predicate;
 
 import static com.facebook.presto.SystemSessionProperties.DISTRIBUTED_SORT;
 import static com.facebook.presto.SystemSessionProperties.ENFORCE_FIXED_DISTRIBUTION_FOR_OUTPUT_OPERATOR;
+import static com.facebook.presto.SystemSessionProperties.EXPLOIT_CONSTRAINTS;
 import static com.facebook.presto.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static com.facebook.presto.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static com.facebook.presto.SystemSessionProperties.JOIN_MAX_BROADCAST_TABLE_SIZE;
@@ -69,6 +73,7 @@ import static com.facebook.presto.spi.plan.AggregationNode.Step.FINAL;
 import static com.facebook.presto.spi.plan.AggregationNode.Step.PARTIAL;
 import static com.facebook.presto.spi.plan.AggregationNode.Step.SINGLE;
 import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
+import static com.facebook.presto.sql.planner.LogicalPlanner.Stage.OPTIMIZED;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.any;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.anyNot;
@@ -602,7 +607,7 @@ public class TestLogicalPlanner
     private void assertPlanContainsNoApplyOrAnyJoin(String sql)
     {
         assertFalse(
-                searchFrom(plan(sql, LogicalPlanner.Stage.OPTIMIZED).getRoot())
+                searchFrom(plan(sql, OPTIMIZED).getRoot())
                         .where(isInstanceOfAny(ApplyNode.class, JoinNode.class, IndexJoinNode.class, SemiJoinNode.class, LateralJoinNode.class))
                         .matches(),
                 "Unexpected node for query: " + sql);
@@ -613,7 +618,7 @@ public class TestLogicalPlanner
     {
         assertPlan(
                 "SELECT orderkey FROM orders WHERE 3 = (SELECT orderkey)",
-                LogicalPlanner.Stage.OPTIMIZED,
+                OPTIMIZED,
                 any(
                         filter(
                                 "X = BIGINT '3'",
@@ -774,7 +779,7 @@ public class TestLogicalPlanner
         assertPlan(
                 "SELECT orderkey FROM orders o " +
                         "WHERE 3 IN (SELECT o.custkey FROM lineitem l WHERE (SELECT l.orderkey = o.orderkey))",
-                LogicalPlanner.Stage.OPTIMIZED,
+                OPTIMIZED,
                 anyTree(
                         filter("OUTER_FILTER",
                                 apply(ImmutableList.of("C", "O"),
@@ -1244,6 +1249,46 @@ public class TestLogicalPlanner
     }
 
     @Test
+    public void testSizeBasedJoin()
+    {
+        // both local.sf100000.nation and local.sf100000.orders don't provide stats, therefore no reordering happens
+        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".nation, local.\"sf42.5\".orders WHERE nation.nationkey = orders.custkey",
+                output(
+                        anyTree(
+                                join(INNER, ImmutableList.of(equiJoinClause("NATIONKEY", "CUSTKEY")),
+                                        anyTree(tableScan("nation", ImmutableMap.of("NATIONKEY", "nationkey"))),
+                                        anyTree(tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey")))))));
+
+        // values node provides stats
+        assertDistributedPlan("SELECT custkey FROM (VALUES CAST(1 AS BIGINT), CAST(2 AS BIGINT)) t(a), local.\"sf42.5\".orders WHERE t.a = orders.custkey",
+                output(
+                        anyTree(
+                                join(INNER, ImmutableList.of(equiJoinClause("CUSTKEY", "T_A")), Optional.empty(), Optional.of(REPLICATED),
+                                        anyTree(tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
+                                        anyTree(values("T_A"))))));
+    }
+
+    @Test
+    public void testSizeBasedSemiJoin()
+    {
+        // both local.sf100000.nation and local.sf100000.orders don't provide stats, therefore no reordering happens
+        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".orders WHERE orders.custkey NOT IN (SELECT nationkey FROM local.\"sf42.5\".nation)",
+                output(
+                        anyTree(
+                                semiJoin("CUSTKEY", "NATIONKEY", "OUT", Optional.of(SemiJoinNode.DistributionType.PARTITIONED),
+                                        anyTree(tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
+                                        anyTree(tableScan("nation", ImmutableMap.of("NATIONKEY", "nationkey")))))));
+
+        // values node provides stats
+        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".orders WHERE orders.custkey NOT IN (SELECT t.a FROM (VALUES CAST(1 AS BIGINT), CAST(2 AS BIGINT)) t(a))",
+                output(
+                        anyTree(
+                                semiJoin("CUSTKEY", "T_A", "OUT", Optional.of(SemiJoinNode.DistributionType.REPLICATED),
+                                        anyTree(tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
+                                        anyTree(values("T_A"))))));
+    }
+
+    @Test
     public void testJoinNullFilters()
     {
         Session nullFiltersInJoin = Session.builder(this.getQueryRunner().getDefaultSession())
@@ -1352,66 +1397,6 @@ public class TestLogicalPlanner
                                                                 project(tableScan("orders", ImmutableMap.of("orderstatus", "orderstatus", "custkey", "custkey"))))))))));
     }
 
-    @Test
-    public void testSizeBasedJoin()
-    {
-        // both local.sf100000.nation and local.sf100000.orders don't provide stats, therefore no reordering happens
-        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".nation, local.\"sf42.5\".orders WHERE nation.nationkey = orders.custkey",
-                automaticJoinDistribution(),
-                output(
-                        anyTree(
-                                join(INNER, ImmutableList.of(equiJoinClause("NATIONKEY", "CUSTKEY")),
-                                        anyTree(
-                                                tableScan("nation", ImmutableMap.of("NATIONKEY", "nationkey"))),
-                                        anyTree(
-                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey")))))));
-
-        // values node provides stats
-        assertDistributedPlan("SELECT custkey FROM (VALUES CAST(1 AS BIGINT), CAST(2 AS BIGINT)) t(a), local.\"sf42.5\".orders WHERE t.a = orders.custkey",
-                automaticJoinDistribution(),
-                output(
-                        anyTree(
-                                join(INNER, ImmutableList.of(equiJoinClause("CUSTKEY", "T_A")), Optional.empty(), Optional.of(REPLICATED),
-                                        anyTree(
-                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
-                                        anyTree(
-                                                values("T_A"))))));
-    }
-
-    @Test
-    public void testSizeBasedSemiJoin()
-    {
-        // both local.sf100000.nation and local.sf100000.orders don't provide stats, therefore no reordering happens
-        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".orders WHERE orders.custkey IN (SELECT nationkey FROM local.\"sf42.5\".nation)",
-                automaticJoinDistribution(),
-                output(
-                        anyTree(
-                                semiJoin("CUSTKEY", "NATIONKEY", "OUT", Optional.of(SemiJoinNode.DistributionType.PARTITIONED),
-                                        anyTree(
-                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
-                                        anyTree(
-                                                tableScan("nation", ImmutableMap.of("NATIONKEY", "nationkey")))))));
-
-        // values node provides stats
-        assertDistributedPlan("SELECT custkey FROM local.\"sf42.5\".orders WHERE orders.custkey IN (SELECT t.a FROM (VALUES CAST(1 AS BIGINT), CAST(2 AS BIGINT)) t(a))",
-                automaticJoinDistribution(),
-                output(
-                        anyTree(
-                                semiJoin("CUSTKEY", "T_A", "OUT", Optional.of(SemiJoinNode.DistributionType.REPLICATED),
-                                        anyTree(
-                                                tableScan("orders", ImmutableMap.of("CUSTKEY", "custkey"))),
-                                        anyTree(
-                                                values("T_A"))))));
-    }
-
-    private Session noJoinReordering()
-    {
-        return Session.builder(getQueryRunner().getDefaultSession())
-                .setSystemProperty(JOIN_REORDERING_STRATEGY, FeaturesConfig.JoinReorderingStrategy.NONE.name())
-                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
-                .build();
-    }
-
     private Session automaticJoinDistribution()
     {
         return Session.builder(getQueryRunner().getDefaultSession())
@@ -1458,5 +1443,106 @@ public class TestLogicalPlanner
                                                                 any(
                                                                         tableScan("nation", ImmutableMap.of("name", "name", "regionkey", "regionkey"))))))
                                                 .withAlias("row_num", new RowNumberSymbolMatcher())))));
+    }
+
+    private Session noJoinReordering()
+    {
+        return Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, ELIMINATE_CROSS_JOINS.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
+                .build();
+    }
+
+    public void testRedundantLimitNodeRemoval()
+    {
+        String query = "SELECT count(*) FROM orders LIMIT 10";
+        assertFalse(
+                searchFrom(plan(query, OPTIMIZED).getRoot())
+                        .where(LimitNode.class::isInstance)
+                        .matches(),
+                format("Unexpected limit node for query: '%s'", query));
+
+        assertPlan(
+                "SELECT orderkey, count(*) FROM orders GROUP BY orderkey LIMIT 10",
+                output(
+                        limit(10,
+                                anyTree(
+                                        tableScan("orders")))));
+
+        assertPlan(
+                "SELECT * FROM (VALUES 1,2,3,4,5,6) AS t1 LIMIT 10",
+                output(
+                        values(ImmutableList.of("x"))));
+    }
+
+    @Test
+    public void testRemoveSingleRowSort()
+    {
+        Session exploitConstraints = Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(EXPLOIT_CONSTRAINTS, Boolean.toString(true))
+                .build();
+
+        String query = "SELECT count(*) FROM orders ORDER BY 1";
+        assertFalse(
+                searchFrom(plan(query, OPTIMIZED, exploitConstraints).getRoot())
+                        .where(isInstanceOfAny(SortNode.class))
+                        .matches(),
+                format("Unexpected sort node for query: '%s'", query));
+
+        assertPlan(
+                "SELECT orderkey, count(*) FROM orders GROUP BY orderkey ORDER BY 1",
+                anyTree(
+                        node(SortNode.class,
+                                anyTree(
+                                        tableScan("orders")))));
+    }
+
+    @Test
+    public void testRedundantTopNNodeRemoval()
+    {
+        Session exploitConstraints = Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(EXPLOIT_CONSTRAINTS, Boolean.toString(true))
+                .build();
+
+        String query = "SELECT count(*) FROM orders ORDER BY 1 LIMIT 10";
+        assertFalse(
+                searchFrom(plan(query, OPTIMIZED, exploitConstraints).getRoot())
+                        .where(isInstanceOfAny(TopNNode.class, SortNode.class))
+                        .matches(),
+                format("Unexpected TopN node for query: '%s'", query));
+
+        assertPlan(
+                "SELECT orderkey, count(*) FROM orders GROUP BY orderkey ORDER BY 1 LIMIT 10",
+                output(
+                        node(TopNNode.class,
+                                anyTree(
+                                        tableScan("orders")))));
+
+        assertPlan(
+                "SELECT orderkey, count(*) FROM orders GROUP BY orderkey ORDER BY 1 LIMIT 0",
+                output(
+                        node(ValuesNode.class)));
+    }
+
+    @Test
+    public void testRedundantDistinctLimitNodeRemoval()
+    {
+        Session exploitConstraints = Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(EXPLOIT_CONSTRAINTS, Boolean.toString(true))
+                .build();
+
+        String query = "SELECT distinct(c) FROM (SELECT count(*) as c FROM orders) LIMIT 10";
+        assertFalse(
+                searchFrom(plan(query, OPTIMIZED, exploitConstraints).getRoot())
+                        .where(isInstanceOfAny(DistinctLimitNode.class))
+                        .matches(),
+                format("Unexpected DistinctLimit node for query: '%s'", query));
+
+        assertPlan(
+                "SELECT distinct(c) FROM (SELECT count(*) as c FROM orders GROUP BY orderkey) LIMIT 10",
+                output(
+                        node(DistinctLimitNode.class,
+                                anyTree(
+                                        tableScan("orders")))));
     }
 }

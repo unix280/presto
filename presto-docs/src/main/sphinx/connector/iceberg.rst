@@ -29,23 +29,28 @@ Configuration Properties
 
 The following configuration properties are available:
 
-====================================== ===================================================
-Property Name                          Description
-====================================== ===================================================
-``hive.metastore.uri``                 The URI(s) of the Hive metastore.
+========================================= =====================================================
+Property Name                             Description
+========================================= =====================================================
+``hive.metastore.uri``                    The URI(s) of the Hive metastore.
 
-``iceberg.file-format``                The storage file format for Iceberg tables.
+``iceberg.file-format``                   The storage file format for Iceberg tables.
 
-``iceberg.compression-codec``          The compression codec to use when writing files.
+``iceberg.compression-codec``             The compression codec to use when writing files.
 
-``iceberg.catalog.type``               The catalog type for Iceberg tables.
+``iceberg.catalog.type``                  The catalog type for Iceberg tables.
 
-``iceberg.catalog.warehouse``          The catalog warehouse root path for Iceberg tables.
+``iceberg.catalog.warehouse``             The catalog warehouse root path for Iceberg tables.
 
-``iceberg.catalog.cached-catalog-num`` The number of Iceberg catalogs to cache.
+``iceberg.catalog.cached-catalog-num``    The number of Iceberg catalogs to cache.
 
-``iceberg.hadoop.config.resources``    The path(s) for Hadoop configuration resources.
-====================================== ===================================================
+``iceberg.hadoop.config.resources``       The path(s) for Hadoop configuration resources.
+
+``iceberg.max-partitions-per-writer``     The maximum number of partitions handled per writer.
+
+``iceberg.minimum-assigned-split-weight`` A decimal value in the range (0, 1] used as a minimum
+                                          for weights assigned to each split.
+========================================= =====================================================
 
 ``hive.metastore.uri``
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -74,8 +79,8 @@ The default is ``GZIP``.
 ``iceberg.catalog.type``
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The catalog type for Iceberg tables. The available values are ``hive``
-and ``hadoop``, corresponding to the catalogs in the Iceberg.
+The catalog type for Iceberg tables. The available values are ``hive``/``hadoop``/``nessie``,
+ corresponding to the catalogs in Iceberg.
 
 The default is ``hive``.
 
@@ -104,6 +109,74 @@ The path(s) for Hadoop configuration resources. Example:
 
 This property is required if the ``iceberg.catalog.type`` is ``hadoop``.
 Otherwise, it will be ignored.
+
+``iceberg.max-partitions-per-writer``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Maximum number of partitions handled per writer.
+
+The default is 100.
+
+``iceberg.minimum-assigned-split-weight``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A decimal value in the range (0, 1] used as a minimum for weights assigned to each split.
+A low value may improve performance on tables with small files. A higher value may improve
+performance for queries with highly skewed aggregations or joins.
+
+The default is 0.05.
+
+Nessie catalog
+^^^^^^^^^^^^^^
+
+In order to use a Nessie catalog, ensure to configure the catalog type with
+``iceberg.catalog.type=nessie`` and provide further details with the following
+properties:
+
+==================================================== ============================================================
+Property Name                                        Description
+==================================================== ============================================================
+``iceberg.nessie.ref``                               The branch/tag to use for Nessie, defaults to ``main``.
+
+``iceberg.nessie.uri``                               Nessie API endpoint URI (required).
+                                                     Example: ``https://localhost:19120/api/v1``
+
+``iceberg.nessie.auth.type``                         The authentication type to use.
+                                                     Available values are ``BASIC`` or ``BEARER``.
+                                                     Example: ``BEARER``
+
+``iceberg.nessie.auth.basic.username``               The username to use with ``BASIC`` authentication.
+                                                     Example: ``test_user``
+
+``iceberg.nessie.auth.basic.password``               The password to use with ``BASIC`` authentication.
+                                                     Example: ``my$ecretPass``
+
+``iceberg.nessie.auth.bearer.token``                 The token to use with ``BEARER`` authentication.
+                                                     Example: ``SXVLUXUhIExFQ0tFUiEK``
+
+``iceberg.nessie.read-timeout-ms``                   The read timeout in milliseconds for requests
+                                                     to the Nessie server.
+                                                     Example: ``5000``
+
+``iceberg.nessie.connect-timeout-ms``                The connection timeout in milliseconds for connection
+                                                     requests to the Nessie server.
+                                                     Example: ``10000``
+
+``iceberg.nessie.compression-enabled``               Configuration of whether compression should be enabled or
+                                                     not for requests to the Nessie server, defaults to ``true``.
+
+``iceberg.nessie.client-builder-impl``               Configuration of the custom ClientBuilder implementation
+                                                     class to be used.
+
+==================================================== ============================================================
+
+.. code-block:: none
+
+    connector.name=iceberg
+    iceberg.catalog.type=nessie
+    iceberg.catalog.warehouse=/tmp
+    iceberg.nessie.uri=https://localhost:19120/api/v1
+
 
 Schema Evolution
 ------------------------

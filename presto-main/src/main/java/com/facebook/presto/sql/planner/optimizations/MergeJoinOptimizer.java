@@ -28,8 +28,10 @@ import com.facebook.presto.sql.planner.plan.SimplePlanRewriter;
 
 import java.util.List;
 
+import static com.facebook.presto.SystemSessionProperties.isGroupedExecutionEnabled;
 import static com.facebook.presto.SystemSessionProperties.preferMergeJoin;
 import static com.facebook.presto.common.block.SortOrder.ASC_NULLS_FIRST;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
@@ -53,7 +55,7 @@ public class MergeJoinOptimizer
         requireNonNull(variableAllocator, "variableAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
-        if (preferMergeJoin(session)) {
+        if (isGroupedExecutionEnabled(session) && preferMergeJoin(session)) {
             return SimplePlanRewriter.rewriteWith(new MergeJoinOptimizer.Rewriter(variableAllocator, idAllocator, metadata, session), plan, null);
         }
         return plan;
@@ -78,6 +80,11 @@ public class MergeJoinOptimizer
         @Override
         public PlanNode visitJoin(JoinNode node, RewriteContext<Void> context)
         {
+            // As of now, we only support inner join for merge join
+            if (node.getType() != INNER) {
+                return node;
+            }
+
             // For example: when we have a plan that looks like:
             // JoinNode
             //- TableScanA
@@ -114,13 +121,28 @@ public class MergeJoinOptimizer
             StreamPropertyDerivations.StreamProperties rightProperties = StreamPropertyDerivations.derivePropertiesRecursively(right, metadata, session, types, parser);
 
             List<VariableReferenceExpression> leftJoinColumns = node.getCriteria().stream().map(JoinNode.EquiJoinClause::getLeft).collect(toImmutableList());
-            List<VariableReferenceExpression> buildHashVariables = node.getCriteria().stream()
+            List<VariableReferenceExpression> rightJoinColumns = node.getCriteria().stream()
                     .map(JoinNode.EquiJoinClause::getRight)
                     .collect(toImmutableList());
 
+            // Check if both the left side and right side's partitioning columns (bucketed-by columns [B]) are a subset of join columns [J]
+            // B = subset (J)
+            if (!verifyStreamProperties(leftProperties, leftJoinColumns) || !verifyStreamProperties(rightProperties, rightJoinColumns)) {
+                return false;
+            }
+
             // Check if the left side and right side are both ordered by the join columns
-            return !LocalProperties.match(rightProperties.getLocalProperties(), LocalProperties.sorted(buildHashVariables, ASC_NULLS_FIRST)).get(0).isPresent() &&
+            return !LocalProperties.match(rightProperties.getLocalProperties(), LocalProperties.sorted(rightJoinColumns, ASC_NULLS_FIRST)).get(0).isPresent() &&
                     !LocalProperties.match(leftProperties.getLocalProperties(), LocalProperties.sorted(leftJoinColumns, ASC_NULLS_FIRST)).get(0).isPresent();
+        }
+
+        private boolean verifyStreamProperties(StreamPropertyDerivations.StreamProperties streamProperties, List<VariableReferenceExpression> joinColumns)
+        {
+            if (!streamProperties.getPartitioningColumns().isPresent()) {
+                return false;
+            }
+            List<VariableReferenceExpression> partitioningColumns = streamProperties.getPartitioningColumns().get();
+            return partitioningColumns.size() <= joinColumns.size() && joinColumns.containsAll(partitioningColumns);
         }
     }
 }

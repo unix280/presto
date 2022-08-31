@@ -25,43 +25,31 @@ public class OrcReaderOptions
     private final DataSize maxBlockSize;
     private final boolean zstdJniDecompressionEnabled;
     private final boolean mapNullKeysEnabled;
-    private final boolean enableTimestampMicroPrecision;
     // if the option is set to true, OrcSelectiveReader will append a row number block at the end of the page
     private final boolean appendRowNumber;
 
-    public OrcReaderOptions(DataSize maxMergeDistance,
-            DataSize tinyStripeThreshold,
-            DataSize maxBlockSize,
-            boolean zstdJniDecompressionEnabled)
-    {
-        this(maxMergeDistance, tinyStripeThreshold, maxBlockSize, zstdJniDecompressionEnabled, false, false, false);
-    }
+    /**
+     * Read column statistics for flat map columns. Usually there are quite a
+     * lot of map statistics, so enable only if it's really needed.
+     */
+    private final boolean readMapStatistics;
 
-    public OrcReaderOptions(DataSize maxMergeDistance,
-            DataSize tinyStripeThreshold,
-            DataSize maxBlockSize,
-            boolean zstdJniDecompressionEnabled,
-            boolean appendRowNumber)
-    {
-        this(maxMergeDistance, tinyStripeThreshold, maxBlockSize, zstdJniDecompressionEnabled, false, false, appendRowNumber);
-    }
-
-    public OrcReaderOptions(
+    private OrcReaderOptions(
             DataSize maxMergeDistance,
             DataSize tinyStripeThreshold,
             DataSize maxBlockSize,
             boolean zstdJniDecompressionEnabled,
             boolean mapNullKeysEnabled,
-            boolean enableTimestampMicroPrecision,
-            boolean appendRowNumber)
+            boolean appendRowNumber,
+            boolean readMapStatistics)
     {
         this.maxMergeDistance = requireNonNull(maxMergeDistance, "maxMergeDistance is null");
         this.maxBlockSize = requireNonNull(maxBlockSize, "maxBlockSize is null");
         this.tinyStripeThreshold = requireNonNull(tinyStripeThreshold, "tinyStripeThreshold is null");
         this.zstdJniDecompressionEnabled = zstdJniDecompressionEnabled;
         this.mapNullKeysEnabled = mapNullKeysEnabled;
-        this.enableTimestampMicroPrecision = enableTimestampMicroPrecision;
         this.appendRowNumber = appendRowNumber;
+        this.readMapStatistics = readMapStatistics;
     }
 
     public DataSize getMaxMergeDistance()
@@ -89,14 +77,14 @@ public class OrcReaderOptions
         return mapNullKeysEnabled;
     }
 
-    public boolean enableTimestampMicroPrecision()
-    {
-        return enableTimestampMicroPrecision;
-    }
-
     public boolean appendRowNumber()
     {
         return appendRowNumber;
+    }
+
+    public boolean readMapStatistics()
+    {
+        return readMapStatistics;
     }
 
     @Override
@@ -108,8 +96,8 @@ public class OrcReaderOptions
                 .add("maxBlockSize", maxBlockSize)
                 .add("zstdJniDecompressionEnabled", zstdJniDecompressionEnabled)
                 .add("mapNullKeysEnabled", mapNullKeysEnabled)
-                .add("enableTimestampMicroPrecision", enableTimestampMicroPrecision)
                 .add("appendRowNumber", appendRowNumber)
+                .add("readMapStatistics", readMapStatistics)
                 .toString();
     }
 
@@ -125,8 +113,8 @@ public class OrcReaderOptions
         private DataSize maxBlockSize;
         private boolean zstdJniDecompressionEnabled;
         private boolean mapNullKeysEnabled;
-        private boolean enableTimestampMicroPrecision;
         private boolean appendRowNumber;
+        private boolean readMapStatistics;
 
         private Builder() {}
 
@@ -160,15 +148,15 @@ public class OrcReaderOptions
             return this;
         }
 
-        public Builder withEnableTimestampMicroPrecision(boolean enableTimestampMicroPrecision)
-        {
-            this.enableTimestampMicroPrecision = enableTimestampMicroPrecision;
-            return this;
-        }
-
         public Builder withAppendRowNumber(boolean appendRowNumber)
         {
             this.appendRowNumber = appendRowNumber;
+            return this;
+        }
+
+        public Builder withReadMapStatistics(boolean readMapStatistics)
+        {
+            this.readMapStatistics = readMapStatistics;
             return this;
         }
 
@@ -180,8 +168,8 @@ public class OrcReaderOptions
                     maxBlockSize,
                     zstdJniDecompressionEnabled,
                     mapNullKeysEnabled,
-                    enableTimestampMicroPrecision,
-                    appendRowNumber);
+                    appendRowNumber,
+                    readMapStatistics);
         }
     }
 }

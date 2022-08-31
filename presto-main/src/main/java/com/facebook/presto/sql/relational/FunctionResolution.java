@@ -235,6 +235,12 @@ public final class FunctionResolution
         return operatorType.isPresent() && operatorType.get().isComparisonOperator();
     }
 
+    public boolean isEqualsFunction(FunctionHandle functionHandle)
+    {
+        Optional<OperatorType> operatorType = functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType();
+        return operatorType.isPresent() && operatorType.get().getOperator().equals(EQUAL.getOperator());
+    }
+
     @Override
     public FunctionHandle subscriptFunction(Type baseType, Type indexType)
     {
@@ -326,5 +332,10 @@ public final class FunctionResolution
     public FunctionHandle approximateSetFunction(Type valueType)
     {
         return functionAndTypeManager.lookupFunction("approx_set", fromTypes(valueType));
+    }
+
+    public boolean isEqualFunction(FunctionHandle functionHandle)
+    {
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType().map(EQUAL::equals).orElse(false);
     }
 }

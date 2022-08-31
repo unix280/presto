@@ -13,6 +13,11 @@
  */
 package com.facebook.presto.hive.metastore.glue;
 
+import com.amazonaws.services.glue.AWSGlueAsync;
+import com.amazonaws.services.glue.AWSGlueAsyncClientBuilder;
+import com.amazonaws.services.glue.model.CreateTableRequest;
+import com.amazonaws.services.glue.model.DeleteTableRequest;
+import com.amazonaws.services.glue.model.TableInput;
 import com.facebook.airlift.concurrent.BoundedExecutor;
 import com.facebook.presto.hive.AbstractTestHiveClientLocal;
 import com.facebook.presto.hive.HdfsConfiguration;
@@ -27,22 +32,39 @@ import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.Table;
+import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import java.io.File;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
+import static com.facebook.airlift.concurrent.Threads.daemonThreadsNamed;
 import static com.facebook.presto.hive.HiveStorageFormat.AVRO;
 import static com.facebook.presto.hive.HiveStorageFormat.CSV;
 import static com.facebook.presto.hive.HiveStorageFormat.PAGEFILE;
+import static com.facebook.presto.hive.HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER;
+import static com.facebook.presto.hive.HiveQueryRunner.METASTORE_CONTEXT;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.DELTA_LAKE_PROVIDER;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.ICEBERG_TABLE_TYPE_NAME;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.ICEBERG_TABLE_TYPE_VALUE;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.SPARK_TABLE_PROVIDER_KEY;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.getMetastoreHeaders;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.isDeltaLakeTable;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.isIcebergTable;
 import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.google.common.collect.Sets.difference;
 import static java.util.Locale.ENGLISH;
 import static java.util.UUID.randomUUID;
+import static java.util.concurrent.Executors.newCachedThreadPool;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -105,6 +127,12 @@ public class TestHiveClientGlueMetastore
     }
 
     @Override
+    public void testTableConstraints()
+    {
+        // GlueMetastore has no support for table constraints
+    }
+
+    @Override
     public void testStorePartitionWithStatistics()
             throws Exception
     {
@@ -147,5 +175,57 @@ public class TestHiveClientGlueMetastore
         long initialFailureCount = stats.getGetDatabase().getTotalFailures().getTotalCount();
         assertThrows(() -> getMetastoreClient().getDatabase(METASTORE_CONTEXT, null));
         assertEquals(stats.getGetDatabase().getTotalFailures().getTotalCount(), initialFailureCount + 1);
+    }
+
+    public void testTableWithoutStorageDescriptor()
+    {
+        // StorageDescriptor is an Optional field for Glue tables. Iceberg and Delta Lake tables may not have it set.
+        SchemaTableName table = temporaryTable("test_missing_storage_descriptor");
+        DeleteTableRequest deleteTableRequest = new DeleteTableRequest()
+                .withDatabaseName(table.getSchemaName())
+                .withName(table.getTableName());
+        AWSGlueAsync glueClient = AWSGlueAsyncClientBuilder.defaultClient();
+        try {
+            ConnectorSession session = newSession();
+            MetastoreContext metastoreContext = new MetastoreContext(
+                    session.getIdentity(),
+                    session.getQueryId(),
+                    session.getClientInfo(),
+                    session.getSource(),
+                    getMetastoreHeaders(session),
+                    false,
+                    DEFAULT_COLUMN_CONVERTER_PROVIDER);
+            TableInput tableInput = new TableInput()
+                    .withName(table.getTableName())
+                    .withTableType(EXTERNAL_TABLE.name());
+            glueClient.createTable(new CreateTableRequest()
+                    .withDatabaseName(database)
+                    .withTableInput(tableInput));
+
+            assertThatThrownBy(() -> getMetastoreClient().getTable(metastoreContext, table.getSchemaName(), table.getTableName()))
+                    .hasMessageStartingWith("Table StorageDescriptor is null for table");
+            glueClient.deleteTable(deleteTableRequest);
+
+            // Iceberg table
+            tableInput = tableInput.withParameters(ImmutableMap.of(ICEBERG_TABLE_TYPE_NAME, ICEBERG_TABLE_TYPE_VALUE));
+            glueClient.createTable(new CreateTableRequest()
+                    .withDatabaseName(database)
+                    .withTableInput(tableInput));
+            assertTrue(isIcebergTable(getMetastoreClient().getTable(metastoreContext, table.getSchemaName(), table.getTableName()).orElseThrow(() -> new NoSuchElementException())));
+            glueClient.deleteTable(deleteTableRequest);
+
+            // Delta Lake table
+            tableInput = tableInput.withParameters(ImmutableMap.of(SPARK_TABLE_PROVIDER_KEY, DELTA_LAKE_PROVIDER));
+            glueClient.createTable(new CreateTableRequest()
+                    .withDatabaseName(database)
+                    .withTableInput(tableInput));
+            assertTrue(isDeltaLakeTable(getMetastoreClient().getTable(metastoreContext, table.getSchemaName(), table.getTableName()).orElseThrow(() -> new NoSuchElementException())));
+        }
+        finally {
+            // Table cannot be dropped through HiveMetastore since a TableHandle cannot be created
+            glueClient.deleteTable(new DeleteTableRequest()
+                    .withDatabaseName(table.getSchemaName())
+                    .withName(table.getTableName()));
+        }
     }
 }

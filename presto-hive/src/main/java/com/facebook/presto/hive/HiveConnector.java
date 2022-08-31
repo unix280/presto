@@ -30,6 +30,7 @@ import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.connector.ConnectorTypeSerdeProvider;
 import com.facebook.presto.spi.connector.classloader.ClassLoaderSafeConnectorMetadata;
 import com.facebook.presto.spi.procedure.Procedure;
 import com.facebook.presto.spi.session.PropertyMetadata;
@@ -44,7 +45,6 @@ import java.util.function.Supplier;
 
 import static com.facebook.presto.spi.connector.ConnectorCapabilities.SUPPORTS_PAGE_SINK_COMMIT;
 import static com.facebook.presto.spi.connector.ConnectorCapabilities.SUPPORTS_REWINDABLE_SPLIT_SOURCE;
-import static com.facebook.presto.spi.connector.EmptyConnectorCommitHandle.INSTANCE;
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_UNCOMMITTED;
 import static com.facebook.presto.spi.transaction.IsolationLevel.checkConnectorSupports;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -72,6 +72,7 @@ public class HiveConnector
     private final ClassLoader classLoader;
     private final ConnectorPlanOptimizerProvider planOptimizerProvider;
     private final ConnectorMetadataUpdaterProvider metadataUpdaterProvider;
+    private final ConnectorTypeSerdeProvider connectorTypeSerdeProvider;
 
     private final HiveTransactionManager transactionManager;
 
@@ -92,6 +93,7 @@ public class HiveConnector
             ConnectorAccessControl accessControl,
             ConnectorPlanOptimizerProvider planOptimizerProvider,
             ConnectorMetadataUpdaterProvider metadataUpdaterProvider,
+            ConnectorTypeSerdeProvider connectorTypeSerdeProvider,
             ClassLoader classLoader)
     {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
@@ -111,6 +113,7 @@ public class HiveConnector
         this.classLoader = requireNonNull(classLoader, "classLoader is null");
         this.planOptimizerProvider = requireNonNull(planOptimizerProvider, "planOptimizerProvider is null");
         this.metadataUpdaterProvider = requireNonNull(metadataUpdaterProvider, "metadataUpdaterProvider is null");
+        this.connectorTypeSerdeProvider = requireNonNull(connectorTypeSerdeProvider, "connectorTypeSerdeProvider is null");
     }
 
     @Override
@@ -161,6 +164,12 @@ public class HiveConnector
     public ConnectorMetadataUpdaterProvider getConnectorMetadataUpdaterProvider()
     {
         return metadataUpdaterProvider;
+    }
+
+    @Override
+    public ConnectorTypeSerdeProvider getConnectorTypeSerdeProvider()
+    {
+        return connectorTypeSerdeProvider;
     }
 
     @Override
@@ -228,9 +237,8 @@ public class HiveConnector
         TransactionalMetadata metadata = transactionManager.remove(transaction);
         checkArgument(metadata != null, "no such transaction: %s", transaction);
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            metadata.commit();
+            return metadata.commit();
         }
-        return INSTANCE;
     }
 
     @Override

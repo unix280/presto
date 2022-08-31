@@ -73,6 +73,7 @@ public final class SystemSessionProperties
     public static final String OPTIMIZE_HASH_GENERATION = "optimize_hash_generation";
     public static final String JOIN_DISTRIBUTION_TYPE = "join_distribution_type";
     public static final String JOIN_MAX_BROADCAST_TABLE_SIZE = "join_max_broadcast_table_size";
+    public static final String SIZE_BASED_JOIN_DISTRIBUTION_TYPE = "size_based_join_distribution_type";
     public static final String DISTRIBUTED_JOIN = "distributed_join";
     public static final String DISTRIBUTED_INDEX_JOIN = "distributed_index_join";
     public static final String HASH_PARTITION_COUNT = "hash_partition_count";
@@ -155,10 +156,12 @@ public final class SystemSessionProperties
     public static final String FILTER_AND_PROJECT_MIN_OUTPUT_PAGE_ROW_COUNT = "filter_and_project_min_output_page_row_count";
     public static final String DISTRIBUTED_SORT = "distributed_sort";
     public static final String USE_MARK_DISTINCT = "use_mark_distinct";
+    public static final String EXPLOIT_CONSTRAINTS = "exploit_constraints";
     public static final String PREFER_PARTIAL_AGGREGATION = "prefer_partial_aggregation";
     public static final String PARTIAL_AGGREGATION_STRATEGY = "partial_aggregation_strategy";
     public static final String PARTIAL_AGGREGATION_BYTE_REDUCTION_THRESHOLD = "partial_aggregation_byte_reduction_threshold";
     public static final String OPTIMIZE_TOP_N_ROW_NUMBER = "optimize_top_n_row_number";
+    public static final String OPTIMIZE_CASE_EXPRESSION_PREDICATE = "optimize_case_expression_predicate";
     public static final String MAX_GROUPING_SETS = "max_grouping_sets";
     public static final String LEGACY_UNNEST = "legacy_unnest";
     public static final String STATISTICS_CPU_TIMER_ENABLED = "statistics_cpu_timer_enabled";
@@ -225,6 +228,8 @@ public final class SystemSessionProperties
     public static final String HYPERLOGLOG_STANDARD_ERROR_WARNING_THRESHOLD = "hyperloglog_standard_error_warning_threshold";
     public static final String PREFER_MERGE_JOIN = "prefer_merge_join";
     public static final String SEGMENTED_AGGREGATION_ENABLED = "segmented_aggregation_enabled";
+    public static final String USE_HISTORY_BASED_PLAN_STATISTICS = "use_history_based_plan_statistics";
+    public static final String USE_EXTERNAL_PLAN_STATISTICS = "use_external_plan_statistics";
 
     //TODO: Prestissimo related session properties that are temporarily put here. They will be relocated in the future
     public static final String PRESTISSIMO_SIMPLIFIED_EXPRESSION_EVALUATION_ENABLED = "simplified_expression_evaluation_enabled";
@@ -300,6 +305,11 @@ public final class SystemSessionProperties
                         true,
                         value -> DataSize.valueOf((String) value),
                         DataSize::toString),
+                booleanProperty(
+                        SIZE_BASED_JOIN_DISTRIBUTION_TYPE,
+                        "Consider source table size when determining join distribution type when CBO fails",
+                        featuresConfig.isSizeBasedJoinDistributionTypeEnabled(),
+                        false),
                 booleanProperty(
                         DISTRIBUTED_INDEX_JOIN,
                         "Distribute index joins on join keys instead of executing inline",
@@ -826,6 +836,11 @@ public final class SystemSessionProperties
                         featuresConfig.isUseMarkDistinct(),
                         false),
                 booleanProperty(
+                        EXPLOIT_CONSTRAINTS,
+                        "Exploit table constraints.",
+                        featuresConfig.isExploitConstraints(),
+                        false),
+                booleanProperty(
                         PREFER_PARTIAL_AGGREGATION,
                         "Prefer splitting aggregations into partial and final stages",
                         null,
@@ -851,6 +866,11 @@ public final class SystemSessionProperties
                         OPTIMIZE_TOP_N_ROW_NUMBER,
                         "Use top N row number optimization",
                         featuresConfig.isOptimizeTopNRowNumber(),
+                        false),
+                booleanProperty(
+                        OPTIMIZE_CASE_EXPRESSION_PREDICATE,
+                        "Optimize case expression predicates",
+                        featuresConfig.isOptimizeCaseExpressionPredicate(),
                         false),
                 integerProperty(
                         MAX_GROUPING_SETS,
@@ -1209,7 +1229,7 @@ public final class SystemSessionProperties
                         SEGMENTED_AGGREGATION_ENABLED,
                         "Enable segmented aggregation.",
                         featuresConfig.isSegmentedAggregationEnabled(),
-                        true),
+                        false),
                 new PropertyMetadata<>(
                         AGGREGATION_IF_TO_FILTER_REWRITE_STRATEGY,
                         format("Set the strategy used to rewrite AGG IF to AGG FILTER. Options are %s",
@@ -1290,6 +1310,16 @@ public final class SystemSessionProperties
                         QUICK_DISTINCT_LIMIT_ENABLED,
                         "Enable quick distinct limit queries that give results as soon as a new distinct value is found",
                         featuresConfig.isQuickDistinctLimitEnabled(),
+                        false),
+                booleanProperty(
+                        USE_HISTORY_BASED_PLAN_STATISTICS,
+                        "Use history based plan statistics in query optimizer",
+                        featuresConfig.isUseHistoryBasedPlanStatistics(),
+                        false),
+                booleanProperty(
+                        USE_EXTERNAL_PLAN_STATISTICS,
+                        "Use plan statistics from external service in query optimizer",
+                        featuresConfig.isUseExternalPlanStatistics(),
                         false));
     }
 
@@ -1370,6 +1400,11 @@ public final class SystemSessionProperties
     public static DataSize getJoinMaxBroadcastTableSize(Session session)
     {
         return session.getSystemProperty(JOIN_MAX_BROADCAST_TABLE_SIZE, DataSize.class);
+    }
+
+    public static boolean isSizeBasedJoinDistributionTypeEnabled(Session session)
+    {
+        return session.getSystemProperty(SIZE_BASED_JOIN_DISTRIBUTION_TYPE, Boolean.class);
     }
 
     public static boolean isDistributedIndexJoinEnabled(Session session)
@@ -1787,6 +1822,11 @@ public final class SystemSessionProperties
         return session.getSystemProperty(USE_MARK_DISTINCT, Boolean.class);
     }
 
+    public static boolean isExploitConstraints(Session session)
+    {
+        return session.getSystemProperty(EXPLOIT_CONSTRAINTS, Boolean.class);
+    }
+
     public static PartialAggregationStrategy getPartialAggregationStrategy(Session session)
     {
         Boolean preferPartialAggregation = session.getSystemProperty(PREFER_PARTIAL_AGGREGATION, Boolean.class);
@@ -1807,6 +1847,11 @@ public final class SystemSessionProperties
     public static boolean isOptimizeTopNRowNumber(Session session)
     {
         return session.getSystemProperty(OPTIMIZE_TOP_N_ROW_NUMBER, Boolean.class);
+    }
+
+    public static boolean isOptimizeCaseExpressionPredicate(Session session)
+    {
+        return session.getSystemProperty(OPTIMIZE_CASE_EXPRESSION_PREDICATE, Boolean.class);
     }
 
     public static boolean isDistributedSortEnabled(Session session)
@@ -2171,5 +2216,15 @@ public final class SystemSessionProperties
     public static boolean isQuickDistinctLimitEnabled(Session session)
     {
         return session.getSystemProperty(QUICK_DISTINCT_LIMIT_ENABLED, Boolean.class);
+    }
+
+    public static boolean useHistoryBasedPlanStatisticsEnabled(Session session)
+    {
+        return session.getSystemProperty(USE_HISTORY_BASED_PLAN_STATISTICS, Boolean.class);
+    }
+
+    public static boolean useExternalPlanStatisticsEnabled(Session session)
+    {
+        return session.getSystemProperty(USE_EXTERNAL_PLAN_STATISTICS, Boolean.class);
     }
 }

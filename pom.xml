@@ -10,7 +10,7 @@
 
     <groupId>com.facebook.presto</groupId>
     <artifactId>presto-root</artifactId>
-    <version>0.273</version>
+    <version>0.274</version>
     <packaging>pom</packaging>
 
     <name>presto-root</name>
@@ -30,7 +30,7 @@
     <scm>
         <connection>scm:git:git://github.com/prestodb/presto.git</connection>
         <url>https://github.com/prestodb/presto</url>
-        <tag>0.273</tag>
+        <tag>0.274</tag>
     </scm>
 
     <properties>
@@ -44,7 +44,7 @@
         <air.maven.version>3.3.9</air.maven.version>
 
         <dep.antlr.version>4.7.1</dep.antlr.version>
-        <dep.airlift.version>0.203</dep.airlift.version>
+        <dep.airlift.version>0.205</dep.airlift.version>
         <dep.packaging.version>${dep.airlift.version}</dep.packaging.version>
         <dep.slice.version>0.38</dep.slice.version>
         <dep.testing-mysql-server-5.version>0.6</dep.testing-mysql-server-5.version>
@@ -56,8 +56,8 @@
         <!-- Changing joda version changes tzdata which must match deployed JVM tzdata
              Do not change this without also making sure it matches -->
         <dep.joda.version>2.10.8</dep.joda.version>
-        <dep.tempto.version>1.51</dep.tempto.version>
-        <dep.testng.version>6.10</dep.testng.version>
+        <dep.tempto.version>1.53</dep.tempto.version>
+        <dep.testng.version>7.5</dep.testng.version>
         <dep.assertj-core.version>3.8.0</dep.assertj-core.version>
         <dep.logback.version>1.2.3</dep.logback.version>
         <dep.parquet.version>1.12.0</dep.parquet.version>
@@ -65,11 +65,12 @@
         <dep.asm.version>9.0</dep.asm.version>
         <dep.gcs.version>1.9.17</dep.gcs.version>
         <dep.alluxio.version>2.7.3</dep.alluxio.version>
+        <dep.slf4j.version>1.7.32</dep.slf4j.version>
         <dep.kafka.version>2.3.1</dep.kafka.version>
         <dep.pinot.version>0.10.0</dep.pinot.version>
         <dep.druid.version>0.19.0</dep.druid.version>
         <dep.jaxb.version>2.3.1</dep.jaxb.version>
-        <dep.hudi.version>0.10.1</dep.hudi.version>
+        <dep.hudi.version>0.11.0</dep.hudi.version>
         <dep.testcontainers.version>1.15.1</dep.testcontainers.version>
         <dep.docker-java.version>3.2.12</dep.docker-java.version>
         <!--
@@ -186,6 +187,7 @@
         <module>presto-grpc-testing-udf-server</module>
         <module>presto-lark-sheets</module>
         <module>presto-test-coverage</module>
+        <module>presto-hudi</module>
     </modules>
 
     <dependencyManagement>
@@ -1272,6 +1274,14 @@
                         <groupId>org.apache.hudi</groupId>
                         <artifactId>hudi-hadoop-mr-bundle</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.parquet</groupId>
+                        <artifactId>parquet-avro</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.avro</groupId>
+                        <artifactId>avro</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <!-- End dependencies for querying Hudi table-->
@@ -2200,6 +2210,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M7</version>
                 <configuration combine.children="append">
                     <includes>
                         <include>**/Test*.java</include>
@@ -2244,13 +2255,13 @@
                         <DynamicDependency>
                             <groupId>org.apache.maven.surefire</groupId>
                             <artifactId>surefire-testng</artifactId>
-                            <version>2.22.0</version>
+                            <version>3.0.0-M7</version>
                             <repositoryType>PLUGIN</repositoryType>
                         </DynamicDependency>
                         <DynamicDependency>
                             <groupId>org.apache.maven.surefire</groupId>
                             <artifactId>surefire-junit4</artifactId>
-                            <version>2.22.0</version>
+                            <version>3.0.0-M7</version>
                             <repositoryType>PLUGIN</repositoryType>
                         </DynamicDependency>
                         <DynamicDependency>

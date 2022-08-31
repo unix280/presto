@@ -41,6 +41,7 @@ import static com.facebook.presto.common.type.StandardTypes.ARRAY;
 import static com.facebook.presto.common.type.StandardTypes.MAP;
 import static com.facebook.presto.common.type.StandardTypes.ROW;
 import static com.facebook.presto.common.type.TimestampType.TIMESTAMP;
+import static com.facebook.presto.common.type.TimestampType.TIMESTAMP_MICROSECONDS;
 import static com.facebook.presto.common.type.TinyintType.TINYINT;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -72,6 +73,7 @@ public class OrcType
 
         DATE,
         TIMESTAMP,
+        TIMESTAMP_MICROSECONDS,
 
         LIST,
         MAP,
@@ -232,6 +234,9 @@ public class OrcType
         if (TIMESTAMP.equals(type)) {
             return ImmutableList.of(new OrcType(OrcTypeKind.TIMESTAMP));
         }
+        if (TIMESTAMP_MICROSECONDS.equals(type)) {
+            return ImmutableList.of(new OrcType(OrcTypeKind.TIMESTAMP_MICROSECONDS));
+        }
         if (type instanceof DecimalType) {
             DecimalType decimalType = (DecimalType) type;
             return ImmutableList.of(new OrcType(OrcTypeKind.DECIMAL, decimalType.getPrecision(), decimalType.getScale()));
@@ -320,5 +325,26 @@ public class OrcType
                 .filter(columnIndex -> columnIndex < fieldCount)
                 .map(rootType::getFieldTypeIndex)
                 .collect(toImmutableSet());
+    }
+
+    public static Map<Integer, Integer> createNodeIdToColumnMap(List<OrcType> orcTypes)
+    {
+        requireNonNull(orcTypes, "orcTypes cannot be null");
+        int totalNodeCount = orcTypes.size();
+        int column = 0;
+        List<Integer> fieldTypeIndexes = orcTypes.get(0).getFieldTypeIndexes();
+        ImmutableMap.Builder<Integer, Integer> nodeIdToColumnBuilder = ImmutableMap.builder();
+        // create nodeId to colId mapping for all the columns except for the last one
+        for (int nodeIndex = 0; nodeIndex < fieldTypeIndexes.size(); nodeIndex++) {
+            boolean isLastNode = nodeIndex == fieldTypeIndexes.size() - 1;
+            int currentNodeId = fieldTypeIndexes.get(nodeIndex);
+            int nextNodeId = isLastNode ? totalNodeCount : fieldTypeIndexes.get(nodeIndex + 1);
+            int numberOfNodesPerColumn = nextNodeId - currentNodeId;
+            for (int i = 0; i < numberOfNodesPerColumn; i++) {
+                nodeIdToColumnBuilder.put(currentNodeId++, column);
+            }
+            column++;
+        }
+        return nodeIdToColumnBuilder.build();
     }
 }

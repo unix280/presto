@@ -17,11 +17,11 @@ import com.facebook.presto.common.NotSupportedException;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveType;
-import com.facebook.presto.hive.authentication.MetastoreContext;
+import com.facebook.presto.spi.constraints.TableConstraint;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
 import io.airlift.units.Duration;
 
 import java.util.List;
@@ -136,5 +136,10 @@ public interface ExtendedHiveMetastore
     default void unlock(MetastoreContext metastoreContext, long lockId)
     {
         throw new NotSupportedException("Unlock is not supported by default");
+    }
+
+    default List<TableConstraint<String>> getTableConstraints(MetastoreContext metastoreContext, String schemaName, String tableName)
+    {
+        return ImmutableList.of();
     }
 }
