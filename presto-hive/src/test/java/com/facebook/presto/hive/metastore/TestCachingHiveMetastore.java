@@ -345,7 +345,6 @@ public class TestCachingHiveMetastore
         CachingHiveMetastore partitionCachingEnabledMetastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(mockHiveMetastore, mockPartitionMutator),
                 executor,
-                false,
                 new Duration(5, TimeUnit.MINUTES),
                 new Duration(1, TimeUnit.MINUTES),
                 1000,
@@ -356,15 +355,16 @@ public class TestCachingHiveMetastore
                 1,
                 NOOP_METASTORE_CACHE_STATS);
 
+        Table table = getTableOrElseThrow();
         // Select all of the available partitions. Normally they would have been loaded into the cache. But because of column count limit, they will not be cached
-        assertEquals(partitionCachingEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(partitionCachingEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
         assertEquals(mockClient.getAccessCount(), 1);
 
-        assertEquals(partitionCachingEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1)).size(), 1);
+        assertEquals(partitionCachingEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1)).size(), 1);
         // Assert that mockClient is used to fetch data since its a cache miss
         assertEquals(mockClient.getAccessCount(), 2);
 
-        assertEquals(partitionCachingEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1)).size(), 1);
+        assertEquals(partitionCachingEnabledMetastore.getPartitionsByNames(TEST_METASTORE_CONTEXT, table, ImmutableList.of(TEST_PARTITION1)).size(), 1);
         // Assert that mockClient is used to fetch data since its a cache miss
         assertEquals(mockClient.getAccessCount(), 3);
     }

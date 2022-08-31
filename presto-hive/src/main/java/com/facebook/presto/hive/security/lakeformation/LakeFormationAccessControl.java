@@ -29,6 +29,7 @@ import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataRequest;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
 import com.amazonaws.services.securitytoken.model.Tag;
 import com.facebook.airlift.log.Logger;
+import com.facebook.presto.common.Subfield;
 import com.facebook.presto.hive.HiveColumnConverterProvider;
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.MetastoreConfig;
@@ -418,7 +419,7 @@ public class LakeFormationAccessControl
      * @throws AccessDeniedException if not allowed
      */
     @Override
-    public void checkCanSelectFromColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, Set<String> columnNames)
+    public void checkCanSelectFromColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, Set<Subfield> columnOrSubfieldNames)
     {
         if (INFORMATION_SCHEMA_NAME.equals(tableName.getSchemaName())) {
             return;
@@ -444,10 +445,13 @@ public class LakeFormationAccessControl
             Set<String> deniedColumns = new HashSet<>();
 
             // Allow access for presto special columns since they won't be part of LF Authorized columns list
-            columnNames.stream()
-                    .filter(allColumnNames::contains)
-                    .filter(columnName -> !authorizedColumns.contains(columnName))
-                    .forEach(deniedColumns::add);
+            for (Subfield columnOrSubfield : columnOrSubfieldNames) {
+                String column = columnOrSubfield.getRootName();
+                if (!allColumnNames.contains(column) || authorizedColumns.contains(column)) {
+                    continue;
+                }
+                deniedColumns.add(column);
+            }
 
             if (!deniedColumns.isEmpty()) {
                 denySelectTable(tableName.getTableName(), format("Access Denied: User [ %s ] has [SELECT] " +

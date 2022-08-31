@@ -18,6 +18,7 @@ import com.amazonaws.services.glue.model.ColumnRowFilter;
 import com.amazonaws.services.glue.model.GetUnfilteredTableMetadataResult;
 import com.amazonaws.services.glue.model.StorageDescriptor;
 import com.amazonaws.services.glue.model.Table;
+import com.facebook.presto.common.Subfield;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingConfig;
 import com.facebook.presto.hive.metastore.glue.GlueSecurityMappingsSupplier;
 import com.facebook.presto.hive.security.lakeformation.LakeFormationAccessControl.LFPolicyCacheKey;
@@ -68,6 +69,15 @@ public class TestLakeFormationAccessControl
 
     private final Map<LFPolicyCacheKey, Optional<GetUnfilteredTableMetadataResult>> mockGetUnfilteredTable = new HashMap<>();
     private ConnectorAccessControl lakeFormationAccessControl;
+
+    public static ImmutableSet<Subfield> toSubfieldSet(String... columns)
+    {
+        ImmutableSet.Builder<Subfield> builder = ImmutableSet.builder();
+        for (String column : columns) {
+            builder.add(new Subfield(column));
+        }
+        return builder.build();
+    }
 
     /*
     We will be creating a mock Map which will be containing sample
@@ -387,7 +397,7 @@ public class TestLakeFormationAccessControl
                 user("admin"),
                 CONTEXT,
                 new SchemaTableName("test", "customer"),
-                ImmutableSet.of("$path"));
+                toSubfieldSet("$path"));
 
         // User: admin, full access to all tables
         lakeFormationAccessControl.checkCanSelectFromColumns(
@@ -395,7 +405,7 @@ public class TestLakeFormationAccessControl
                 user("admin"),
                 CONTEXT,
                 new SchemaTableName("test", "customer"),
-                ImmutableSet.of("custkey", "name", "address", "nation", "phone", "acctbal", "mktsegment"));
+                toSubfieldSet("custkey", "name", "address", "nation", "phone", "acctbal", "mktsegment"));
 
         // User: analyst, access to subset of columns
         lakeFormationAccessControl.checkCanSelectFromColumns(
@@ -403,13 +413,13 @@ public class TestLakeFormationAccessControl
                 user("analyst"),
                 CONTEXT,
                 new SchemaTableName("test", "customer"),
-                ImmutableSet.of("custkey", "name", "nation", "mktsegment"));
+                toSubfieldSet("custkey", "name", "nation", "mktsegment"));
         assertDenied(() -> lakeFormationAccessControl.checkCanSelectFromColumns(
                 TRANSACTION_HANDLE,
                 user("analyst"),
                 CONTEXT,
                 new SchemaTableName("test", "orders"),
-                ImmutableSet.of("orderkey", "custkey", "orderstatus", "totalprice", "orderdate", "order-priority")));
+                toSubfieldSet("orderkey", "custkey", "orderstatus", "totalprice", "orderdate", "order-priority")));
 
         // Any other user, no access to any table
         assertDenied(() -> lakeFormationAccessControl.checkCanSelectFromColumns(
@@ -417,7 +427,7 @@ public class TestLakeFormationAccessControl
                 user("anyuser"),
                 CONTEXT,
                 new SchemaTableName("test", "orders"),
-                ImmutableSet.of("orderkey")));
+                toSubfieldSet("orderkey")));
 
         // User: admin, access denied due to multiple rowFilters
         assertDenied(() -> lakeFormationAccessControl.checkCanSelectFromColumns(
@@ -425,7 +435,7 @@ public class TestLakeFormationAccessControl
                 user("admin"),
                 CONTEXT,
                 new SchemaTableName("test", "orders"),
-                ImmutableSet.of("orderkey")));
+                toSubfieldSet("orderkey")));
     }
 
     @Test
