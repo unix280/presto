@@ -95,9 +95,10 @@ public final class GlueToPrestoConverter
             if (sd == null) {
                 throw new PrestoException(HIVE_UNSUPPORTED_FORMAT, format("Table StorageDescriptor is null for table %s.%s (%s)", dbName, glueTable.getName(), glueTable));
             }
-            tableBuilder.setDataColumns(convertColumns(sd.getColumns()));
+            tableBuilder.setDataColumns(convertColumns(sd.getColumns(), Optional.ofNullable(sd.getSerdeInfo().getSerializationLibrary())));
             if (glueTable.getPartitionKeys() != null) {
-                tableBuilder.setPartitionColumns(convertColumns(glueTable.getPartitionKeys()));
+                tableBuilder.setPartitionColumns(convertColumns(glueTable.getPartitionKeys(),
+                        Optional.ofNullable(sd.getSerdeInfo().getSerializationLibrary())));
             }
             else {
                 tableBuilder.setPartitionColumns(ImmutableList.of());

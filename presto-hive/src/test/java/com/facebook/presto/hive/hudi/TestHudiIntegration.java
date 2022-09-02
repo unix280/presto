@@ -15,7 +15,7 @@
 package com.facebook.presto.hive.hudi;
 
 import com.facebook.presto.common.type.TypeManager;
-import com.facebook.presto.hive.HivePlugin;
+import com.facebook.presto.hive.TestingHivePlugin;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.metadata.FunctionAndTypeManager;
 import com.facebook.presto.testing.QueryRunner;
@@ -45,7 +45,7 @@ public class TestHudiIntegration
         return HudiTestUtils.createQueryRunner(
                 ImmutableMap.of(),
                 ImmutableMap.of(),
-                metastore -> new HivePlugin("hive", metastore),
+                metastore -> new TestingHivePlugin(metastore.get()),
                 "hive",
                 "hive",
                 "testing");

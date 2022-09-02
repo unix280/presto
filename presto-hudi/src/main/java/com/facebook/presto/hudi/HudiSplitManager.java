@@ -16,9 +16,9 @@ package com.facebook.presto.hudi;
 
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.HdfsEnvironment;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
-import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.Table;
 import com.facebook.presto.spi.ConnectorSession;
@@ -167,10 +167,10 @@ public class HudiSplitManager
         String tableName = tableLayout.getTable().getTableName();
         List<HudiColumnHandle> partitionColumns = tableLayout.getPartitionColumns();
 
+        Table table = metastore.getTable(context, databaseName, tableName)
+                .orElseThrow(() -> new PrestoException(HUDI_INVALID_METADATA, format("Table %s.%s expected but not found", databaseName, tableName)));
         if (partitionColumns.isEmpty()) {
             // non-partitioned tableLayout
-            Table table = metastore.getTable(context, databaseName, tableName)
-                    .orElseThrow(() -> new PrestoException(HUDI_INVALID_METADATA, format("Table %s.%s expected but not found", databaseName, tableName)));
             return new HudiPartition(partitionName, ImmutableList.of(), ImmutableMap.of(), table.getStorage(), tableLayout.getDataColumns());
         }
         else {
@@ -178,7 +178,7 @@ public class HudiSplitManager
             List<String> partitionValues = extractPartitionValues(partitionName);
             checkArgument(partitionColumns.size() == partitionValues.size(),
                     format("Invalid partition name %s for partition columns %s", partitionName, partitionColumns));
-            Partition partition = metastore.getPartition(context, databaseName, tableName, partitionValues)
+            Partition partition = metastore.getPartition(context, table, partitionValues)
                     .orElseThrow(() -> new PrestoException(HUDI_INVALID_METADATA, format("Partition %s expected but not found", partitionName)));
             Map<String, String> keyValues = zipPartitionKeyValues(partitionColumns, partitionValues);
             return new HudiPartition(partitionName, partitionValues, keyValues, partition.getStorage(), fromDataColumns(partition.getColumns()));

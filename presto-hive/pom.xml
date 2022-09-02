@@ -161,11 +161,6 @@
         </dependency>
 
         <dependency>
-            <groupId>com.facebook.airlift</groupId>
-            <artifactId>http-client</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>com.facebook.drift</groupId>
             <artifactId>drift-api</artifactId>
         </dependency>

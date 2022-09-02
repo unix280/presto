@@ -638,14 +638,19 @@ public class CachingHiveMetastore
     protected void invalidateTable(String databaseName, String tableName)
     {
         invalidateTableCache(databaseName, tableName);
-        tableConstraintsCache.asMap().keySet().stream()
-                .filter(hiveTableNameKey -> hiveTableNameKey.getKey().equals(hiveTableName))
-                .forEach(tableConstraintsCache::invalidate);
+        invalidateTableConstraintCache(databaseName, tableName);
         invalidateTableNamesCache(databaseName);
         invalidateViewNamesCache(databaseName);
         invalidateTablePrivilegesCache(databaseName, tableName);
         invalidateTableStatisticsCache(databaseName, tableName);
         invalidatePartitionCache(databaseName, tableName);
+    }
+
+    private void invalidateTableConstraintCache(String databaseName, String tableName)
+    {
+        tableConstraintsCache.asMap().keySet().stream()
+                .filter(table -> table.getKey().getDatabaseName().equals(databaseName) && table.getKey().getTableName().equals(tableName))
+                .forEach(tableConstraintsCache::invalidate);
     }
 
     private void invalidateTableCache(String databaseName, String tableName)

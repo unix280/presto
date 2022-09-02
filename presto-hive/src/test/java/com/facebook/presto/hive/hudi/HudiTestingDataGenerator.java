@@ -16,10 +16,10 @@ package com.facebook.presto.hive.hudi;
 
 import com.facebook.presto.hive.HiveColumnConverterProvider;
 import com.facebook.presto.hive.HiveType;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
-import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.PartitionWithStatistics;
