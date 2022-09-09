@@ -385,20 +385,17 @@
         </dependency>
 
         <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-urlconnection</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.commons</groupId>
-                    <artifactId>commons-compress</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>net.java.dev.jna</groupId>
-                    <artifactId>jna</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -580,6 +577,45 @@
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
                             <excludes combine.self="override" />
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>test-presto-main-no-docker</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/TestLocalExecutionPlanner.java</exclude>
+                                <!-- Exclude the OAuth2 tests that require docker from build -->
+                                <exclude>**/BaseOAuth2AuthenticationFilterTest.java</exclude>
+                                <exclude>**/TestOAuth2AuthenticationFilterWithJwt.java</exclude>
+                                <exclude>**/TestOAuth2AuthenticationFilterWithOpaque.java</exclude>
+                                <exclude>**/TestDualAuthenticationFilterWithOAuth.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>test-oauth-docker-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/TestOAuth2AuthenticationFilterWithJwt.java</include>
+                                <include>**/TestOAuth2AuthenticationFilterWithOpaque.java</include>
+                                <include>**/TestDualAuthenticationFilterWithOAuth.java</include>
+                            </includes>
                         </configuration>
                     </plugin>
                 </plugins>

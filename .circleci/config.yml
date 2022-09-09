@@ -545,6 +545,30 @@ jobs:
 
       - persist_test_results
 
+  oauth_dockerized_tests:
+    executor: openjdk-machine-executor
+    resource_class: xlarge
+    steps:
+      - checkout
+
+      - set_java_to_8
+
+      - restore_package_cache
+
+      - run:
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Install test dependencies
+          command: ./mvnw install $MAVEN_FAST_INSTALL -pl presto-main -am
+
+      - run:
+          name: Test oauth dockerized tests
+          command: ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B -pl presto-main -P test-oauth-docker-tests
+
+      - persist_test_results
+
   kudu_tests:
     executor: openjdk
     resource_class: large
@@ -986,6 +1010,7 @@ workflows:
           context:
             - docker_hub
           module: presto-main
+          test_flags: -P test-presto-main-no-docker
           resource_class: xlarge
           custom_mvn_opts: -Xmx13G -Xms1G -XX:+ExitOnOutOfMemoryError
           requires:
@@ -1183,6 +1208,11 @@ workflows:
             - docker_hub
           requires:
             - start_test_suite
+      - oauth_dockerized_tests:
+          context:
+            - docker_hub
+          requires:
+            - start_test_suite
       #      - kudu_tests:
 #          context:
 #            - docker_hub
@@ -1249,6 +1279,7 @@ workflows:
             - hive_tests
             - hive_s3_tests
             - hive_dockerized_tests
+            - oauth_dockerized_tests
             # - kudu_tests
             # - spark_integration_tests
       - tag_version:
