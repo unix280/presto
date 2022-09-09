@@ -84,7 +84,16 @@ public interface ExtendedHiveMetastore
 
     Optional<Partition> getPartition(MetastoreContext metastoreContext, Table table, List<String> partitionValues);
 
-    Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table);
+    /**
+     * Reverting the method signature to have databaseName and tableName instead of table object to allow {@code TestCachingHiveMetastore#testInvalidGetPartitionNames}
+     * to pass. This compromises with the existing optimization of reducing the number of getTable() calls over the network introduced as part of ACP-38 changes.
+     * Need to figure out a workaround for the mentioned test case so that the optimization can be brought back.
+     * @param metastoreContext
+     * @param databaseName
+     * @param tableName
+     * @return list of partition names
+     */
+    Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName);
 
     List<String> getPartitionNamesByFilter(
             MetastoreContext metastoreContext,

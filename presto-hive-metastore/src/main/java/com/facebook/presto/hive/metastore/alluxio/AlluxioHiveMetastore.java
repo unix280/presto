@@ -283,10 +283,10 @@ public class AlluxioHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         try {
-            List<PartitionInfo> partitionInfos = AlluxioProtoUtils.toPartitionInfoList(client.readTable(table.getDatabaseName(), table.getTableName(), Constraint.getDefaultInstance()));
+            List<PartitionInfo> partitionInfos = AlluxioProtoUtils.toPartitionInfoList(client.readTable(databaseName, tableName, Constraint.getDefaultInstance()));
             return Optional.of(partitionInfos.stream().map(PartitionInfo::getPartitionName).collect(toImmutableList()));
         }
         catch (AlluxioStatusException e) {

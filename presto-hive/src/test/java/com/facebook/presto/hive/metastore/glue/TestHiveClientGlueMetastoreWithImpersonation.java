@@ -26,7 +26,6 @@ import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
-import com.facebook.presto.hive.metastore.Table;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -117,8 +116,7 @@ public class TestHiveClientGlueMetastoreWithImpersonation
     {
         try {
             createDummyPartitionedTable(tablePartitionFormat, CREATE_TABLE_COLUMNS_PARTITIONED);
-            Optional<Table> table = getMetastoreClient().getTable(getMetastoreContext(ADMIN), tablePartitionFormat.getSchemaName(), tablePartitionFormat.getTableName());
-            Optional<List<String>> partitionNames = getMetastoreClient().getPartitionNames(getMetastoreContext(ADMIN), table.get());
+            Optional<List<String>> partitionNames = getMetastoreClient().getPartitionNames(getMetastoreContext(ADMIN), tablePartitionFormat.getSchemaName(), tablePartitionFormat.getTableName());
             assertTrue(partitionNames.isPresent());
             assertEquals(partitionNames.get(), ImmutableList.of("ds=2016-01-01", "ds=2016-01-02"));
         }

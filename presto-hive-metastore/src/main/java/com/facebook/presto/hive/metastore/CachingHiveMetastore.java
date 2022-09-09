@@ -20,8 +20,6 @@ import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.spi.TableNotFoundException;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
@@ -656,18 +654,14 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        return get(partitionNamesCache, getCachingKey(metastoreContext, hiveTableName(table.getDatabaseName(), table.getTableName())));
+        return get(partitionNamesCache, getCachingKey(metastoreContext, hiveTableName(databaseName, tableName)));
     }
 
     private Optional<List<String>> loadPartitionNames(KeyAndContext<HiveTableName> hiveTableNameKey)
     {
-        Optional<Table> table = getTable(hiveTableNameKey.getContext(), hiveTableNameKey.getKey().getDatabaseName(), hiveTableNameKey.getKey().getTableName());
-        if (!table.isPresent()) {
-            throw new TableNotFoundException(new SchemaTableName(hiveTableNameKey.getKey().getDatabaseName(), hiveTableNameKey.getKey().getTableName()));
-        }
-        return delegate.getPartitionNames(hiveTableNameKey.getContext(), table.get());
+        return delegate.getPartitionNames(hiveTableNameKey.getContext(), hiveTableNameKey.getKey().getDatabaseName(), hiveTableNameKey.getKey().getTableName());
     }
 
     @Override
