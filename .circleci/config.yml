@@ -897,6 +897,14 @@ workflows:
           requires:
             - start_test_suite
       - test_specific_module:
+          name: test_specific_module_presto_hive_metastore
+          context:
+            - docker_hub
+          module: presto-hive-metastore
+          resource_class: xlarge
+          requires:
+            - start_test_suite
+      - test_specific_module:
           name: test_specific_module_presto_hive_glue
           context:
             - docker_hub
@@ -1105,6 +1113,7 @@ workflows:
             - test_specific_module_presto_hive_pushdown_filter_queries_advanced
             - test_specific_module_presto_hive_repartitioning
             - test_specific_module_presto_hive_parquet
+            - test_specific_module_presto_hive_metastore
             - test_specific_module_presto_main
             - test_specific_module_presto_mongodb
             - test_specific_module_presto_redis
