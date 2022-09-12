@@ -779,6 +779,31 @@ jobs:
           repo_name: prestodb-cli
           aws_ecr_account_url: << parameters.aws_ecr_account_url >>
 
+  deploy_to_download:
+    parameters:
+      s3_bucket_name:
+        type: string
+    executor: aws-cli/default
+    steps:
+      - checkout
+
+      - attach_workspace:
+          at: ~/build-artifacts
+
+      - aws-cli/setup
+
+      - run:
+          name: Copy Presto CLI to S3
+          command: aws s3 cp ~/build-artifacts/presto-cli-*-executable.jar s3://<< parameters.s3_bucket_name >>/presto/
+
+      - run:
+          name: Copy Presto JDBC to S3
+          command: aws s3 cp ~/build-artifacts/presto-jdbc-*.jar s3://<< parameters.s3_bucket_name >>/presto/
+
+      - run:
+          name: Invalidate cloudfront
+          command: for id in $(aws cloudfront list-distributions --query "DistributionList.Items[*].{id:Id,origin:Origins.Items[0].Id}[?origin==<< parameters.s3_bucket_name >>].id" --output text); do aws cloudfront create-invalidation --distribution-id $id --paths "/*"; done;
+
   rotate_iam_credentials:
     executor: aws-cli/default
     parameters:
@@ -1330,6 +1355,19 @@ workflows:
       #         ignore: /.*/
       #     requires:
       #       - build_version
+      - deploy_to_download:
+          name: deploy_to_download_staging
+          s3_bucket_name: ahana-download-origin-download.staging.ahn-dev.app
+          context:
+            - prestodb_staging
+            - docker_hub
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+          requires:
+            - build_version
       - release_to_production:
           type: approval
           filters:
@@ -1339,9 +1377,23 @@ workflows:
               ignore: /.*/
           requires:
             - deploy_prestodb_docker_image_staging
+            - deploy_to_download_staging
       - deploy_prestodb_docker_image:
           name: deploy_prestodb_docker_image_production
           aws_ecr_account_url: 119343124599.dkr.ecr.us-east-1.amazonaws.com
+          context:
+            - prestodb_production
+            - docker_hub
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+          requires:
+            - release_to_production
+      - deploy_to_download:
+          name: deploy_to_download_production
+          s3_bucket_name: ahana-download-origin-download.ahana.cloud
           context:
             - prestodb_production
             - docker_hub
@@ -1360,6 +1412,7 @@ workflows:
               ignore: /.*/
           requires:
             - deploy_prestodb_docker_image_production
+            - deploy_to_download_production
           context:
             - docker_hub
 
