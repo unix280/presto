@@ -1037,6 +1037,111 @@ workflows:
           module: presto-spark-base
           requires:
             - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_base_jdbc
+          context:
+            - docker_hub
+          module: presto-base-jdbc
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_common
+          context:
+            - docker_hub
+          module: presto-common
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_event_listener
+          context:
+            - docker_hub
+          module: presto-event-listener
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_geospatial
+          context:
+            - docker_hub
+          module: presto-geospatial
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_geospatial_toolkit
+          context:
+            - docker_hub
+          module: presto-geospatial-toolkit
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_hive_common
+          context:
+            - docker_hub
+          module: presto-hive-common
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_jdbc
+          context:
+            - docker_hub
+          module: presto-jdbc
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_cli
+          context:
+            - docker_hub
+          module: presto-cli
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_client
+          context:
+            - docker_hub
+          module: presto-client
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_parquet
+          context:
+            - docker_hub
+          module: presto-parquet
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_password_authenticators
+          context:
+            - docker_hub
+          module: presto-password-authenticators
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_plugin_toolkit
+          context:
+            - docker_hub
+          module: presto-plugin-toolkit
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_redshift
+          context:
+            - docker_hub
+          module: presto-redshift
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_session_property_managers
+          context:
+            - docker_hub
+          module: presto-session-property-managers
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_spi
+          context:
+            - docker_hub
+          module: presto-spi
+          requires:
+            - start_test_suite
 #      - test_other_modules:
 #          context:
 #            - docker_hub
@@ -1121,6 +1226,21 @@ workflows:
             - test_specific_module_presto_orc
             - test_specific_module_presto_thrift_connector
             - test_specific_module_presto_spark_base
+            - test_specific_module_presto_base_jdbc
+            - test_specific_module_presto_common
+            - test_specific_module_presto_event_listener
+            - test_specific_module_presto_geospatial
+            - test_specific_module_presto_geospatial_toolkit
+            - test_specific_module_presto_hive_common
+            - test_specific_module_presto_jdbc
+            - test_specific_module_presto_parquet
+            - test_specific_module_presto_password_authenticators
+            - test_specific_module_presto_plugin_toolkit
+            - test_specific_module_presto_redshift
+            - test_specific_module_presto_session_property_managers
+            - test_specific_module_presto_spi
+            - test_specific_module_presto_cli
+            - test_specific_module_presto_client
             # - test_other_modules
             - product_test_basic_environment
             - product_jdbc_tests
