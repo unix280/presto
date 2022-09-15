@@ -783,7 +783,7 @@ jobs:
     parameters:
       s3_bucket_name:
         type: string
-    executor: aws-cli/default
+    executor: openjdk
     steps:
       - aws-cli/setup
 
