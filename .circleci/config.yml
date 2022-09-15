@@ -785,20 +785,31 @@ jobs:
         type: string
     executor: aws-cli/default
     steps:
+      - aws-cli/setup
+
       - checkout
+
+      - run:
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Get Presto Version
+          command: |
+            mvn_version=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+            echo "export PRESTO_VERSION=$mvn_version" >> $BASH_ENV
+            source $BASH_ENV
 
       - attach_workspace:
           at: ~/build-artifacts
 
-      - aws-cli/setup
-
       - run:
           name: Copy Presto CLI to S3
-          command: aws s3 cp ~/build-artifacts/presto-cli-*-executable.jar s3://<< parameters.s3_bucket_name >>/presto/
+          command: aws s3 cp ~/build-artifacts/presto-cli-$PRESTO_VERSION-executable.jar s3://<< parameters.s3_bucket_name >>/presto/
 
       - run:
           name: Copy Presto JDBC to S3
-          command: aws s3 cp ~/build-artifacts/presto-jdbc-*.jar s3://<< parameters.s3_bucket_name >>/presto/
+          command: aws s3 cp ~/build-artifacts/presto-jdbc-$PRESTO_VERSION.jar s3://<< parameters.s3_bucket_name >>/presto/
 
       - run:
           name: Invalidate cloudfront
