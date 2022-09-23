@@ -585,7 +585,7 @@ public abstract class AbstractTestHiveFileSystem
                 locations.add(table.getStorage().getLocation());
             }
 
-            Optional<List<String>> partitionNames = getPartitionNames(metastoreContext, table);
+            Optional<List<String>> partitionNames = getPartitionNames(metastoreContext, schemaName, tableName);
             if (partitionNames.isPresent()) {
                 getPartitionsByNames(metastoreContext, table, partitionNames.get()).values().stream()
                         .map(Optional::get)

@@ -545,6 +545,30 @@ jobs:
 
       - persist_test_results
 
+  oauth_dockerized_tests:
+    executor: openjdk-machine-executor
+    resource_class: xlarge
+    steps:
+      - checkout
+
+      - set_java_to_8
+
+      - restore_package_cache
+
+      - run:
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Install test dependencies
+          command: ./mvnw install $MAVEN_FAST_INSTALL -pl presto-main -am
+
+      - run:
+          name: Test oauth dockerized tests
+          command: ./mvnw test $MAVEN_SKIP_CHECKS_AND_DOCS -B -pl presto-main -P test-oauth-docker-tests
+
+      - persist_test_results
+
   kudu_tests:
     executor: openjdk
     resource_class: large
@@ -755,6 +779,42 @@ jobs:
           repo_name: prestodb-cli
           aws_ecr_account_url: << parameters.aws_ecr_account_url >>
 
+  deploy_to_download:
+    parameters:
+      s3_bucket_name:
+        type: string
+    executor: openjdk
+    steps:
+      - aws-cli/setup
+
+      - checkout
+
+      - run:
+          name: Install Maven Wrapper
+          command: ./mvnw -v
+
+      - run:
+          name: Get Presto Version
+          command: |
+            mvn_version=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+            echo "export PRESTO_VERSION=$mvn_version" >> $BASH_ENV
+            source $BASH_ENV
+
+      - attach_workspace:
+          at: ~/build-artifacts
+
+      - run:
+          name: Copy Presto CLI to S3
+          command: aws s3 cp ~/build-artifacts/presto-cli-$PRESTO_VERSION-executable.jar s3://<< parameters.s3_bucket_name >>/presto/
+
+      - run:
+          name: Copy Presto JDBC to S3
+          command: aws s3 cp ~/build-artifacts/presto-jdbc-$PRESTO_VERSION.jar s3://<< parameters.s3_bucket_name >>/presto/
+
+      - run:
+          name: Invalidate cloudfront
+          command: for id in $(aws cloudfront list-distributions --query "DistributionList.Items[*].{id:Id,origin:Origins.Items[0].Id}[?origin==<< parameters.s3_bucket_name >>].id" --output text); do aws cloudfront create-invalidation --distribution-id $id --paths "/*"; done;
+
   rotate_iam_credentials:
     executor: aws-cli/default
     parameters:
@@ -897,6 +957,14 @@ workflows:
           requires:
             - start_test_suite
       - test_specific_module:
+          name: test_specific_module_presto_hive_metastore
+          context:
+            - docker_hub
+          module: presto-hive-metastore
+          resource_class: xlarge
+          requires:
+            - start_test_suite
+      - test_specific_module:
           name: test_specific_module_presto_hive_glue
           context:
             - docker_hub
@@ -978,6 +1046,7 @@ workflows:
           context:
             - docker_hub
           module: presto-main
+          test_flags: -P test-presto-main-no-docker
           resource_class: xlarge
           custom_mvn_opts: -Xmx13G -Xms1G -XX:+ExitOnOutOfMemoryError
           requires:
@@ -1029,6 +1098,111 @@ workflows:
           module: presto-spark-base
           requires:
             - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_base_jdbc
+          context:
+            - docker_hub
+          module: presto-base-jdbc
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_common
+          context:
+            - docker_hub
+          module: presto-common
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_event_listener
+          context:
+            - docker_hub
+          module: presto-event-listener
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_geospatial
+          context:
+            - docker_hub
+          module: presto-geospatial
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_geospatial_toolkit
+          context:
+            - docker_hub
+          module: presto-geospatial-toolkit
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_hive_common
+          context:
+            - docker_hub
+          module: presto-hive-common
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_jdbc
+          context:
+            - docker_hub
+          module: presto-jdbc
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_cli
+          context:
+            - docker_hub
+          module: presto-cli
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_client
+          context:
+            - docker_hub
+          module: presto-client
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_parquet
+          context:
+            - docker_hub
+          module: presto-parquet
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_password_authenticators
+          context:
+            - docker_hub
+          module: presto-password-authenticators
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_plugin_toolkit
+          context:
+            - docker_hub
+          module: presto-plugin-toolkit
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_redshift
+          context:
+            - docker_hub
+          module: presto-redshift
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_session_property_managers
+          context:
+            - docker_hub
+          module: presto-session-property-managers
+          requires:
+            - start_test_suite
+      - test_specific_module:
+          name: test_specific_module_presto_spi
+          context:
+            - docker_hub
+          module: presto-spi
+          requires:
+            - start_test_suite
 #      - test_other_modules:
 #          context:
 #            - docker_hub
@@ -1070,6 +1244,11 @@ workflows:
             - docker_hub
           requires:
             - start_test_suite
+      - oauth_dockerized_tests:
+          context:
+            - docker_hub
+          requires:
+            - start_test_suite
       #      - kudu_tests:
 #          context:
 #            - docker_hub
@@ -1105,6 +1284,7 @@ workflows:
             - test_specific_module_presto_hive_pushdown_filter_queries_advanced
             - test_specific_module_presto_hive_repartitioning
             - test_specific_module_presto_hive_parquet
+            - test_specific_module_presto_hive_metastore
             - test_specific_module_presto_main
             - test_specific_module_presto_mongodb
             - test_specific_module_presto_redis
@@ -1112,6 +1292,21 @@ workflows:
             - test_specific_module_presto_orc
             - test_specific_module_presto_thrift_connector
             - test_specific_module_presto_spark_base
+            - test_specific_module_presto_base_jdbc
+            - test_specific_module_presto_common
+            - test_specific_module_presto_event_listener
+            - test_specific_module_presto_geospatial
+            - test_specific_module_presto_geospatial_toolkit
+            - test_specific_module_presto_hive_common
+            - test_specific_module_presto_jdbc
+            - test_specific_module_presto_parquet
+            - test_specific_module_presto_password_authenticators
+            - test_specific_module_presto_plugin_toolkit
+            - test_specific_module_presto_redshift
+            - test_specific_module_presto_session_property_managers
+            - test_specific_module_presto_spi
+            - test_specific_module_presto_cli
+            - test_specific_module_presto_client
             # - test_other_modules
             - product_test_basic_environment
             - product_jdbc_tests
@@ -1120,6 +1315,7 @@ workflows:
             - hive_tests
             - hive_s3_tests
             - hive_dockerized_tests
+            - oauth_dockerized_tests
             # - kudu_tests
             # - spark_integration_tests
       - tag_version:
@@ -1170,6 +1366,19 @@ workflows:
       #         ignore: /.*/
       #     requires:
       #       - build_version
+      - deploy_to_download:
+          name: deploy_to_download_staging
+          s3_bucket_name: ahana-download-origin-download.staging.ahn-dev.app
+          context:
+            - prestodb_staging
+            - docker_hub
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+          requires:
+            - build_version
       - release_to_production:
           type: approval
           filters:
@@ -1179,9 +1388,23 @@ workflows:
               ignore: /.*/
           requires:
             - deploy_prestodb_docker_image_staging
+            - deploy_to_download_staging
       - deploy_prestodb_docker_image:
           name: deploy_prestodb_docker_image_production
           aws_ecr_account_url: 119343124599.dkr.ecr.us-east-1.amazonaws.com
+          context:
+            - prestodb_production
+            - docker_hub
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+          requires:
+            - release_to_production
+      - deploy_to_download:
+          name: deploy_to_download_production
+          s3_bucket_name: ahana-download-origin-download.ahana.cloud
           context:
             - prestodb_production
             - docker_hub
@@ -1200,6 +1423,7 @@ workflows:
               ignore: /.*/
           requires:
             - deploy_prestodb_docker_image_production
+            - deploy_to_download_production
           context:
             - docker_hub
 

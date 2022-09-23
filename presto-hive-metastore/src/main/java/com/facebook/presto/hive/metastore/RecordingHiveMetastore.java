@@ -347,12 +347,12 @@ public class RecordingHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         return loadValue(
                 partitionNamesCache,
-                hiveTableName(table.getDatabaseName(), table.getTableName()),
-                () -> delegate.getPartitionNames(metastoreContext, table));
+                hiveTableName(databaseName, tableName),
+                () -> delegate.getPartitionNames(metastoreContext, databaseName, tableName));
     }
 
     @Override

@@ -138,7 +138,9 @@ public abstract class AbstractCliTest
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                false);
+                false,
+                false,
+                ImmutableList.of());
     }
 
     protected static void assertHeaders(String headerName, Headers headers, Set<String> expectedSessionHeaderValues)

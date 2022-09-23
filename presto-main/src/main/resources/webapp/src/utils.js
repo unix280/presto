@@ -501,3 +501,10 @@ export function removeNodeTypePackage(nodeType: string): string {
     const classEndIndex = nodeType.lastIndexOf(".");
     return nodeType.substr(classEndIndex + 1);
 }
+
+export function getLastUrl(): string {
+    const path = window.location.pathname;
+    const queryString = window.location.search;
+
+    return path + queryString;
+}

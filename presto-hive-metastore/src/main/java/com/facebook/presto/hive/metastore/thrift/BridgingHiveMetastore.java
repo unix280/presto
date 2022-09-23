@@ -277,9 +277,9 @@ public class BridgingHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        return delegate.getPartitionNames(metastoreContext, table.getDatabaseName(), table.getTableName());
+        return delegate.getPartitionNames(metastoreContext, databaseName, tableName);
     }
 
     @Override

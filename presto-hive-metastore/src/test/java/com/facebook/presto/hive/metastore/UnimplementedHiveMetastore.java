@@ -158,7 +158,7 @@ public class UnimplementedHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         throw new UnsupportedOperationException();
     }

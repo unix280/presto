@@ -96,6 +96,7 @@
 
     <module name="TreeWalker">
         <module name="SuppressWarningsHolder" />
+        <module name="SuppressionCommentFilter" />
 
         <module name="EmptyBlock">
             <property name="option" value="text" />

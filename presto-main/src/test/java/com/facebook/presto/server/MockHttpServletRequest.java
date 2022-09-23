@@ -29,8 +29,10 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpUpgradeHandler;
 import javax.servlet.http.Part;
+import javax.ws.rs.core.UriBuilder;
 
 import java.io.BufferedReader;
+import java.net.URI;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -47,10 +49,20 @@ public class MockHttpServletRequest
     private final ListMultimap<String, String> headers;
     private final String remoteAddress;
 
+    private final String requestUrl;
+
     public MockHttpServletRequest(ListMultimap<String, String> headers, String remoteAddress)
     {
         this.headers = ImmutableListMultimap.copyOf(requireNonNull(headers, "headers is null"));
         this.remoteAddress = requireNonNull(remoteAddress, "remoteAddress is null");
+        this.requestUrl = null;
+    }
+
+    public MockHttpServletRequest(ListMultimap<String, String> headers, String remoteAddress, String requestUrl)
+    {
+        this.headers = ImmutableListMultimap.copyOf(requireNonNull(headers, "headers is null"));
+        this.remoteAddress = requireNonNull(remoteAddress, "remoteAddress is null");
+        this.requestUrl = requireNonNull(requestUrl, "requestUrl is null");
     }
 
     @Override
@@ -128,7 +140,12 @@ public class MockHttpServletRequest
     @Override
     public String getQueryString()
     {
-        throw new UnsupportedOperationException();
+        if (this.requestUrl == null) {
+            throw new UnsupportedOperationException();
+        }
+        URI uri = UriBuilder.fromUri(this.requestUrl).build();
+
+        return uri.getQuery();
     }
 
     @Override
@@ -164,7 +181,10 @@ public class MockHttpServletRequest
     @Override
     public StringBuffer getRequestURL()
     {
-        throw new UnsupportedOperationException();
+        if (this.requestUrl == null) {
+            throw new UnsupportedOperationException();
+        }
+        return new StringBuffer(this.requestUrl);
     }
 
     @Override
@@ -332,7 +352,12 @@ public class MockHttpServletRequest
     @Override
     public String getScheme()
     {
-        throw new UnsupportedOperationException();
+        if (this.requestUrl == null) {
+            throw new UnsupportedOperationException();
+        }
+        URI uri = UriBuilder.fromUri(this.requestUrl).build();
+
+        return uri.getScheme();
     }
 
     @Override

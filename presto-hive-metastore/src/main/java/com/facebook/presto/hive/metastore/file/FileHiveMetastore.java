@@ -867,11 +867,16 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
+    public synchronized Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         requireNonNull(metastoreContext, "metastoreContext is null");
-        requireNonNull(table.getDatabaseName(), "databaseName is null");
-        requireNonNull(table.getTableName(), "tableName is null");
+        requireNonNull(databaseName, "databaseName is null");
+        requireNonNull(tableName, "tableName is null");
+        Optional<Table> tableReference = getTable(metastoreContext, databaseName, tableName);
+        if (!tableReference.isPresent()) {
+            return Optional.empty();
+        }
+        Table table = tableReference.get();
 
         Path tableMetadataDirectory = getTableMetadataDirectory(table);
 
@@ -941,12 +946,8 @@ public class FileHiveMetastore
             Map<Column, Domain> partitionPredicates)
     {
         List<String> parts = convertPredicateToParts(partitionPredicates);
-        Optional<Table> table = getTable(metastoreContext, databaseName, tableName);
-        if (!table.isPresent()) {
-            return ImmutableList.of();
-        }
         // todo this should be more efficient by selectively walking the directory tree
-        return getPartitionNames(metastoreContext, table.get()).map(partitionNames -> partitionNames.stream()
+        return getPartitionNames(metastoreContext, databaseName, tableName).map(partitionNames -> partitionNames.stream()
                 .filter(partitionName -> partitionMatches(partitionName, parts))
                 .collect(toImmutableList()))
                 .orElse(ImmutableList.of());

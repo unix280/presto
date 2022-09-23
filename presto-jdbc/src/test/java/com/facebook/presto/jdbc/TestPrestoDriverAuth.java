@@ -26,6 +26,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import javax.crypto.SecretKey;
+
 import java.io.File;
 import java.net.URL;
 import java.security.PrivateKey;
@@ -44,6 +46,7 @@ import static com.facebook.presto.jdbc.TestPrestoDriver.waitForNodeRefresh;
 import static com.google.common.io.Files.asCharSource;
 import static com.google.common.io.Resources.getResource;
 import static io.jsonwebtoken.JwsHeader.KEY_ID;
+import static io.jsonwebtoken.security.Keys.secretKeyFor;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.util.Base64.getMimeDecoder;
@@ -190,9 +193,10 @@ public class TestPrestoDriverAuth
     public void testFailedBadHmacSignature()
             throws Exception
     {
+        SecretKey signingKey = secretKeyFor(SignatureAlgorithm.HS512);
         String accessToken = Jwts.builder()
                 .setSubject("test")
-                .signWith(SignatureAlgorithm.HS512, Base64.getEncoder().encodeToString("bad-key".getBytes(US_ASCII)))
+                .signWith(SignatureAlgorithm.HS512, Base64.getEncoder().encodeToString(signingKey.getEncoded()))
                 .compact();
 
         try (Connection connection = createConnection(ImmutableMap.of("accessToken", accessToken))) {

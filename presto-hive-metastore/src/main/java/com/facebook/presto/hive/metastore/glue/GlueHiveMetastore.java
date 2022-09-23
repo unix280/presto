@@ -812,8 +812,9 @@ public class GlueHiveMetastore
     }
 
     @Override
-    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, Table table)
+    public Optional<List<String>> getPartitionNames(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
+        Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
         List<Partition> partitions = getPartitions(metastoreContext, WILDCARD_EXPRESSION, table);
         return Optional.of(buildPartitionNames(table.getPartitionColumns(), partitions));
     }

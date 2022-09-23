@@ -15,6 +15,7 @@ package com.facebook.presto.server.security;
 
 import com.facebook.airlift.http.server.AuthenticationException;
 import com.facebook.airlift.http.server.Authenticator;
+import com.facebook.presto.server.security.oauth2.OAuth2Authenticator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -37,7 +38,11 @@ import java.security.Principal;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import static com.facebook.presto.server.WebUiResource.UI_ENDPOINT;
+import static com.facebook.presto.server.security.oauth2.OAuth2CallbackResource.CALLBACK_ENDPOINT;
+import static com.facebook.presto.server.security.oauth2.OAuth2TokenExchangeResource.TOKEN_ENDPOINT;
 import static com.google.common.io.ByteStreams.copy;
 import static com.google.common.io.ByteStreams.nullOutputStream;
 import static com.google.common.net.HttpHeaders.WWW_AUTHENTICATE;
@@ -50,12 +55,17 @@ public class AuthenticationFilter
     private static final String HTTPS_PROTOCOL = "https";
     private final List<Authenticator> authenticators;
     private final boolean httpsForwardingEnabled;
+    private final WebUiAuthenticationManager webUiAuthenticationManager;
+    private final boolean isOauth2Enabled;
 
     @Inject
-    public AuthenticationFilter(List<Authenticator> authenticators, SecurityConfig securityConfig)
+    public AuthenticationFilter(List<Authenticator> authenticators, SecurityConfig securityConfig, WebUiAuthenticationManager webUiAuthenticationManager)
     {
         this.authenticators = ImmutableList.copyOf(requireNonNull(authenticators, "authenticators is null"));
         this.httpsForwardingEnabled = requireNonNull(securityConfig, "securityConfig is null").getEnableForwardingHttps();
+        this.webUiAuthenticationManager = requireNonNull(webUiAuthenticationManager, "webUiAuthenticationManager is null");
+        this.isOauth2Enabled = this.authenticators.stream()
+                .anyMatch(a -> a.getClass().equals(OAuth2Authenticator.class));
     }
 
     @Override
@@ -70,7 +80,12 @@ public class AuthenticationFilter
     {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         HttpServletResponse response = (HttpServletResponse) servletResponse;
-
+        // Check if it's a request going to the web UI side.
+        if (isWebUiRequest(request) && isOauth2Enabled) {
+            // call web authenticator
+            this.webUiAuthenticationManager.handleRequest(request, response, nextFilter);
+            return;
+        }
         // skip authentication if non-secure or not configured
         if (!doesRequestSupportAuthentication(request)) {
             nextFilter.doFilter(request, response);
@@ -102,6 +117,10 @@ public class AuthenticationFilter
         // authentication failed
         skipRequestBody(request);
 
+        // Browsers have special handling for the BASIC challenge authenticate header so we need to filter them out if the WebUI Oauth Token is present.
+        if (isOauth2Enabled && OAuth2Authenticator.extractTokenFromCookie(request).isPresent()) {
+            authenticateHeaders = authenticateHeaders.stream().filter(value -> value.contains("x_token_server")).collect(Collectors.toSet());
+        }
         for (String value : authenticateHeaders) {
             response.addHeader(WWW_AUTHENTICATE, value);
         }
@@ -109,10 +128,11 @@ public class AuthenticationFilter
         if (messages.isEmpty()) {
             messages.add("Unauthorized");
         }
+
         response.sendError(SC_UNAUTHORIZED, Joiner.on(" | ").join(messages));
     }
 
-    private static ServletRequest withPrincipal(HttpServletRequest request, Principal principal)
+    public static ServletRequest withPrincipal(HttpServletRequest request, Principal principal)
     {
         requireNonNull(principal, "principal is null");
         return new HttpServletRequestWrapper(request)
@@ -123,6 +143,12 @@ public class AuthenticationFilter
                 return principal;
             }
         };
+    }
+
+    public static boolean isPublic(HttpServletRequest request)
+    {
+        return request.getPathInfo().startsWith(TOKEN_ENDPOINT)
+                || request.getPathInfo().startsWith(CALLBACK_ENDPOINT);
     }
 
     private static void skipRequestBody(HttpServletRequest request)
@@ -141,6 +167,10 @@ public class AuthenticationFilter
 
     private boolean doesRequestSupportAuthentication(HttpServletRequest request)
     {
+        if (isPublic(request)) {
+            return false;
+        }
+
         if (authenticators.isEmpty()) {
             return false;
         }
@@ -148,5 +178,11 @@ public class AuthenticationFilter
             return true;
         }
         return httpsForwardingEnabled && Strings.nullToEmpty(request.getHeader(HttpHeaders.X_FORWARDED_PROTO)).equalsIgnoreCase(HTTPS_PROTOCOL);
+    }
+
+    private boolean isWebUiRequest(HttpServletRequest request)
+    {
+        String pathInfo = request.getPathInfo();
+        return pathInfo == null || pathInfo.equals(UI_ENDPOINT) || pathInfo.startsWith("/ui");
     }
 }

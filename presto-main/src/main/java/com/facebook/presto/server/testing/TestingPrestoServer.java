@@ -211,6 +211,11 @@ public class TestingPrestoServer
         this(true, ImmutableMap.of(), null, null, new SqlParserOptions(), additionalModules);
     }
 
+    public TestingPrestoServer(Map<String, String> properties) throws Exception
+    {
+        this(true, properties, null, null, new SqlParserOptions(), ImmutableList.of());
+    }
+
     public TestingPrestoServer(
             boolean coordinator,
             Map<String, String> properties,
@@ -508,6 +513,11 @@ public class TestingPrestoServer
     {
         URI httpsUri = server.getHttpServerInfo().getHttpsUri();
         return HostAndPort.fromParts(httpsUri.getHost(), httpsUri.getPort());
+    }
+
+    public URI getHttpBaseUrl()
+    {
+        return server.getHttpServerInfo().getHttpUri();
     }
 
     public CatalogManager getCatalogManager()
