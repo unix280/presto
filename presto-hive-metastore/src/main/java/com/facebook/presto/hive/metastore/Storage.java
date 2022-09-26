@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import javax.annotation.concurrent.Immutable;
 
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -31,7 +32,7 @@ import static java.util.Objects.requireNonNull;
 public class Storage
 {
     private final StorageFormat storageFormat;
-    private final String location;
+    private final Optional<String> location;
     private final Optional<HiveBucketProperty> bucketProperty;
     private final boolean skewed;
     private final Map<String, String> serdeParameters;
@@ -40,7 +41,7 @@ public class Storage
     @JsonCreator
     public Storage(
             @JsonProperty("storageFormat") StorageFormat storageFormat,
-            @JsonProperty("location") String location,
+            @JsonProperty("location") Optional<String> location,
             @JsonProperty("bucketProperty") Optional<HiveBucketProperty> bucketProperty,
             @JsonProperty("skewed") boolean skewed,
             @JsonProperty("serdeParameters") Map<String, String> serdeParameters,
@@ -54,16 +55,41 @@ public class Storage
         this.parameters = ImmutableMap.copyOf(requireNonNull(parameters, "parameters is null"));
     }
 
+    // Constructor for test cases
+    public Storage(StorageFormat storageFormat,
+                   String location,
+                   Optional<HiveBucketProperty> bucketProperty,
+                   boolean skewed,
+                   Map<String, String> serdeParameters,
+                   Map<String, String> parameters)
+    {
+        this.storageFormat = requireNonNull(storageFormat, "storageFormat is null");
+        requireNonNull(location, "location is null");
+        this.location = Optional.of(location);
+        this.bucketProperty = requireNonNull(bucketProperty, "bucketProperty is null");
+        this.skewed = skewed;
+        this.serdeParameters = ImmutableMap.copyOf(requireNonNull(serdeParameters, "serdeParameters is null"));
+        this.parameters = ImmutableMap.copyOf(requireNonNull(parameters, "parameters is null"));
+    }
+
     @JsonProperty
     public StorageFormat getStorageFormat()
     {
         return storageFormat;
     }
 
-    @JsonProperty
-    public String getLocation()
+    @JsonProperty("location")
+    public Optional<String> getOptionalLocation()
     {
         return location;
+    }
+
+    public String getLocation()
+    {
+        // Default getter requires location to be set. Location is not set in the following scenarios:
+        // 2. Iceberg format tables
+        // 3. Delta format tables (sometimes)
+        return location.orElseThrow(() -> new NoSuchElementException("No value present"));
     }
 
     @JsonProperty
@@ -141,7 +167,7 @@ public class Storage
     public static class Builder
     {
         private StorageFormat storageFormat;
-        private String location;
+        private Optional<String> location = Optional.empty();
         private Optional<HiveBucketProperty> bucketProperty = Optional.empty();
         private boolean skewed;
         private Map<String, String> serdeParameters = ImmutableMap.of();
@@ -167,9 +193,15 @@ public class Storage
             return this;
         }
 
-        public Builder setLocation(String location)
+        public Builder setLocation(Optional<String> location)
         {
             this.location = location;
+            return this;
+        }
+
+        public Builder setLocation(String location)
+        {
+            this.location = Optional.of(location);
             return this;
         }
 
