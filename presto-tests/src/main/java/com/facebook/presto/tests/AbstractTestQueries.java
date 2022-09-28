@@ -966,15 +966,6 @@ public abstract class AbstractTestQueries
     }
 
     @Test
-    public void testDistinctLimitWithQuickDistinctLimitEnabled()
-    {
-        Session session = Session.builder(getSession())
-                .setSystemProperty(QUICK_DISTINCT_LIMIT_ENABLED, "true")
-                .build();
-        testDistinctLimitInternal(session);
-    }
-
-    @Test
     public void testDistinctLimitWithHashBasedDistinctLimitEnabled()
     {
         Session session = Session.builder(getSession())
