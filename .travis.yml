@@ -1,2 +1,4 @@
 language: java
 dist: jammy
+before_install:
+- apt-get install python3-venv
