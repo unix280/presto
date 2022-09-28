@@ -4,3 +4,4 @@ addons:
   apt:
     packages:
       - python3-venv
+script: mvn clean package -DskipTests=true
