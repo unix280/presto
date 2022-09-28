@@ -1,4 +1,4 @@
 language: java
 dist: jammy
 before_install:
-- sudo apt-get install python3-venv
+- sudo apt-get install python3.10-venv
