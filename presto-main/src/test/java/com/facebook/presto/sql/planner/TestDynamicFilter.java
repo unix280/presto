@@ -287,6 +287,7 @@ public class TestDynamicFilter
     {
         assertPlan(
                 "SELECT part.partkey from (lineitem JOIN orders ON lineitem.orderkey = orders.orderkey) JOIN part ON lineitem.orderkey = part.partkey",
+                noJoinReordering(),
                 anyTree(
                         join(
                                 INNER,
