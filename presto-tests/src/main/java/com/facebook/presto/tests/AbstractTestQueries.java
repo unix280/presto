@@ -984,8 +984,8 @@ public abstract class AbstractTestQueries
     {
         assertQuery(session,
                 "SELECT DISTINCT orderstatus, custkey " +
-                "FROM (SELECT orderstatus, custkey FROM orders ORDER BY orderkey LIMIT 10) " +
-                "LIMIT 10");
+                        "FROM (SELECT orderstatus, custkey FROM orders ORDER BY orderkey LIMIT 10) " +
+                        "LIMIT 10");
         assertQuery(session, "SELECT COUNT(*) FROM (SELECT DISTINCT orderstatus, custkey FROM orders LIMIT 10)");
         assertQuery(session, "SELECT DISTINCT custkey, orderstatus FROM orders WHERE custkey = 1268 LIMIT 2");
         assertQuery(session, "SELECT DISTINCT custkey, orderstatus FROM orders WHERE custkey = 1268 LIMIT 10000");
@@ -2853,7 +2853,8 @@ public abstract class AbstractTestQueries
                 getQueryRunner().getMetadata().getSessionPropertyManager(),
                 getSession().getPreparedStatements(),
                 ImmutableMap.of(),
-                getSession().getTracer());
+                getSession().getTracer(),
+                getSession().getWarningCollector());
         MaterializedResult result = computeActual(session, "SHOW SESSION");
 
         ImmutableMap<String, MaterializedRow> properties = Maps.uniqueIndex(result.getMaterializedRows(), input -> {

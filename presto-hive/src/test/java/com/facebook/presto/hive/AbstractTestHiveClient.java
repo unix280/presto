@@ -1129,6 +1129,12 @@ public abstract class AbstractTestHiveClient
             {
                 return Optional.empty();
             }
+
+            @Override
+            public WarningCollector getWarningCollector()
+            {
+                return WarningCollector.NOOP;
+            }
         };
     }
 
