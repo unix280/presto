@@ -6,8 +6,9 @@
     <servers>
         <server>
             <id>ahana-s3-maven-repo-snapshots</id>
-            <username>AKIA3P3XAX7FHR6WZQ4P</username>
-            <password>dvGiS/2J2Sy53/lJXhnl8G2FWwbce0LlTqcigDAI</password>
+            <!-- TODO: Remove Access Key from here and store in CircleCI secrets -->
+            <username>AKIA3P3XAX7FKTSFSPVC</username>
+            <password>F+ZmmI4oHYooFQyJ7jLx7A/IgK5jw5Y2OQ45Gfll</password>
             <configuration>
                 <region>us-east-2</region>
                 <publicRepository>false</publicRepository>
@@ -16,8 +17,9 @@
 
         <server>
             <id>ahana-s3-maven-repo-releases</id>
-            <username>AKIA3P3XAX7FHR6WZQ4P</username>
-            <password>dvGiS/2J2Sy53/lJXhnl8G2FWwbce0LlTqcigDAI</password>
+            <!-- TODO: Remove Access Key from here and store in CircleCI secrets -->
+            <username>AKIA3P3XAX7FKTSFSPVC</username>
+            <password>F+ZmmI4oHYooFQyJ7jLx7A/IgK5jw5Y2OQ45Gfll</password>
             <configuration>
                 <region>us-east-2</region>
                 <publicRepository>false</publicRepository>
