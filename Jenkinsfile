@@ -26,6 +26,22 @@ pipeline {
     }
 
     stages {
+        stage('Maven S3 Credential') {
+            steps {
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'maven-s3-private-repo',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                    sh '''
+                        sed -i "s#MAVEN_S3_ACCESS_KEY#$AWS_ACCESS_KEY_ID#g" settings.xml
+                        sed -i "s#MAVEN_S3_SECRET_KEY#$AWS_SECRET_ACCESS_KEY#g" settings.xml
+                        cat settings.xml
+                    '''
+                }
+            }
+        }
+
         stage('Maven Build') {
             steps {
                 script {
@@ -72,7 +88,6 @@ pipeline {
                         credentialsId: "${AWS_CREDENTIAL_ID}",
                         accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                         secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
-
                     sh '''
                         echo "upload prestodb-${BUILD_VERSION}.tar.gz to S3"
                         aws s3 cp --no-progress prestodb-${BUILD_VERSION}.tar.gz s3://ahana-jenkins/kaniko-image-context/prestodb/
