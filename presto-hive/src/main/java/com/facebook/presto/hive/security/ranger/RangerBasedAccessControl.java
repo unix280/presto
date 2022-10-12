@@ -52,7 +52,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static com.facebook.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
@@ -74,6 +73,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameC
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static java.lang.String.format;
 import static java.util.Objects.isNull;
@@ -166,7 +166,7 @@ public class RangerBasedAccessControl
     private Map<String, Set<String>> getRolesForUserList(OkHttpClient client, String rangerEndPoint)
     {
         List<VXUser> users = getUsers(client, rangerEndPoint);
-        List<String> usersList = users.stream().map(VXUser::getName).collect(Collectors.toList());
+        List<String> usersList = users.stream().map(VXUser::getName).collect(toImmutableList());
         HttpUrl getRolesUrl;
         for (String user : usersList) {
             getRolesUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))

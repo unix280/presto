@@ -42,7 +42,7 @@ public class RangerBasedAccessControlConfig
 
     private String rangerHttpEndPoint;
     private String rangerHiveServiceName;
-    private Duration refreshPeriod = new Duration(60, TimeUnit.SECONDS);
+    private Duration refreshPeriod = new Duration(120, TimeUnit.SECONDS);
     private String basicAuthUser;
     private String basicAuthPassword;
     private String rangerRestKeystorePath;

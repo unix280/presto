@@ -596,7 +596,7 @@ Property Name                                      Description                  
 ``hive.ranger.rest-endpoint``                      URL address of the Ranger REST service. Kerberos
                                                    authentication is not supported yet.
 
-``hive.ranger.refresh-policy-period``              Interval at which cached policies are refreshed              60s
+``hive.ranger.refresh-policy-period``              Interval at which cached policies are refreshed              120s
 
 ``hive.ranger.policy.hive-servicename``            Ranger Hive plugin service name
 
