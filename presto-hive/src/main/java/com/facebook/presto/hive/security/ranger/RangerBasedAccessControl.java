@@ -27,6 +27,7 @@ import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import okhttp3.Credentials;
@@ -52,7 +53,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static com.facebook.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
@@ -74,6 +74,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameC
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static java.lang.String.format;
 import static java.util.Objects.isNull;
@@ -139,27 +140,34 @@ public class RangerBasedAccessControl
         return jsonParse(response, ServicePolicies.class);
     }
 
-    private Users getUsers(OkHttpClient client, String rangerEndPoint)
+    private List<VXUser> getUsers(OkHttpClient client, String rangerEndPoint)
     {
-        HttpUrl getUsersUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))
-                .appendPath(RANGER_REST_USER_GROUP_URL)
-                .build()));
-
-        Request request = new Request.Builder().url(getUsersUrl).header("Accept", "application/json").build();
-
+        ImmutableList.Builder<VXUser> vXUsers = ImmutableList.builder();
+        long curIndex = 0;
+        JsonResponse<Users> users;
         JsonCodec<Users> usersJsonCodec = jsonCodec(Users.class);
-        JsonResponse<Users> users = JsonResponse.execute(usersJsonCodec, client, request);
-        if (!users.hasValue()) {
-            throw new RuntimeException(format("Request to %s failed: %s [Error: %s]", getUsersUrl, users, users.getResponseBody()));
-        }
+        do {
+            HttpUrl getUsersUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))
+                    .appendPath(RANGER_REST_USER_GROUP_URL)
+                    .addParameter("startIndex", Long.toString(curIndex))
+                    .build()));
 
-        return users.getValue();
+            Request request = new Request.Builder().url(getUsersUrl).header("Accept", "application/json").build();
+            users = JsonResponse.execute(usersJsonCodec, client, request);
+            if (!users.hasValue()) {
+                throw new RuntimeException(format("Request to %s failed: %s [Error: %s]", getUsersUrl, users, users.getResponseBody()));
+            }
+            vXUsers.addAll(users.getValue().getvXUsers());
+            curIndex += users.getValue().getPageSize();
+        } while (curIndex < users.getValue().getTotalCount());
+
+        return vXUsers.build();
     }
 
     private Map<String, Set<String>> getRolesForUserList(OkHttpClient client, String rangerEndPoint)
     {
-        Users users = getUsers(client, rangerEndPoint);
-        List<String> usersList = users.getvXUsers().stream().map(VXUser::getName).collect(Collectors.toList());
+        List<VXUser> users = getUsers(client, rangerEndPoint);
+        List<String> usersList = users.stream().map(VXUser::getName).collect(toImmutableList());
         HttpUrl getRolesUrl;
         for (String user : usersList) {
             getRolesUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))
@@ -214,9 +222,9 @@ public class RangerBasedAccessControl
 
     private Map<String, Set<String>> getUserGroupsMappings(OkHttpClient client, String rangerEndPoint)
     {
-        Users users = getUsers(client, rangerEndPoint);
+        List<VXUser> users = getUsers(client, rangerEndPoint);
         ImmutableMap.Builder<String, Set<String>> userGroupsMapping = ImmutableMap.builder();
-        for (VXUser vxUser : users.getvXUsers()) {
+        for (VXUser vxUser : users) {
             if (!(isNull(vxUser.getGroupNameList()) || vxUser.getGroupNameList().isEmpty())) {
                 userGroupsMapping.put(vxUser.getName(), ImmutableSet.copyOf(vxUser.getGroupNameList()));
             }

@@ -293,7 +293,7 @@ public class PlanOptimizers
                 estimatedExchangesCostCalculator,
                 new RewriteCaseExpressionPredicate(metadata.getFunctionAndTypeManager()).rules());
 
-        PlanOptimizer predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, sqlParser));
+        PlanOptimizer predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, sqlParser, false));
 
         builder.add(
                 // Clean up all the sugar in expressions, e.g. AtTimeZone, must be run before all the other optimizers
@@ -550,6 +550,10 @@ public class PlanOptimizers
                 statsCalculator,
                 estimatedExchangesCostCalculator,
                 ImmutableSet.of(new ReorderJoins(costComparator, metadata))));
+
+        //Predicate pushdown has dynamicFiltering off by default. Now that Joins are reordered, enable them and run again
+        predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, sqlParser, true));
+        builder.add(predicatePushDown, simplifyRowExpressionOptimizer);
 
         builder.add(new OptimizeMixedDistinctAggregations(metadata));
         builder.add(new IterativeOptimizer(

@@ -190,6 +190,14 @@ jobs:
       - restore_package_cache
 
       - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
+
+      - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
 
@@ -282,6 +290,14 @@ jobs:
       - restore_package_cache
 
       - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
+
+      - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
 
@@ -306,6 +322,14 @@ jobs:
           version: 19.03.13
 
       - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
+
+      - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
 
@@ -328,6 +352,14 @@ jobs:
       - set_java_to_8
 
       - restore_package_cache
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -357,6 +389,14 @@ jobs:
 
       - setup_remote_docker:
           version: 19.03.13
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -406,6 +446,15 @@ jobs:
       - checkout
       - set_java_to_8
       - restore_package_cache
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml  
+
       - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
@@ -434,6 +483,14 @@ jobs:
 
       - setup_remote_docker:
           version: 19.03.13
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -484,6 +541,14 @@ jobs:
       - restore_package_cache
 
       - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
+
+      - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
 
@@ -506,6 +571,14 @@ jobs:
       - set_java_to_8
 
       - restore_package_cache
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -532,6 +605,14 @@ jobs:
       - restore_package_cache
 
       - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
+
+      - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
 
@@ -554,6 +635,14 @@ jobs:
       - set_java_to_8
 
       - restore_package_cache
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -579,6 +668,14 @@ jobs:
 
       - setup_remote_docker:
           version: 19.03.13
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -607,6 +704,14 @@ jobs:
 
       - setup_remote_docker:
           version: 19.03.13
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -640,6 +745,14 @@ jobs:
       - add_ssh_keys
 
       - checkout
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -689,6 +802,14 @@ jobs:
       - checkout
 
       - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
+
+      - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
 
@@ -719,6 +840,14 @@ jobs:
       - checkout
 
       - set_java_to_8
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -756,6 +885,14 @@ jobs:
       - checkout
 
       - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
+
+      - run:
           name: Install Maven Wrapper
           command: ./mvnw -v
 
@@ -788,6 +925,14 @@ jobs:
       - aws-cli/setup
 
       - checkout
+
+      - run:
+          name: Update maven settings.xml
+          command: |
+            echo $MAVEN_S3_ACCESS_KEY
+            echo $MAVEN_S3_SECRET_KEY
+            sed -i "s#MAVEN_S3_ACCESS_KEY#$MAVEN_S3_ACCESS_KEY#g" settings.xml
+            sed -i "s#MAVEN_S3_SECRET_KEY#$MAVEN_S3_SECRET_KEY#g" settings.xml
 
       - run:
           name: Install Maven Wrapper
@@ -845,6 +990,7 @@ workflows:
       - build:
           context:
             - docker_hub
+            - presto_maven
       - start_test_suite:
           type: approval
           requires:
@@ -853,6 +999,7 @@ workflows:
           name: test_specific_module_presto_tests_execution_memory
           context:
             - docker_hub
+            - presto_maven
           module: presto-tests
           test_flags: -P presto-tests-execution-memory
           resource_class: large
@@ -871,6 +1018,7 @@ workflows:
           name: test_specific_module_presto_tests_ci_only_distributed_non_hash_gen
           context:
             - docker_hub
+            - presto_maven
           module: presto-tests
           test_flags: -P ci-only-distributed-non-hash-gen
           requires:
@@ -879,6 +1027,7 @@ workflows:
           name: test_specific_module_presto_tests_ci_only_tpch_distributed_queries
           context:
             - docker_hub
+            - presto_maven
           module: presto-tests
           test_flags: -P ci-only-tpch-distributed-queries
           requires:
@@ -887,6 +1036,7 @@ workflows:
           name: test_specific_module_presto_tests_ci_only_local_queries
           context:
             - docker_hub
+            - presto_maven
           module: presto-tests
           test_flags: -P ci-only-local-queries
           requires:
@@ -895,6 +1045,7 @@ workflows:
           name: test_specific_module_presto_tests_ci_only_distributed_queries
           context:
             - docker_hub
+            - presto_maven
           module: presto-tests
           test_flags: -P ci-only-distributed-queries
           requires:
@@ -903,6 +1054,7 @@ workflows:
           name: test_specific_module_presto_tests_ci_only_aggregation_queries
           context:
             - docker_hub
+            - presto_maven
           module: presto-tests
           test_flags: -P ci-only-aggregation-queries
           requires:
@@ -911,6 +1063,7 @@ workflows:
           name: test_specific_module_presto_tests_ci_only_plan_determinism
           context:
             - docker_hub
+            - presto_maven
           module: presto-tests
           test_flags: -P ci-only-plan-determinism
           resource_class: medium
@@ -928,6 +1081,7 @@ workflows:
           name: test_specific_module_presto_accumulo
           context:
             - docker_hub
+            - presto_maven
           module: presto-accumulo
           requires:
             - start_test_suite
@@ -935,6 +1089,7 @@ workflows:
           name: test_specific_module_presto_cassandra
           context:
             - docker_hub
+            - presto_maven
           module: presto-cassandra
           test_flags: -P test-cassandra-integration-smoke-test
           resource_class: medium
@@ -944,6 +1099,7 @@ workflows:
           name: test_specific_module_presto_delta
           context:
             - docker_hub
+            - presto_maven
           module: presto-delta
           resource_class: xlarge
           requires:
@@ -952,6 +1108,7 @@ workflows:
           name: test_specific_module_presto_hive
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           resource_class: xlarge
           requires:
@@ -960,6 +1117,7 @@ workflows:
           name: test_specific_module_presto_hive_metastore
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive-metastore
           resource_class: xlarge
           requires:
@@ -968,6 +1126,7 @@ workflows:
           name: test_specific_module_presto_hive_glue
           context:
             - docker_hub
+            - presto_maven
             - prestodb_glue_tests
           module: presto-hive
           test_flags: -P test-hive-glue
@@ -978,6 +1137,7 @@ workflows:
           name: test_specific_module_presto_hive_glue_impersonation
           context:
             - docker_hub
+            - presto_maven
             - prestodb_glue_tests_temp
           module: presto-hive
           test_flags: -P test-hive-glue-impersonation
@@ -988,6 +1148,7 @@ workflows:
           name: test_specific_module_presto_hive_materialized_queries
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           test_flags: -P test-hive-materialized-queries
           requires:
@@ -996,6 +1157,7 @@ workflows:
           name: test_specific_module_presto_hive_materialized_aggregations
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           test_flags: -P test-hive-materialized-aggregations
           requires:
@@ -1004,6 +1166,7 @@ workflows:
           name: test_specific_module_presto_hive_recoverable_execution
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           test_flags: -P test-hive-recoverable-execution
           resource_class: medium
@@ -1013,6 +1176,7 @@ workflows:
           name: test_specific_module_presto_hive_pushdown_filter_queries_basic
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           test_flags: -P test-hive-pushdown-filter-queries-basic
           requires:
@@ -1021,6 +1185,7 @@ workflows:
           name: test_specific_module_presto_hive_pushdown_filter_queries_advanced
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           test_flags: -P test-hive-pushdown-filter-queries-advanced
           requires:
@@ -1029,6 +1194,7 @@ workflows:
           name: test_specific_module_presto_hive_repartitioning
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           test_flags: -P test-hive-repartitioning
           requires:
@@ -1037,6 +1203,7 @@ workflows:
           name: test_specific_module_presto_hive_parquet
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive
           test_flags: -P test-hive-parquet
           requires:
@@ -1045,6 +1212,7 @@ workflows:
           name: test_specific_module_presto_main
           context:
             - docker_hub
+            - presto_maven
           module: presto-main
           test_flags: -P test-presto-main-no-docker
           resource_class: xlarge
@@ -1055,6 +1223,7 @@ workflows:
           name: test_specific_module_presto_mongodb
           context:
             - docker_hub
+            - presto_maven
           module: presto-mongodb
           test_flags: -P test-mongo-distributed-queries
           requires:
@@ -1063,6 +1232,7 @@ workflows:
           name: test_specific_module_presto_redis
           context:
             - docker_hub
+            - presto_maven
           module: presto-redis
           test_flags: -P test-redis-integration-smoke-test
           resource_class: medium
@@ -1072,6 +1242,7 @@ workflows:
           name: test_specific_module_presto_elasticsearch
           context:
             - docker_hub
+            - presto_maven
           module: presto-elasticsearch
           resource_class: medium
           requires:
@@ -1080,6 +1251,7 @@ workflows:
           name: test_specific_module_presto_orc
           context:
             - docker_hub
+            - presto_maven
           module: presto-orc
           resource_class: medium
           requires:
@@ -1088,6 +1260,7 @@ workflows:
           name: test_specific_module_presto_thrift_connector
           context:
             - docker_hub
+            - presto_maven
           module: presto-thrift-connector
           requires:
             - start_test_suite
@@ -1095,6 +1268,7 @@ workflows:
           name: test_specific_module_presto_spark_base
           context:
             - docker_hub
+            - presto_maven
           module: presto-spark-base
           requires:
             - start_test_suite
@@ -1102,6 +1276,7 @@ workflows:
           name: test_specific_module_presto_base_jdbc
           context:
             - docker_hub
+            - presto_maven
           module: presto-base-jdbc
           requires:
             - start_test_suite
@@ -1109,6 +1284,7 @@ workflows:
           name: test_specific_module_presto_common
           context:
             - docker_hub
+            - presto_maven
           module: presto-common
           requires:
             - start_test_suite
@@ -1116,6 +1292,7 @@ workflows:
           name: test_specific_module_presto_event_listener
           context:
             - docker_hub
+            - presto_maven
           module: presto-event-listener
           requires:
             - start_test_suite
@@ -1123,6 +1300,7 @@ workflows:
           name: test_specific_module_presto_geospatial
           context:
             - docker_hub
+            - presto_maven
           module: presto-geospatial
           requires:
             - start_test_suite
@@ -1130,6 +1308,7 @@ workflows:
           name: test_specific_module_presto_geospatial_toolkit
           context:
             - docker_hub
+            - presto_maven
           module: presto-geospatial-toolkit
           requires:
             - start_test_suite
@@ -1137,6 +1316,7 @@ workflows:
           name: test_specific_module_presto_hive_common
           context:
             - docker_hub
+            - presto_maven
           module: presto-hive-common
           requires:
             - start_test_suite
@@ -1144,6 +1324,7 @@ workflows:
           name: test_specific_module_presto_jdbc
           context:
             - docker_hub
+            - presto_maven
           module: presto-jdbc
           requires:
             - start_test_suite
@@ -1151,6 +1332,7 @@ workflows:
           name: test_specific_module_presto_cli
           context:
             - docker_hub
+            - presto_maven
           module: presto-cli
           requires:
             - start_test_suite
@@ -1158,6 +1340,7 @@ workflows:
           name: test_specific_module_presto_client
           context:
             - docker_hub
+            - presto_maven
           module: presto-client
           requires:
             - start_test_suite
@@ -1165,6 +1348,7 @@ workflows:
           name: test_specific_module_presto_parquet
           context:
             - docker_hub
+            - presto_maven
           module: presto-parquet
           requires:
             - start_test_suite
@@ -1172,6 +1356,7 @@ workflows:
           name: test_specific_module_presto_password_authenticators
           context:
             - docker_hub
+            - presto_maven
           module: presto-password-authenticators
           requires:
             - start_test_suite
@@ -1179,6 +1364,7 @@ workflows:
           name: test_specific_module_presto_plugin_toolkit
           context:
             - docker_hub
+            - presto_maven
           module: presto-plugin-toolkit
           requires:
             - start_test_suite
@@ -1186,6 +1372,7 @@ workflows:
           name: test_specific_module_presto_redshift
           context:
             - docker_hub
+            - presto_maven
           module: presto-redshift
           requires:
             - start_test_suite
@@ -1193,6 +1380,7 @@ workflows:
           name: test_specific_module_presto_session_property_managers
           context:
             - docker_hub
+            - presto_maven
           module: presto-session-property-managers
           requires:
             - start_test_suite
@@ -1200,6 +1388,7 @@ workflows:
           name: test_specific_module_presto_spi
           context:
             - docker_hub
+            - presto_maven
           module: presto-spi
           requires:
             - start_test_suite
@@ -1211,11 +1400,13 @@ workflows:
       - product_test_basic_environment:
           context:
             - docker_hub
+            - presto_maven
           requires:
             - start_test_suite
       - product_jdbc_tests:
           context:
             - docker_hub
+            - presto_maven
           requires:
             - start_test_suite
 #      - product_test_specific_environment:
@@ -1231,22 +1422,26 @@ workflows:
       - hive_tests:
           context:
             - docker_hub
+            - presto_maven
           requires:
             - start_test_suite
       - hive_s3_tests:
           context:
             - docker_hub
+            - presto_maven
             - prestodb_staging
           requires:
             - start_test_suite
       - hive_dockerized_tests:
           context:
             - docker_hub
+            - presto_maven
           requires:
             - start_test_suite
       - oauth_dockerized_tests:
           context:
             - docker_hub
+            - presto_maven
           requires:
             - start_test_suite
       #      - kudu_tests:
@@ -1321,6 +1516,7 @@ workflows:
       - tag_version:
           context:
             - docker_hub
+            - presto_maven
           filters:
             branches:
               only:
@@ -1334,6 +1530,7 @@ workflows:
           name: build_version
           context:
             - docker_hub
+            - presto_maven
           persist_artifacts: true
           filters:
             tags:
@@ -1346,6 +1543,7 @@ workflows:
           context:
             - prestodb_staging
             - docker_hub
+            - presto_maven
           filters:
             tags:
               only: /^v.*/
@@ -1372,6 +1570,7 @@ workflows:
           context:
             - prestodb_staging
             - docker_hub
+            - presto_maven
           filters:
             tags:
               only: /^v.*/
@@ -1395,6 +1594,7 @@ workflows:
           context:
             - prestodb_production
             - docker_hub
+            - presto_maven
           filters:
             tags:
               only: /^v.*/
@@ -1408,6 +1608,7 @@ workflows:
           context:
             - prestodb_production
             - docker_hub
+            - presto_maven
           filters:
             tags:
               only: /^v.*/
@@ -1426,6 +1627,7 @@ workflows:
             - deploy_to_download_production
           context:
             - docker_hub
+            - presto_maven
 
   rotate_credentials_monthly:
     triggers:

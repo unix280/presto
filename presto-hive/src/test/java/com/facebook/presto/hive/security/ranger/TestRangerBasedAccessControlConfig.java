@@ -43,7 +43,7 @@ public class TestRangerBasedAccessControlConfig
     public void testDefaults()
     {
         assertRecordedDefaults(ConfigAssertions.recordDefaults(RangerBasedAccessControlConfig.class)
-                .setRefreshPeriod(new Duration(60, TimeUnit.SECONDS))
+                .setRefreshPeriod(new Duration(120, TimeUnit.SECONDS))
                 .setRangerHttpEndPoint(null)
                 .setRangerHiveServiceName(null)
                 .setBasicAuthUser(null)
