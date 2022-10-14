@@ -338,8 +338,8 @@ public final class QueryEventListener
             executeSqlUpdate(() -> dao.insertQueryPlans(
                     queryCompletedEvent.getMetadata().getQueryId(),
                     queryCompletedEvent.getMetadata().getQuery(),
-                    queryCompletedEvent.getMetadata().getJsonPlan().toString(),
                     queryCompletedEvent.getMetadata().getPlan().toString(),
+                    queryCompletedEvent.getMetadata().getJsonPlan().toString(),
                     queryCompletedEvent.getContext().getEnvironment(),
                     queryCompletedEvent.getCreateTime().atZone(UTC).format(DATETIME_FORMAT)));
         }
