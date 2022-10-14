@@ -16,10 +16,12 @@ package com.facebook.presto.orc;
 import com.facebook.presto.orc.metadata.DwrfStripeCacheMode;
 import com.facebook.presto.orc.writer.StreamLayoutFactory;
 import com.facebook.presto.orc.writer.StreamLayoutFactory.ColumnSizeLayoutFactory;
+import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
 
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 
 import static com.facebook.presto.orc.metadata.DwrfStripeCacheMode.INDEX_AND_FOOTER;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -41,6 +43,7 @@ public class OrcWriterOptions
     public static final DataSize DEFAULT_DWRF_STRIPE_CACHE_MAX_SIZE = new DataSize(8, MEGABYTE);
     public static final DwrfStripeCacheMode DEFAULT_DWRF_STRIPE_CACHE_MODE = INDEX_AND_FOOTER;
     public static final int DEFAULT_PRESERVE_DIRECT_ENCODING_STRIPE_COUNT = 0;
+    public static final int DEFAULT_MAX_FLATTENED_MAP_KEY_COUNT = 20000;
 
     private final OrcWriterFlushPolicy flushPolicy;
     private final int rowGroupMaxRowCount;
@@ -62,6 +65,13 @@ public class OrcWriterOptions
     private final boolean ignoreDictionaryRowGroupSizes;
     private final Optional<DwrfStripeCacheOptions> dwrfWriterOptions;
     private final int preserveDirectEncodingStripeCount;
+    private final boolean mapStatisticsEnabled;
+    private final int maxFlattenedMapKeyCount;
+
+    /**
+     * Contains indexes of columns (not nodes!) for which writer should use flattened encoding, e.g. flat maps.
+     */
+    private final Set<Integer> flattenedColumns;
 
     private OrcWriterOptions(
             OrcWriterFlushPolicy flushPolicy,
@@ -79,7 +89,10 @@ public class OrcWriterOptions
             boolean stringDictionaryEncodingEnabled,
             Optional<DwrfStripeCacheOptions> dwrfWriterOptions,
             boolean ignoreDictionaryRowGroupSizes,
-            int preserveDirectEncodingStripeCount)
+            int preserveDirectEncodingStripeCount,
+            Set<Integer> flattenedColumns,
+            boolean mapStatisticsEnabled,
+            int maxFlattenedMapKeyCount)
     {
         requireNonNull(flushPolicy, "flushPolicy is null");
         checkArgument(rowGroupMaxRowCount >= 1, "rowGroupMaxRowCount must be at least 1");
@@ -91,6 +104,8 @@ public class OrcWriterOptions
         requireNonNull(compressionLevel, "compressionLevel is null");
         requireNonNull(streamLayoutFactory, "streamLayoutFactory is null");
         requireNonNull(dwrfWriterOptions, "dwrfWriterOptions is null");
+        requireNonNull(flattenedColumns, "flattenedColumns is null");
+        checkArgument(maxFlattenedMapKeyCount > 0, "maxFlattenedMapKeyCount must be positive: %s", maxFlattenedMapKeyCount);
 
         this.flushPolicy = flushPolicy;
         this.rowGroupMaxRowCount = rowGroupMaxRowCount;
@@ -108,6 +123,9 @@ public class OrcWriterOptions
         this.dwrfWriterOptions = dwrfWriterOptions;
         this.ignoreDictionaryRowGroupSizes = ignoreDictionaryRowGroupSizes;
         this.preserveDirectEncodingStripeCount = preserveDirectEncodingStripeCount;
+        this.flattenedColumns = flattenedColumns;
+        this.mapStatisticsEnabled = mapStatisticsEnabled;
+        this.maxFlattenedMapKeyCount = maxFlattenedMapKeyCount;
     }
 
     public OrcWriterFlushPolicy getFlushPolicy()
@@ -190,6 +208,21 @@ public class OrcWriterOptions
         return preserveDirectEncodingStripeCount;
     }
 
+    public Set<Integer> getFlattenedColumns()
+    {
+        return flattenedColumns;
+    }
+
+    public boolean isMapStatisticsEnabled()
+    {
+        return mapStatisticsEnabled;
+    }
+
+    public int getMaxFlattenedMapKeyCount()
+    {
+        return maxFlattenedMapKeyCount;
+    }
+
     @Override
     public String toString()
     {
@@ -210,6 +243,9 @@ public class OrcWriterOptions
                 .add("dwrfWriterOptions", dwrfWriterOptions)
                 .add("ignoreDictionaryRowGroupSizes", ignoreDictionaryRowGroupSizes)
                 .add("preserveDirectEncodingStripeCount", preserveDirectEncodingStripeCount)
+                .add("flattenedColumns", flattenedColumns)
+                .add("mapStatisticsEnabled", mapStatisticsEnabled)
+                .add("maxFlattenedMapKeyCount", maxFlattenedMapKeyCount)
                 .toString();
     }
 
@@ -243,6 +279,9 @@ public class OrcWriterOptions
         private DataSize dwrfStripeCacheMaxSize = DEFAULT_DWRF_STRIPE_CACHE_MAX_SIZE;
         private boolean ignoreDictionaryRowGroupSizes;
         private int preserveDirectEncodingStripeCount = DEFAULT_PRESERVE_DIRECT_ENCODING_STRIPE_COUNT;
+        private Set<Integer> flattenedColumns = ImmutableSet.of();
+        private boolean mapStatisticsEnabled;
+        private int maxFlattenedMapKeyCount = DEFAULT_MAX_FLATTENED_MAP_KEY_COUNT;
 
         public Builder withFlushPolicy(OrcWriterFlushPolicy flushPolicy)
         {
@@ -354,6 +393,24 @@ public class OrcWriterOptions
             return this;
         }
 
+        public Builder withFlattenedColumns(Set<Integer> flattenedColumns)
+        {
+            this.flattenedColumns = ImmutableSet.copyOf(flattenedColumns);
+            return this;
+        }
+
+        public Builder withMapStatisticsEnabled(boolean mapStatisticsEnabled)
+        {
+            this.mapStatisticsEnabled = mapStatisticsEnabled;
+            return this;
+        }
+
+        public Builder withMaxFlattenedMapKeyCount(int maxFlattenedMapKeyCount)
+        {
+            this.maxFlattenedMapKeyCount = maxFlattenedMapKeyCount;
+            return this;
+        }
+
         public OrcWriterOptions build()
         {
             Optional<DwrfStripeCacheOptions> dwrfWriterOptions;
@@ -380,7 +437,10 @@ public class OrcWriterOptions
                     stringDictionaryEncodingEnabled,
                     dwrfWriterOptions,
                     ignoreDictionaryRowGroupSizes,
-                    preserveDirectEncodingStripeCount);
+                    preserveDirectEncodingStripeCount,
+                    flattenedColumns,
+                    mapStatisticsEnabled,
+                    maxFlattenedMapKeyCount);
         }
     }
 }

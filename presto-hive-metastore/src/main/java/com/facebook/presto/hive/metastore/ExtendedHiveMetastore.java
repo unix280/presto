@@ -18,9 +18,11 @@ import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.authentication.MetastoreContext;
+import com.facebook.presto.spi.constraints.TableConstraint;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.units.Duration;
 
@@ -63,7 +65,7 @@ public interface ExtendedHiveMetastore
 
     void renameDatabase(MetastoreContext metastoreContext, String databaseName, String newDatabaseName);
 
-    void createTable(MetastoreContext metastoreContext, Table table, PrincipalPrivileges principalPrivileges);
+    MetastoreOperationResult createTable(MetastoreContext metastoreContext, Table table, PrincipalPrivileges principalPrivileges);
 
     void dropTable(MetastoreContext metastoreContext, String databaseName, String tableName, boolean deleteData);
 
@@ -72,15 +74,15 @@ public interface ExtendedHiveMetastore
      * alter one field of a table object previously acquired from getTable is
      * probably not what you want.
      */
-    void replaceTable(MetastoreContext metastoreContext, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges);
+    MetastoreOperationResult replaceTable(MetastoreContext metastoreContext, String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges);
 
-    void renameTable(MetastoreContext metastoreContext, String databaseName, String tableName, String newDatabaseName, String newTableName);
+    MetastoreOperationResult renameTable(MetastoreContext metastoreContext, String databaseName, String tableName, String newDatabaseName, String newTableName);
 
-    void addColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment);
+    MetastoreOperationResult addColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName, HiveType columnType, String columnComment);
 
-    void renameColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String oldColumnName, String newColumnName);
+    MetastoreOperationResult renameColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String oldColumnName, String newColumnName);
 
-    void dropColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName);
+    MetastoreOperationResult dropColumn(MetastoreContext metastoreContext, String databaseName, String tableName, String columnName);
 
     Optional<Partition> getPartition(MetastoreContext metastoreContext, Table table, List<String> partitionValues);
 
@@ -109,11 +111,11 @@ public interface ExtendedHiveMetastore
 
     Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, Table table, List<String> partitionNames);
 
-    void addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitions);
+    MetastoreOperationResult addPartitions(MetastoreContext metastoreContext, String databaseName, String tableName, List<PartitionWithStatistics> partitions);
 
     void dropPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> parts, boolean deleteData);
 
-    void alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partition);
+    MetastoreOperationResult alterPartition(MetastoreContext metastoreContext, String databaseName, String tableName, PartitionWithStatistics partition);
 
     void createRole(MetastoreContext metastoreContext, String role, String grantor);
 
@@ -145,5 +147,10 @@ public interface ExtendedHiveMetastore
     default void unlock(MetastoreContext metastoreContext, long lockId)
     {
         throw new NotSupportedException("Unlock is not supported by default");
+    }
+
+    default List<TableConstraint<String>> getTableConstraints(MetastoreContext metastoreContext, String schemaName, String tableName)
+    {
+        return ImmutableList.of();
     }
 }

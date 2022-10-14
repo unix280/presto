@@ -78,7 +78,7 @@ public class TestCachingDirectoryLister
                 1000,
                 ImmutableList.of("test_dbname.test_table"));
         TestingHdfsFileSystem testingHdfsFileSystem = new TestingHdfsFileSystem(TEST_FILES);
-        HiveDirectoryContext cachedHiveDirectoryContext = new HiveDirectoryContext(IGNORED, true);
+        HiveDirectoryContext cachedHiveDirectoryContext = new HiveDirectoryContext(IGNORED, true, ImmutableMap.of());
         // Initial file count retrieved will be 2 and these 2 will file statuses will be cached
         assertEquals(getFileCount(cachedHiveDirectoryContext, testingHdfsFileSystem, cachingDirectoryLister), 2);
         // remove one file
@@ -88,7 +88,7 @@ public class TestCachingDirectoryLister
         assertEquals(getFileCount(cachedHiveDirectoryContext, testingHdfsFileSystem, cachingDirectoryLister), 2);
         // Test with file list cache disabled, it will now return the correct value of 1, since it will
         // read the file status from the filesystem again instead of cache.
-        assertEquals(getFileCount(new HiveDirectoryContext(IGNORED, false), testingHdfsFileSystem, cachingDirectoryLister), 1);
+        assertEquals(getFileCount(new HiveDirectoryContext(IGNORED, false, ImmutableMap.of()), testingHdfsFileSystem, cachingDirectoryLister), 1);
     }
 
     private int getFileCount(HiveDirectoryContext hiveDirectoryContext, TestingHdfsFileSystem testingHdfsFileSystem, CachingDirectoryLister cachingDirectoryLister)
@@ -97,6 +97,7 @@ public class TestCachingDirectoryLister
                 testingHdfsFileSystem,
                 TABLE,
                 new Path(LOCATION),
+                Optional.empty(),
                 new NamenodeStats(),
                 hiveDirectoryContext);
 

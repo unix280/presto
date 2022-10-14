@@ -17,6 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.common.CatalogSchemaName;
 import com.facebook.presto.common.QualifiedObjectName;
+import com.facebook.presto.common.Subfield;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.common.type.ArrayType;
 import com.facebook.presto.common.type.DoubleType;
@@ -142,6 +143,7 @@ import com.facebook.presto.sql.tree.StartTransaction;
 import com.facebook.presto.sql.tree.Statement;
 import com.facebook.presto.sql.tree.Table;
 import com.facebook.presto.sql.tree.TableSubquery;
+import com.facebook.presto.sql.tree.TruncateTable;
 import com.facebook.presto.sql.tree.Union;
 import com.facebook.presto.sql.tree.Unnest;
 import com.facebook.presto.sql.tree.Use;
@@ -180,6 +182,8 @@ import static com.facebook.presto.common.RuntimeMetricName.GET_MATERIALIZED_VIEW
 import static com.facebook.presto.common.RuntimeMetricName.GET_TABLE_HANDLE_TIME_NANOS;
 import static com.facebook.presto.common.RuntimeMetricName.GET_TABLE_METADATA_TIME_NANOS;
 import static com.facebook.presto.common.RuntimeMetricName.GET_VIEW_TIME_NANOS;
+import static com.facebook.presto.common.RuntimeMetricName.SKIP_READING_FROM_MATERIALIZED_VIEW_COUNT;
+import static com.facebook.presto.common.RuntimeUnit.NONE;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
 import static com.facebook.presto.common.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.common.type.TypeSignature.parseTypeSignature;
@@ -338,9 +342,7 @@ class StatementAnalyzer
         {
             Scope returnScope = super.process(node, scope);
             checkState(returnScope.getOuterQueryParent().equals(outerQueryScope), "result scope should have outer query scope equal with parameter outer query scope");
-            if (scope.isPresent()) {
-                checkState(hasScopeAsLocalParent(returnScope, scope.get()), "return scope should have context scope as one of ancestors");
-            }
+            scope.ifPresent(value -> checkState(hasScopeAsLocalParent(returnScope, value), "return scope should have context scope as one of ancestors"));
             return returnScope;
         }
 
@@ -617,11 +619,11 @@ class StatementAnalyzer
                     .orElseThrow(() -> (new SemanticException(MISSING_TABLE, node, "Table '%s' does not exist", tableName)));
 
             // user must have read and insert permission in order to analyze stats of a table
-            analysis.addTableColumnReferences(
+            analysis.addTableColumnAndSubfieldReferences(
                     accessControl,
                     session.getIdentity(),
-                    ImmutableMultimap.<QualifiedObjectName, String>builder()
-                            .putAll(tableName, metadata.getColumnHandles(session, tableHandle).keySet())
+                    ImmutableMultimap.<QualifiedObjectName, Subfield>builder()
+                            .putAll(tableName, metadata.getColumnHandles(session, tableHandle).keySet().stream().map(column -> new Subfield(column, ImmutableList.of())).collect(toImmutableSet()))
                             .build());
             try {
                 accessControl.checkCanInsertIntoTable(session.getRequiredTransactionId(), session.getIdentity(), session.getAccessControlContext(), tableName);
@@ -938,6 +940,12 @@ class StatementAnalyzer
             // Property value expressions must be constant
             createConstantAnalyzer(metadata, session, analysis.getParameters(), warningCollector, analysis.isDescribe())
                     .analyze(node.getValue(), createScope(scope));
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
+        protected Scope visitTruncateTable(TruncateTable node, Optional<Scope> scope)
+        {
             return createAndAssignScope(node, scope);
         }
 
@@ -1429,6 +1437,7 @@ class StatementAnalyzer
             String materializedViewCreateSql = connectorMaterializedViewDefinition.getOriginalSql();
 
             if (materializedViewStatus.isNotMaterialized() || materializedViewStatus.isTooManyPartitionsMissing()) {
+                session.getRuntimeStats().addMetricValue(SKIP_READING_FROM_MATERIALIZED_VIEW_COUNT, NONE, 1);
                 return materializedViewCreateSql;
             }
 
@@ -1737,17 +1746,17 @@ class StatementAnalyzer
             return visitSetOperation(node, scope);
         }
 
-        private boolean isJoinOnConditionReferencesRelatedFields(Expression expression, Relation relation)
+        private boolean isJoinOnConditionReferencesRelatedFields(Expression expression, Scope scope)
         {
             if (expression instanceof LogicalBinaryExpression) {
                 LogicalBinaryExpression logicalBinaryExpression = (LogicalBinaryExpression) expression;
-                switch (logicalBinaryExpression.getOperator()){
+                switch (logicalBinaryExpression.getOperator()) {
                     case AND:
-                        return isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getLeft(), relation)
-                                || isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getRight(), relation);
+                        return isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getLeft(), scope)
+                                || isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getRight(), scope);
                     case OR:
-                        return isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getLeft(), relation)
-                                && isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getRight(), relation);
+                        return isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getLeft(), scope)
+                                && isJoinOnConditionReferencesRelatedFields(logicalBinaryExpression.getRight(), scope);
                 }
             }
             if (expression instanceof ComparisonExpression) {
@@ -1755,18 +1764,12 @@ class StatementAnalyzer
                 if (comparisonExpression.getLeft() instanceof Literal || comparisonExpression.getRight() instanceof Literal) {
                     return false;
                 }
-                return isJoinOnConditionReferencesRelatedFields(comparisonExpression.getLeft(), relation)
-                        != isJoinOnConditionReferencesRelatedFields(comparisonExpression.getRight(), relation);
+                return isJoinOnConditionReferencesRelatedFields(comparisonExpression.getLeft(), scope)
+                        != isJoinOnConditionReferencesRelatedFields(comparisonExpression.getRight(), scope);
             }
-            if (expression instanceof DereferenceExpression) {
-                DereferenceExpression dereferenceExpression = (DereferenceExpression) expression;
-                String expressionBase = dereferenceExpression.getBase().toString();
-                if (relation instanceof AliasedRelation) {
-                    return expressionBase.equals(((AliasedRelation) relation).getAlias().toString());
-                }
-                if (relation instanceof Table) {
-                    return expressionBase.equals(((Table) relation).getName().toString());
-                }
+            if (expression instanceof DereferenceExpression || expression instanceof Identifier) {
+                Optional<ResolvedField> resolvedField = scope.tryResolveField(expression);
+                return resolvedField.isPresent();
             }
             return false;
         }
@@ -1812,7 +1815,7 @@ class StatementAnalyzer
                     }
                 }
 
-                verifyJoinOnConditionReferencesRelatedFields(node.getRight(), expression);
+                verifyJoinOnConditionReferencesRelatedFields(right, expression, node.getRight());
                 verifyNoAggregateWindowOrGroupingFunctions(analysis.getFunctionHandles(), metadata.getFunctionAndTypeManager(), expression, "JOIN clause");
 
                 analysis.recordSubqueries(node, expressionAnalysis);
@@ -1825,35 +1828,37 @@ class StatementAnalyzer
             return output;
         }
 
-        private void verifyJoinOnConditionReferencesRelatedFields(Relation rightRelation, Expression expression)
+        private void verifyJoinOnConditionReferencesRelatedFields(Scope rightScope, Expression expression, Relation rightRelation)
         {
-            if (!(rightRelation instanceof AliasedRelation || rightRelation instanceof Table)) {
-                // TODO Add handling of TableSubquery, Lateral and Table for the case when columns in
-                //  JOIN ON condition specified without table name or alias (See #17382).
-                return;
-            }
-            if (!isJoinOnConditionReferencesRelatedFields(expression, rightRelation)) {
-                String rightTableName;
-                if (rightRelation instanceof Table) {
-                    rightTableName = ((Table) rightRelation).getName().toString();
-                }
-                else {
-                    AliasedRelation aliasedRelation = (AliasedRelation) rightRelation;
-                    if (aliasedRelation.getRelation() instanceof Table) {
-                        rightTableName = ((Table) aliasedRelation.getRelation()).getName().toString();
-                    }
-                    else {
-                        rightTableName = aliasedRelation.getAlias().toString();
-                    }
-                }
-                String warningMessage = createWarningMessage(
-                        expression,
-                        format(
-                            "JOIN ON condition(s) do not reference the joined table '%s' and other tables in the same " +
-                                    "expression that can cause performance issues as it may lead to a cross join with filter",
-                            rightTableName));
+            if (!isJoinOnConditionReferencesRelatedFields(expression, rightScope)) {
+                Optional<String> tableName = tryGetTableName(rightRelation);
+                String warningMessage = tableName.isPresent() ?
+                        createWarningMessage(
+                                expression,
+                                format(
+                                        "JOIN ON condition(s) do not reference the joined table '%s' and other tables in the same " +
+                                                "expression that can cause performance issues as it may lead to a cross join with filter",
+                                        tableName.get())) :
+                        createWarningMessage(
+                                expression,
+                                "JOIN ON condition(s) do not reference the joined relation and other relation in the same " +
+                                        "expression that can cause performance issues as it may lead to a cross join with filter");
                 warningCollector.add(new PrestoWarning(PERFORMANCE_WARNING, warningMessage));
             }
+        }
+
+        private Optional<String> tryGetTableName(Relation relation)
+        {
+            if (relation instanceof Table) {
+                return Optional.of(((Table) relation).getName().toString());
+            }
+            else if (relation instanceof AliasedRelation) {
+                AliasedRelation aliasedRelation = (AliasedRelation) relation;
+                if (aliasedRelation.getRelation() instanceof Table) {
+                    return Optional.of(((Table) aliasedRelation.getRelation()).getName().toString());
+                }
+            }
+            return Optional.empty();
         }
 
         private String createWarningMessage(Node node, String description)
@@ -1905,16 +1910,16 @@ class StatementAnalyzer
                 analysis.addColumnReference(NodeRef.of(column), FieldId.from(leftField.get()));
                 analysis.addColumnReference(NodeRef.of(column), FieldId.from(rightField.get()));
                 if (leftField.get().getField().getOriginTable().isPresent() && leftField.get().getField().getOriginColumnName().isPresent()) {
-                    analysis.addTableColumnReferences(
+                    analysis.addTableColumnAndSubfieldReferences(
                             accessControl,
                             session.getIdentity(),
-                            ImmutableMultimap.of(leftField.get().getField().getOriginTable().get(), leftField.get().getField().getOriginColumnName().get()));
+                            ImmutableMultimap.of(leftField.get().getField().getOriginTable().get(), new Subfield(leftField.get().getField().getOriginColumnName().get(), ImmutableList.of())));
                 }
                 if (rightField.get().getField().getOriginTable().isPresent() && rightField.get().getField().getOriginColumnName().isPresent()) {
-                    analysis.addTableColumnReferences(
+                    analysis.addTableColumnAndSubfieldReferences(
                             accessControl,
                             session.getIdentity(),
-                            ImmutableMultimap.of(rightField.get().getField().getOriginTable().get(), rightField.get().getField().getOriginColumnName().get()));
+                            ImmutableMultimap.of(rightField.get().getField().getOriginTable().get(), new Subfield(rightField.get().getField().getOriginColumnName().get(), ImmutableList.of())));
                 }
             }
 
@@ -2651,11 +2656,11 @@ class StatementAnalyzer
                         .collect(toImmutableList());
 
                 for (Expression expression : outputExpressions) {
-                    verifySourceAggregations(distinctGroupingColumns, sourceScope, expression, metadata, analysis, warningCollector);
+                    verifySourceAggregations(distinctGroupingColumns, sourceScope, expression, metadata, analysis, warningCollector, session);
                 }
 
                 for (Expression expression : orderByExpressions) {
-                    verifyOrderByAggregations(distinctGroupingColumns, sourceScope, orderByScope.get(), expression, metadata, analysis, warningCollector);
+                    verifyOrderByAggregations(distinctGroupingColumns, sourceScope, orderByScope.get(), expression, metadata, analysis, warningCollector, session);
                 }
             }
         }

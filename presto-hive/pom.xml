@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.272</version>
+        <version>0.274</version>
     </parent>
 
     <artifactId>presto-hive</artifactId>
@@ -24,6 +24,26 @@
     </repositories>
 
     <dependencies>
+        <dependency>
+            <groupId>com.facebook.airlift</groupId>
+            <artifactId>http-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.drift</groupId>
+            <artifactId>drift-codec</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.drift</groupId>
+            <artifactId>drift-codec-utils</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.drift</groupId>
+            <artifactId>drift-transport-netty</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-plugin-toolkit</artifactId>
@@ -141,8 +161,8 @@
         </dependency>
 
         <dependency>
-            <groupId>com.facebook.airlift</groupId>
-            <artifactId>http-client</artifactId>
+            <groupId>com.facebook.drift</groupId>
+            <artifactId>drift-api</artifactId>
         </dependency>
 
         <dependency>
@@ -892,13 +912,13 @@
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-testing-docker</artifactId>
+            <artifactId>presto-tpcds</artifactId>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-tpcds</artifactId>
+            <artifactId>presto-testing-docker</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

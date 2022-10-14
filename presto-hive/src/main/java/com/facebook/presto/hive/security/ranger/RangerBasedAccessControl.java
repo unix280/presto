@@ -17,6 +17,7 @@ import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.client.JsonResponse;
 import com.facebook.presto.client.OkHttpUtil;
+import com.facebook.presto.common.Subfield;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
@@ -423,10 +424,11 @@ public class RangerBasedAccessControl
      * @throws AccessDeniedException if not allowed
      */
     @Override
-    public void checkCanSelectFromColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, Set<String> columnNames)
+    public void checkCanSelectFromColumns(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, SchemaTableName tableName, Set<Subfield> columnOrSubfieldNames)
     {
         Set<String> deniedColumns = new HashSet<>();
-        for (String column : columnNames) {
+        for (Subfield columnOrSubfield : columnOrSubfieldNames) {
+            String column = columnOrSubfield.getRootName();
             if (!checkAccess(identity, tableName, column, HiveAccessType.SELECT)) {
                 deniedColumns.add(column);
             }

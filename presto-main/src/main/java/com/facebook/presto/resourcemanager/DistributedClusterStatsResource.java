@@ -104,7 +104,6 @@ public class DistributedClusterStatsResource
                 runningTasks += query.getQueryStats().getRunningTasks();
             }
         }
-        //TODO compute adjusted queue size on RM
         return Response.ok(new ClusterStatsResource.ClusterStats(
                 runningQueries,
                 blockedQueries,
@@ -117,7 +116,7 @@ public class DistributedClusterStatsResource
                 totalInputRows,
                 totalInputBytes,
                 totalCpuTimeSecs,
-                0))
+                clusterStateProvider.getAdjustedQueueSize()))
                 .build();
     }
 

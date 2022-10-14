@@ -24,6 +24,7 @@ import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.iterative.IterativeOptimizer;
 import com.facebook.presto.sql.planner.iterative.Rule;
+import com.facebook.presto.sql.planner.iterative.properties.LogicalPropertiesProviderImpl;
 import com.facebook.presto.sql.planner.iterative.rule.AddIntermediateAggregations;
 import com.facebook.presto.sql.planner.iterative.rule.CanonicalizeExpressions;
 import com.facebook.presto.sql.planner.iterative.rule.CreatePartialTopN;
@@ -91,13 +92,20 @@ import com.facebook.presto.sql.planner.iterative.rule.PushTableWriteThroughUnion
 import com.facebook.presto.sql.planner.iterative.rule.PushTopNThroughUnion;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveEmptyDelete;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveFullSample;
+import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantAggregateDistinct;
+import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantDistinct;
+import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantDistinctLimit;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantLimit;
+import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantSort;
+import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantTopN;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveTrivialFilters;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveUnreferencedScalarApplyNodes;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveUnreferencedScalarLateralNodes;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveUnsupportedDynamicFilters;
 import com.facebook.presto.sql.planner.iterative.rule.ReorderJoins;
 import com.facebook.presto.sql.planner.iterative.rule.RewriteAggregationIfToFilter;
+import com.facebook.presto.sql.planner.iterative.rule.RewriteCaseExpressionPredicate;
 import com.facebook.presto.sql.planner.iterative.rule.RewriteFilterWithExternalFunctionToProject;
 import com.facebook.presto.sql.planner.iterative.rule.RewriteSpatialPartitioningAggregation;
 import com.facebook.presto.sql.planner.iterative.rule.RuntimeReorderJoinSides;
@@ -125,6 +133,7 @@ import com.facebook.presto.sql.planner.optimizations.ImplementIntersectAndExcept
 import com.facebook.presto.sql.planner.optimizations.IndexJoinOptimizer;
 import com.facebook.presto.sql.planner.optimizations.KeyBasedSampler;
 import com.facebook.presto.sql.planner.optimizations.LimitPushDown;
+import com.facebook.presto.sql.planner.optimizations.MergeJoinOptimizer;
 import com.facebook.presto.sql.planner.optimizations.MetadataDeleteOptimizer;
 import com.facebook.presto.sql.planner.optimizations.MetadataQueryOptimizer;
 import com.facebook.presto.sql.planner.optimizations.OptimizeMixedDistinctAggregations;
@@ -138,6 +147,7 @@ import com.facebook.presto.sql.planner.optimizations.StatsRecordingPlanOptimizer
 import com.facebook.presto.sql.planner.optimizations.TransformQuantifiedComparisonApplyToLateralJoin;
 import com.facebook.presto.sql.planner.optimizations.UnaliasSymbolReferences;
 import com.facebook.presto.sql.planner.optimizations.WindowFilterPushDown;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.weakref.jmx.MBeanExporter;
@@ -147,6 +157,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.sql.planner.ConnectorPlanOptimizerManager.PlanPhase.LOGICAL;
@@ -276,6 +287,12 @@ public class PlanOptimizers
                         .add(new PruneRedundantProjectionAssignments())
                         .build());
 
+        IterativeOptimizer caseExpressionPredicateRewriter = new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                estimatedExchangesCostCalculator,
+                new RewriteCaseExpressionPredicate(metadata.getFunctionAndTypeManager()).rules());
+
         PlanOptimizer predicatePushDown = new StatsRecordingPlanOptimizer(optimizerStats, new PredicatePushDown(metadata, sqlParser, false));
 
         builder.add(
@@ -404,6 +421,7 @@ public class PlanOptimizers
         // After this point, all planNodes should not contain OriginalExpression
 
         builder.add(
+                caseExpressionPredicateRewriter,
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
@@ -421,7 +439,14 @@ public class PlanOptimizers
                         ruleStats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
+                        Optional.of(new LogicalPropertiesProviderImpl(new FunctionResolution(metadata.getFunctionAndTypeManager()))),
                         ImmutableSet.of(
+                                new RemoveRedundantDistinct(),
+                                new RemoveRedundantTopN(),
+                                new RemoveRedundantSort(),
+                                new RemoveRedundantLimit(),
+                                new RemoveRedundantDistinctLimit(),
+                                new RemoveRedundantAggregateDistinct(),
                                 new RemoveRedundantIdentityProjections(),
                                 new PushAggregationThroughOuterJoin(metadata.getFunctionAndTypeManager()))),
                 inlineProjections,
@@ -551,7 +576,7 @@ public class PlanOptimizers
 
         if (!forceSingleNode) {
             builder.add(new ReplicateSemiJoinInDelete()); // Must run before AddExchanges
-            builder.add((new IterativeOptimizer(
+            builder.add(new IterativeOptimizer(
                     ruleStats,
                     statsCalculator,
                     estimatedExchangesCostCalculator,
@@ -559,7 +584,7 @@ public class PlanOptimizers
                             new DetermineJoinDistributionType(costComparator, taskCountEstimator), // Must run before AddExchanges
                             // Must run before AddExchanges and after ReplicateSemiJoinInDelete
                             // to avoid temporarily having an invalid plan
-                            new DetermineSemiJoinDistributionType(costComparator, taskCountEstimator)))));
+                            new DetermineSemiJoinDistributionType(costComparator, taskCountEstimator))));
             builder.add(
                     new IterativeOptimizer(
                             ruleStats,
@@ -595,6 +620,11 @@ public class PlanOptimizers
                         .add(new PushRemoteExchangeThroughAssignUniqueId())
                         .add(new InlineProjections(metadata.getFunctionAndTypeManager()))
                         .build()));
+
+        // MergeJoinOptimizer can avoid the local exchange for a join operation
+        // Should be placed after AddExchanges, but before AddLocalExchange
+        // To replace the JoinNode to MergeJoin ahead of AddLocalExchange to avoid adding extra local exchange
+        builder.add(new MergeJoinOptimizer(metadata, sqlParser));
 
         // Optimizers above this don't understand local exchanges, so be careful moving this.
         builder.add(new AddLocalExchanges(metadata, sqlParser));

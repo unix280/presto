@@ -59,6 +59,7 @@ import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.ExplainAnalyzeNode;
 import com.facebook.presto.sql.planner.plan.InternalPlanVisitor;
 import com.facebook.presto.sql.planner.plan.JoinNode;
+import com.facebook.presto.sql.planner.plan.MergeJoinNode;
 import com.facebook.presto.sql.planner.plan.MetadataDeleteNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.plan.PlanFragmentId;
@@ -94,6 +95,7 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.SystemSessionProperties.GROUPED_EXECUTION;
 import static com.facebook.presto.SystemSessionProperties.getExchangeMaterializationStrategy;
 import static com.facebook.presto.SystemSessionProperties.getQueryMaxStageCount;
 import static com.facebook.presto.SystemSessionProperties.getTaskPartitionedWriterCount;
@@ -103,6 +105,7 @@ import static com.facebook.presto.SystemSessionProperties.isRecoverableGroupedEx
 import static com.facebook.presto.SystemSessionProperties.isTableWriterMergeOperatorEnabled;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
+import static com.facebook.presto.spi.StandardErrorCode.INVALID_PLAN_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.QUERY_HAS_TOO_MANY_STAGES;
 import static com.facebook.presto.spi.StandardWarningCode.TOO_MANY_STAGES;
@@ -1080,6 +1083,35 @@ public class PlanFragmenter
                 default:
                     throw new UnsupportedOperationException("Unknown distribution type: " + node.getDistributionType());
             }
+        }
+
+        @Override
+        public GroupedExecutionProperties visitMergeJoin(MergeJoinNode node, Void context)
+        {
+            GroupedExecutionProperties left = node.getLeft().accept(this, null);
+            GroupedExecutionProperties right = node.getRight().accept(this, null);
+
+            if (groupedExecutionEnabled && left.currentNodeCapable && right.currentNodeCapable) {
+                checkState(left.totalLifespans == right.totalLifespans, format("Mismatched number of lifespans on left(%s) and right(%s) side of join", left.totalLifespans, right.totalLifespans));
+                return new GroupedExecutionProperties(
+                        true,
+                        true,
+                        ImmutableList.<PlanNodeId>builder()
+                                .addAll(left.capableTableScanNodes)
+                                .addAll(right.capableTableScanNodes)
+                                .build(),
+                        left.totalLifespans,
+                        left.recoveryEligible && right.recoveryEligible);
+            }
+            throw new PrestoException(
+                    INVALID_PLAN_ERROR,
+                    format("When grouped execution can't be enabled, merge join plan is not valid." +
+                                    "%s is currently set to %s; left node grouped execution capable is %s and " +
+                                    "right node grouped execution capable is %s.",
+                            GROUPED_EXECUTION,
+                            groupedExecutionEnabled,
+                            left.currentNodeCapable,
+                            right.currentNodeCapable));
         }
 
         @Override

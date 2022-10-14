@@ -54,7 +54,6 @@ import com.facebook.presto.parquet.ParquetDataSource;
 import com.facebook.presto.parquet.RichColumnDescriptor;
 import com.facebook.presto.parquet.cache.MetadataReader;
 import com.facebook.presto.parquet.predicate.Predicate;
-import com.facebook.presto.parquet.reader.ColumnIndexFilterUtils;
 import com.facebook.presto.parquet.reader.ParquetReader;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
@@ -76,6 +75,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.BlockMissingException;
 import org.apache.iceberg.FileFormat;
 import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.crypto.DecryptionPropertiesFactory;
+import org.apache.parquet.crypto.FileDecryptionProperties;
+import org.apache.parquet.crypto.InternalFileDecryptor;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
@@ -91,6 +93,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -120,8 +123,10 @@ import static com.facebook.presto.orc.OrcReader.INITIAL_BATCH_SIZE;
 import static com.facebook.presto.parquet.ParquetTypeUtils.getColumnIO;
 import static com.facebook.presto.parquet.ParquetTypeUtils.getDescriptors;
 import static com.facebook.presto.parquet.ParquetTypeUtils.getParquetTypeByName;
+import static com.facebook.presto.parquet.cache.MetadataReader.findFirstNonHiddenColumnId;
 import static com.facebook.presto.parquet.predicate.PredicateUtils.buildPredicate;
 import static com.facebook.presto.parquet.predicate.PredicateUtils.predicateMatches;
+import static com.facebook.presto.parquet.reader.ColumnIndexFilterUtils.getColumnIndexStore;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
@@ -185,11 +190,25 @@ public class IcebergPageSourceProvider
             FileStatus fileStatus = fileSystem.getFileStatus(path);
             long fileSize = fileStatus.getLen();
             long modificationTime = fileStatus.getModificationTime();
-            HiveFileContext hiveFileContext = new HiveFileContext(true, NO_CACHE_CONSTRAINTS,
-                    Optional.empty(), Optional.of(fileSize), modificationTime, false);
+            HiveFileContext hiveFileContext = new HiveFileContext(
+                    true,
+                    NO_CACHE_CONSTRAINTS,
+                    Optional.empty(),
+                    OptionalLong.of(fileSize),
+                    OptionalLong.of(start),
+                    OptionalLong.of(length),
+                    modificationTime,
+                    false);
             FSDataInputStream inputStream = fileSystem.openFile(path, hiveFileContext);
-            dataSource = buildHdfsParquetDataSource(inputStream, path, fileFormatDataSourceStats);
-            ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, fileSize).getParquetMetadata();
+            // Lambda expression below requires final variable, so we define a new variable parquetDataSource.
+            final ParquetDataSource parquetDataSource = buildHdfsParquetDataSource(inputStream, path, fileFormatDataSourceStats);
+            dataSource = parquetDataSource;
+            DecryptionPropertiesFactory cryptoFactory = DecryptionPropertiesFactory.loadFactory(configuration);
+            FileDecryptionProperties fileDecryptionProperties = (cryptoFactory == null) ?
+                    null : cryptoFactory.getFileDecryptionProperties(configuration, path);
+            Optional<InternalFileDecryptor> fileDecryptor = (fileDecryptionProperties == null) ?
+                    Optional.empty() : Optional.of(new InternalFileDecryptor(fileDecryptionProperties));
+            ParquetMetadata parquetMetadata = hdfsEnvironment.doAs(user, () -> MetadataReader.readFooter(parquetDataSource, fileSize, fileDecryptor).getParquetMetadata());
             FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
             MessageType fileSchema = fileMetaData.getSchema();
 
@@ -217,12 +236,15 @@ public class IcebergPageSourceProvider
             List<BlockMetaData> blocks = new ArrayList<>();
             List<ColumnIndexStore> blockIndexStores = new ArrayList<>();
             for (BlockMetaData block : parquetMetadata.getBlocks()) {
-                long firstDataPage = block.getColumns().get(0).getFirstDataPageOffset();
-                Optional<ColumnIndexStore> columnIndexStore = ColumnIndexFilterUtils.getColumnIndexStore(parquetPredicate, finalDataSource, block, descriptorsByPath, false);
-                if ((firstDataPage >= start) && (firstDataPage < (start + length)) &&
-                        predicateMatches(parquetPredicate, block, dataSource, descriptorsByPath, parquetTupleDomain, columnIndexStore, false, Optional.of(session.getWarningCollector()))) {
-                    blocks.add(block);
-                    blockIndexStores.add(columnIndexStore.orElse(null));
+                Optional<Integer> firstIndex = findFirstNonHiddenColumnId(block);
+                if (firstIndex.isPresent()) {
+                    long firstDataPage = block.getColumns().get(firstIndex.get()).getFirstDataPageOffset();
+                    Optional<ColumnIndexStore> columnIndexStore = getColumnIndexStore(parquetPredicate, finalDataSource, block, descriptorsByPath, false);
+                    if ((firstDataPage >= start) && (firstDataPage < (start + length)) &&
+                            predicateMatches(parquetPredicate, block, dataSource, descriptorsByPath, parquetTupleDomain, columnIndexStore, false, Optional.of(session.getWarningCollector()))) {
+                        blocks.add(block);
+                        blockIndexStores.add(columnIndexStore.orElse(null));
+                    }
                 }
             }
 
@@ -230,6 +252,7 @@ public class IcebergPageSourceProvider
             ParquetReader parquetReader = new ParquetReader(
                     messageColumnIO,
                     blocks,
+                    Optional.empty(),
                     dataSource,
                     systemMemoryContext,
                     getParquetMaxReadBlockSize(session),
@@ -237,7 +260,8 @@ public class IcebergPageSourceProvider
                     isParquetBatchReaderVerificationEnabled(session),
                     parquetPredicate,
                     blockIndexStores,
-                    false);
+                    false,
+                    fileDecryptor);
 
             ImmutableList.Builder<String> namesBuilder = ImmutableList.builder();
             ImmutableList.Builder<Type> prestoTypes = ImmutableList.builder();
@@ -335,8 +359,15 @@ public class IcebergPageSourceProvider
             FileStatus fileStatus = fileSystem.getFileStatus(path);
             long fileSize = fileStatus.getLen();
             long modificationTime = fileStatus.getModificationTime();
-            HiveFileContext hiveFileContext = new HiveFileContext(true, NO_CACHE_CONSTRAINTS,
-                    Optional.empty(), Optional.of(fileSize), modificationTime, false);
+            HiveFileContext hiveFileContext = new HiveFileContext(
+                    true,
+                    NO_CACHE_CONSTRAINTS,
+                    Optional.empty(),
+                    OptionalLong.of(fileSize),
+                    OptionalLong.of(start),
+                    OptionalLong.of(length),
+                    modificationTime,
+                    false);
             FSDataInputStream inputStream = hdfsEnvironment.doAs(user, () -> fileSystem.openFile(path, hiveFileContext));
             orcDataSource = new HdfsOrcDataSource(
                     new OrcDataSourceId(path.toString()),

@@ -20,6 +20,8 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import org.apache.iceberg.FileFormat;
 
+import javax.validation.constraints.DecimalMax;
+import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
@@ -36,7 +38,9 @@ public class IcebergConfig
     private CatalogType catalogType = HIVE;
     private String catalogWarehouse;
     private int catalogCacheSize = 10;
+    private int maxPartitionsPerWriter = 100;
     private List<String> hadoopConfigResources = ImmutableList.of();
+    private double minimumAssignedSplitWeight = 0.05;
 
     @NotNull
     public FileFormat getFileFormat()
@@ -118,5 +122,34 @@ public class IcebergConfig
             this.hadoopConfigResources = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(files);
         }
         return this;
+    }
+
+    @Min(1)
+    public int getMaxPartitionsPerWriter()
+    {
+        return maxPartitionsPerWriter;
+    }
+
+    @Config("iceberg.max-partitions-per-writer")
+    @ConfigDescription("Maximum number of partitions per writer")
+    public IcebergConfig setMaxPartitionsPerWriter(int maxPartitionsPerWriter)
+    {
+        this.maxPartitionsPerWriter = maxPartitionsPerWriter;
+        return this;
+    }
+
+    @Config("iceberg.minimum-assigned-split-weight")
+    @ConfigDescription("Minimum weight that a split can be assigned")
+    public IcebergConfig setMinimumAssignedSplitWeight(double minimumAssignedSplitWeight)
+    {
+        this.minimumAssignedSplitWeight = minimumAssignedSplitWeight;
+        return this;
+    }
+
+    @DecimalMax("1")
+    @DecimalMin(value = "0", inclusive = false)
+    public double getMinimumAssignedSplitWeight()
+    {
+        return minimumAssignedSplitWeight;
     }
 }

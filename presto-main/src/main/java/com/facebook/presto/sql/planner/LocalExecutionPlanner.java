@@ -264,6 +264,7 @@ import static com.facebook.presto.SystemSessionProperties.isOptimizeCommonSubExp
 import static com.facebook.presto.SystemSessionProperties.isOptimizedRepartitioningEnabled;
 import static com.facebook.presto.SystemSessionProperties.isOrderByAggregationSpillEnabled;
 import static com.facebook.presto.SystemSessionProperties.isOrderBySpillEnabled;
+import static com.facebook.presto.SystemSessionProperties.isQuickDistinctLimitEnabled;
 import static com.facebook.presto.SystemSessionProperties.isSpillEnabled;
 import static com.facebook.presto.SystemSessionProperties.isWindowSpillEnabled;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
@@ -1312,6 +1313,16 @@ public class LocalExecutionPlanner
             return visitScanFilterAndProject(context, node.getId(), sourceNode, filterExpression, node.getAssignments(), node.getOutputVariables(), node.getLocality());
         }
 
+        private int getFilterProjectMinRowCount(PlanNode projectSource)
+        {
+            // For final DistinctLimit, this project simply drops the hash variable so for better user experience, we set the limit to 1 so that results are shown quicker
+            if (isQuickDistinctLimitEnabled(session) && projectSource instanceof DistinctLimitNode && !((DistinctLimitNode) projectSource).isPartial()) {
+                return 1;
+            }
+
+            return getFilterAndProjectMinOutputPageRowCount(session);
+        }
+
         // TODO: This should be refactored, so that there's an optimizer that merges scan-filter-project into a single PlanNode
         private PhysicalOperation visitScanFilterAndProject(
                 LocalExecutionPlanContext context,
@@ -1444,7 +1455,7 @@ public class LocalExecutionPlanner
                             pageProcessor,
                             projections.stream().map(RowExpression::getType).collect(toImmutableList()),
                             getFilterAndProjectMinOutputPageSize(session),
-                            getFilterAndProjectMinOutputPageRowCount(session));
+                            getFilterProjectMinRowCount(sourceNode));
 
                     return new PhysicalOperation(operatorFactory, outputMappings, context, source);
                 }
@@ -2530,6 +2541,7 @@ public class LocalExecutionPlanner
                         aggregation.getAggregations(),
                         ImmutableSet.of(),
                         groupingVariables,
+                        ImmutableList.of(),
                         PARTIAL,
                         Optional.empty(),
                         Optional.empty(),
@@ -2635,6 +2647,7 @@ public class LocalExecutionPlanner
                         aggregation.getAggregations(),
                         ImmutableSet.of(),
                         groupingVariables,
+                        ImmutableList.of(),
                         INTERMEDIATE,
                         Optional.empty(),
                         Optional.empty(),
@@ -2689,6 +2702,7 @@ public class LocalExecutionPlanner
                         aggregation.getAggregations(),
                         ImmutableSet.of(),
                         groupingVariables,
+                        ImmutableList.of(),
                         FINAL,
                         Optional.empty(),
                         Optional.empty(),
@@ -3064,6 +3078,7 @@ public class LocalExecutionPlanner
                     node.getAggregations(),
                     node.getGlobalGroupingSets(),
                     node.getGroupingKeys(),
+                    node.getPreGroupedVariables(),
                     node.getStep(),
                     node.getHashVariable(),
                     node.getGroupIdVariable(),
@@ -3088,6 +3103,7 @@ public class LocalExecutionPlanner
                 Map<VariableReferenceExpression, Aggregation> aggregations,
                 Set<Integer> globalGroupingSets,
                 List<VariableReferenceExpression> groupbyVariables,
+                List<VariableReferenceExpression> preGroupedVariables,
                 Step step,
                 Optional<VariableReferenceExpression> hashVariable,
                 Optional<VariableReferenceExpression> groupIdVariable,
@@ -3156,11 +3172,13 @@ public class LocalExecutionPlanner
             }
             else {
                 Optional<Integer> hashChannel = hashVariable.map(variableChannelGetter(source));
+                List<Integer> preGroupedChannels = getChannelsForVariables(preGroupedVariables, source.getLayout());
                 return new HashAggregationOperatorFactory(
                         context.getNextOperatorId(),
                         planNodeId,
                         groupByTypes,
                         groupByChannels,
+                        preGroupedChannels,
                         ImmutableList.copyOf(globalGroupingSets),
                         step,
                         hasDefaultOutput,

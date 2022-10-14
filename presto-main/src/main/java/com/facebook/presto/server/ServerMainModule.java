@@ -38,8 +38,10 @@ import com.facebook.presto.common.block.BlockEncodingSerde;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeManager;
 import com.facebook.presto.connector.ConnectorManager;
+import com.facebook.presto.connector.ConnectorTypeSerdeManager;
 import com.facebook.presto.connector.system.SystemConnectorModule;
 import com.facebook.presto.cost.FilterStatsCalculator;
+import com.facebook.presto.cost.HistoryBasedPlanStatisticsManager;
 import com.facebook.presto.cost.ScalarStatsCalculator;
 import com.facebook.presto.cost.StatsNormalizer;
 import com.facebook.presto.event.SplitMonitor;
@@ -523,6 +525,9 @@ public class ServerMainModule
         // connector distributed metadata manager
         binder.bind(ConnectorMetadataUpdaterManager.class).in(Scopes.SINGLETON);
 
+        // connector metadata update handle serde manager
+        binder.bind(ConnectorTypeSerdeManager.class).in(Scopes.SINGLETON);
+
         // page sink provider
         binder.bind(PageSinkManager.class).in(Scopes.SINGLETON);
         binder.bind(PageSinkProvider.class).to(PageSinkManager.class).in(Scopes.SINGLETON);
@@ -549,6 +554,9 @@ public class ServerMainModule
         // plan
         jsonBinder(binder).addKeySerializerBinding(VariableReferenceExpression.class).to(VariableReferenceExpressionSerializer.class);
         jsonBinder(binder).addKeyDeserializerBinding(VariableReferenceExpression.class).to(VariableReferenceExpressionDeserializer.class);
+
+        // history statistics
+        binder.bind(HistoryBasedPlanStatisticsManager.class).in(Scopes.SINGLETON);
 
         // split manager
         binder.bind(SplitManager.class).in(Scopes.SINGLETON);

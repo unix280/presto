@@ -67,6 +67,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameT
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRevokeTablePrivilege;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetUser;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
+import static com.facebook.presto.spi.security.AccessDeniedException.denyTruncateTable;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Suppliers.memoizeWithExpiration;
 import static java.lang.String.format;
@@ -296,6 +297,14 @@ public class FileBasedSystemAccessControl
     {
         if (!canAccessCatalog(identity, table.getCatalogName(), ALL)) {
             denyDropTable(table.toString());
+        }
+    }
+
+    @Override
+    public void checkCanTruncateTable(Identity identity, AccessControlContext context, CatalogSchemaTableName table)
+    {
+        if (!canAccessCatalog(identity, table.getCatalogName(), ALL)) {
+            denyTruncateTable(table.toString());
         }
     }
 

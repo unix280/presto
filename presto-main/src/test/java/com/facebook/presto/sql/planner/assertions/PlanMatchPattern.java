@@ -42,6 +42,7 @@ import com.facebook.presto.sql.planner.plan.GroupIdNode;
 import com.facebook.presto.sql.planner.plan.IndexSourceNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LateralJoinNode;
+import com.facebook.presto.sql.planner.plan.MergeJoinNode;
 import com.facebook.presto.sql.planner.plan.OffsetNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.plan.SemiJoinNode;
@@ -176,8 +177,7 @@ public final class PlanMatchPattern
 
     private PlanMatchPattern addColumnReferences(String expectedTableName, Map<String, String> columnReferences)
     {
-        columnReferences.entrySet().forEach(
-                reference -> withAlias(reference.getKey(), columnReference(expectedTableName, reference.getValue())));
+        columnReferences.forEach((key, value) -> withAlias(key, columnReference(expectedTableName, value)));
         return this;
     }
 
@@ -414,6 +414,15 @@ public final class PlanMatchPattern
     {
         return node(SpatialJoinNode.class, left, right).with(
                 new SpatialJoinMatcher(SpatialJoinNode.Type.LEFT, rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(expectedFilter, new ParsingOptions())), Optional.empty()));
+    }
+
+    public static PlanMatchPattern mergeJoin(JoinNode.Type joinType, List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria, Optional<Expression> filter, PlanMatchPattern left, PlanMatchPattern right)
+    {
+        return node(MergeJoinNode.class, left, right).with(
+                new MergeJoinMatcher(
+                        joinType,
+                        expectedEquiCriteria,
+                        filter));
     }
 
     public static PlanMatchPattern unnest(PlanMatchPattern source)
@@ -848,7 +857,7 @@ public final class PlanMatchPattern
     public static GroupingSetDescriptor singleGroupingSet(List<String> groupingKeys)
     {
         Set<Integer> globalGroupingSets;
-        if (groupingKeys.size() == 0) {
+        if (groupingKeys.isEmpty()) {
             globalGroupingSets = ImmutableSet.of(0);
         }
         else {

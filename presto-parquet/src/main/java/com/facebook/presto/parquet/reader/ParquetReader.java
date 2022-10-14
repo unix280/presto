@@ -43,6 +43,8 @@ import it.unimi.dsi.fastutil.booleans.BooleanList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.crypto.HiddenColumnChunkMetaData;
+import org.apache.parquet.crypto.InternalFileDecryptor;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.predicate.FilterPredicate;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
@@ -89,19 +91,23 @@ public class ParquetReader
     private static final int MAX_VECTOR_LENGTH = 1024;
     private static final int INITIAL_BATCH_SIZE = 1;
     private static final int BATCH_SIZE_GROWTH_FACTOR = 2;
-
+    private final Optional<InternalFileDecryptor> fileDecryptor;
     private final List<BlockMetaData> blocks;
+    private final Optional<List<Long>> firstRowsOfBlocks;
     private final List<PrimitiveColumnIO> columns;
-    private final ParquetDataSource dataSource;
     private final AggregatedMemoryContext systemMemoryContext;
     private final boolean batchReadEnabled;
     private final boolean enableVerification;
     private final FilterPredicate filter;
 
     private int currentBlock;
-    private BlockMetaData currentBlockMetadata;
     private long currentPosition;
     private long currentGroupRowCount;
+
+    /**
+     * Index in the Parquet file of the first row of the current group
+     */
+    private Optional<Long> firstRowIndexInGroup = Optional.empty();
     private RowRanges currentGroupRowRanges;
     private long nextRowInGroup;
     private int batchSize;
@@ -120,11 +126,15 @@ public class ParquetReader
     private final List<RowRanges> blockRowRanges;
     private final Map<ColumnPath, ColumnDescriptor> paths = new HashMap<>();
 
+    protected final ParquetDataSource dataSource;
+    protected BlockMetaData currentBlockMetadata;
+
     private final boolean columnIndexFilterEnabled;
 
-    public ParquetReader(MessageColumnIO
-            messageColumnIO,
+    public ParquetReader(
+            MessageColumnIO messageColumnIO,
             List<BlockMetaData> blocks,
+            Optional<List<Long>> firstRowsOfBlocks,
             ParquetDataSource dataSource,
             AggregatedMemoryContext systemMemoryContext,
             DataSize maxReadBlockSize,
@@ -132,9 +142,11 @@ public class ParquetReader
             boolean enableVerification,
             Predicate parquetPredicate,
             List<ColumnIndexStore> blockIndexStores,
-            boolean columnIndexFilterEnabled)
+            boolean columnIndexFilterEnabled,
+            Optional<InternalFileDecryptor> fileDecryptor)
     {
         this.blocks = blocks;
+        this.firstRowsOfBlocks = requireNonNull(firstRowsOfBlocks, "firstRowsOfBlocks is null");
         this.dataSource = requireNonNull(dataSource, "dataSource is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
         this.currentRowGroupMemoryContext = systemMemoryContext.newAggregatedMemoryContext();
@@ -147,6 +159,11 @@ public class ParquetReader
         maxBytesPerCell = new long[columns.size()];
         this.blockIndexStores = blockIndexStores;
         this.blockRowRanges = listWithNulls(this.blocks.size());
+
+        firstRowsOfBlocks.ifPresent(firstRows -> {
+            checkArgument(blocks.size() == firstRows.size(), "elements of firstRowsOfBlocks must correspond to blocks");
+        });
+
         for (PrimitiveColumnIO column : columns) {
             ColumnDescriptor columnDescriptor = column.getColumnDescriptor();
             this.paths.put(ColumnPath.get(columnDescriptor.getPath()), columnDescriptor);
@@ -159,6 +176,8 @@ public class ParquetReader
         }
         this.currentBlock = -1;
         this.columnIndexFilterEnabled = columnIndexFilterEnabled;
+        requireNonNull(fileDecryptor, "fileDecryptor is null");
+        this.fileDecryptor = fileDecryptor;
     }
 
     @Override
@@ -172,6 +191,15 @@ public class ParquetReader
     public long getPosition()
     {
         return currentPosition;
+    }
+
+    /**
+     * Get the global row index of the first row in the last batch.
+     */
+    public long lastBatchStartRow()
+    {
+        long baseIndex = firstRowIndexInGroup.orElseThrow(() -> new IllegalStateException("row index unavailable"));
+        return baseIndex + nextRowInGroup - batchSize;
     }
 
     public int nextBatch()
@@ -207,6 +235,7 @@ public class ParquetReader
             return false;
         }
         currentBlockMetadata = blocks.get(currentBlock);
+        firstRowIndexInGroup = firstRowsOfBlocks.map(firstRows -> firstRows.get(currentBlock));
 
         if (filter != null && columnIndexFilterEnabled) {
             ColumnIndexStore columnIndexStore = blockIndexStores.get(currentBlock);
@@ -372,7 +401,7 @@ public class ParquetReader
     {
         ColumnChunkDescriptor descriptor = new ColumnChunkDescriptor(columnDescriptor, metadata, bufferSize);
         ParquetColumnChunk columnChunk = new ParquetColumnChunk(descriptor, buffers, offsetIndex);
-        return columnChunk.readAllPages();
+        return createPageReaderInternal(columnDescriptor, columnChunk);
     }
 
     protected PageReader createPageReader(byte[] buffer, int bufferSize, ColumnChunkMetaData metadata, ColumnDescriptor columnDescriptor)
@@ -380,7 +409,24 @@ public class ParquetReader
     {
         ColumnChunkDescriptor descriptor = new ColumnChunkDescriptor(columnDescriptor, metadata, bufferSize);
         ParquetColumnChunk columnChunk = new ParquetColumnChunk(descriptor, buffer, 0);
-        return columnChunk.readAllPages();
+        return createPageReaderInternal(columnDescriptor, columnChunk);
+    }
+
+    private PageReader createPageReaderInternal(ColumnDescriptor columnDescriptor, ParquetColumnChunk columnChunk)
+            throws IOException
+    {
+        if (!isEncryptedColumn(fileDecryptor, columnDescriptor)) {
+            return columnChunk.readAllPages(Optional.empty(), -1, -1);
+        }
+
+        int columnOrdinal = fileDecryptor.get().getColumnSetup(ColumnPath.get(columnChunk.getDescriptor().getColumnDescriptor().getPath())).getOrdinal();
+        return columnChunk.readAllPages(fileDecryptor, currentBlock, columnOrdinal);
+    }
+
+    private boolean isEncryptedColumn(Optional<InternalFileDecryptor> fileDecryptor, ColumnDescriptor columnDescriptor)
+    {
+        ColumnPath columnPath = ColumnPath.get(columnDescriptor.getPath());
+        return fileDecryptor.isPresent() && !fileDecryptor.get().plaintextFile() && fileDecryptor.get().getColumnSetup(columnPath).isEncrypted();
     }
 
     protected byte[] allocateBlock(long length)
@@ -395,7 +441,7 @@ public class ParquetReader
             throws IOException
     {
         for (ColumnChunkMetaData metadata : currentBlockMetadata.getColumns()) {
-            if (metadata.getPath().equals(ColumnPath.get(columnDescriptor.getPath()))) {
+            if (!HiddenColumnChunkMetaData.isHiddenColumn(metadata) && metadata.getPath().equals(ColumnPath.get(columnDescriptor.getPath()))) {
                 return metadata;
             }
         }

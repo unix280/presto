@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.security.ranger;
 
+import com.facebook.presto.common.Subfield;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
@@ -48,6 +49,7 @@ public class TestRangerBasedAccessControl
 {
     public static final ConnectorTransactionHandle TRANSACTION_HANDLE = new ConnectorTransactionHandle() {};
     public static final AccessControlContext CONTEXT = new AccessControlContext(new QueryId("query_id"), Optional.empty(), Optional.empty());
+    public static final ImmutableSet<Subfield> COLUMN1 = ImmutableSet.of(new Subfield("column1"));
 
     @Test
     public void testTablePriviledgesRolesNotAllowed()
@@ -117,7 +119,7 @@ public class TestRangerBasedAccessControl
 
         //  Access denied to others {group - readall, user - bob}
         assertDenied(() -> accessControl.checkCanShowCreateTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test")));
-        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test"), ImmutableSet.of("column1")));
+        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test"), COLUMN1));
         assertDenied(() -> accessControl.checkCanCreateTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test")));
         assertDenied(() -> accessControl.checkCanRenameTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test"), new SchemaTableName("foodmart", "test1")));
         assertDenied(() -> accessControl.checkCanDropTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test")));
@@ -152,15 +154,15 @@ public class TestRangerBasedAccessControl
     {
         ConnectorAccessControl accessControl = createRangerAccessControl("default-table-select-update.json", "user_groups.json", "user_roles.json");
         // 'etladmin' group have all access {group - etladmin, user - alice}
-        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "test"), ImmutableSet.of("column1"));
+        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "test"), COLUMN1);
         accessControl.checkCanInsertIntoTable(TRANSACTION_HANDLE, user("alice"), CONTEXT, new SchemaTableName("foodmart", "test"));
 
         // 'analyst' group have SELECT, UPDATE {group - analyst, user - joe}
-        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "test"), ImmutableSet.of("column1"));
+        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "test"), COLUMN1);
         accessControl.checkCanInsertIntoTable(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "test"));
 
         //  Access denied to others {group - readall, user - bob}
-        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test"), ImmutableSet.of("column1"));
+        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test"), COLUMN1);
         assertDenied(() -> accessControl.checkCanInsertIntoTable(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "test")));
     }
 
@@ -169,11 +171,12 @@ public class TestRangerBasedAccessControl
             throws IOException
     {
         ConnectorAccessControl accessControl = createRangerAccessControl("default-table-column-access.json", "user_groups.json", "user_roles.json");
+        Set<Subfield> columns = ImmutableSet.of(new Subfield("currency_id"), new Subfield("overtime_paid"));
         // 'analyst' group have read acces {group - analyst, user - joe}
-        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "salary"), ImmutableSet.of("currency_id", "overtime_paid"));
+        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("joe"), CONTEXT, new SchemaTableName("foodmart", "salary"), columns);
 
         //  Access denied to others {group - readall, user - bob}
-        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "salary"), ImmutableSet.of("currency_id", "overtime_paid")));
+        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("bob"), CONTEXT, new SchemaTableName("foodmart", "salary"), columns));
     }
 
     @Test
@@ -183,24 +186,24 @@ public class TestRangerBasedAccessControl
         ConnectorAccessControl accessControl = createRangerAccessControl("ranger-role-based-access.json", "user_groups.json", "user_roles.json");
 
         // 'admin_role' role have all access {user - raj, group - admin, role - admin_role}
-        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("raj"), CONTEXT, new SchemaTableName("default", "customer"), ImmutableSet.of("column1"));
+        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("raj"), CONTEXT, new SchemaTableName("default", "customer"), COLUMN1);
         accessControl.checkCanInsertIntoTable(TRANSACTION_HANDLE, user("raj"), CONTEXT, new SchemaTableName("default", "customer"));
         accessControl.checkCanDropTable(TRANSACTION_HANDLE, user("raj"), CONTEXT, new SchemaTableName("default", "customer"));
 
         // 'etl_role' role have all access {user - maria, group - etldev, role - etl_role}
-        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("maria"), CONTEXT, new SchemaTableName("default", "orders"), ImmutableSet.of("column1"));
+        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("maria"), CONTEXT, new SchemaTableName("default", "orders"), COLUMN1);
         accessControl.checkCanInsertIntoTable(TRANSACTION_HANDLE, user("maria"), CONTEXT, new SchemaTableName("default", "orders"));
         accessControl.checkCanDropTable(TRANSACTION_HANDLE, user("maria"), CONTEXT, new SchemaTableName("default", "orders"));
         //  Access denied to columns other than name & comment {user - maria, group - etldev, role - etl_role}
-        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("maria"), CONTEXT, new SchemaTableName("default", "customer"), ImmutableSet.of("column1")));
+        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("maria"), CONTEXT, new SchemaTableName("default", "customer"), COLUMN1));
 
         // 'analyst_role' role have all access {user - sam, group - analyst, role - analyst_role}
-        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "lineitem"), ImmutableSet.of("column1"));
+        accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "lineitem"), COLUMN1);
         accessControl.checkCanInsertIntoTable(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "lineitem"));
         accessControl.checkCanDropTable(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "lineitem"));
         //  Access denied {user - sam, group - analyst, role - analyst_role}
-        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "customer"), ImmutableSet.of("column1")));
-        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "supplier"), ImmutableSet.of("column1")));
+        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "customer"), COLUMN1));
+        assertDenied(() -> accessControl.checkCanSelectFromColumns(TRANSACTION_HANDLE, user("sam"), CONTEXT, new SchemaTableName("default", "supplier"), COLUMN1));
     }
 
     private static ConnectorIdentity user(String name)

@@ -151,6 +151,17 @@ public class TestPinotSplitManager
     }
 
     @Test
+    public void testGetTimeBoundaryForTable()
+    {
+        assertEquals(pinotConnection.getTimeBoundary("hybrid").getOfflineTimePredicate().get(), "secondsSinceEpoch < '4562345'");
+        assertEquals(pinotConnection.getTimeBoundary("hybrid").getOnlineTimePredicate().get(), "secondsSinceEpoch >= '4562345'");
+        assertEquals(pinotConnection.getTimeBoundary("hybridTableWithTsTimeColumn").getOfflineTimePredicate().get(), "ts < '2022-05-29 23:56:53.312'");
+        assertEquals(pinotConnection.getTimeBoundary("hybridTableWithTsTimeColumn").getOnlineTimePredicate().get(), "ts >= '2022-05-29 23:56:53.312'");
+        assertFalse(pinotConnection.getTimeBoundary("unknown").getOfflineTimePredicate().isPresent());
+        assertFalse(pinotConnection.getTimeBoundary("unknown").getOfflineTimePredicate().isPresent());
+    }
+
+    @Test
     public void testSplitsBroker()
     {
         PinotQueryGenerator.GeneratedPinotQuery generatedPql = new PinotQueryGenerator.GeneratedPinotQuery(realtimeOnlyTable.getTableName(), String.format("SELECT %s, COUNT(1) FROM %s GROUP BY %s TOP %d", city.getColumnName(), realtimeOnlyTable.getTableName(), city.getColumnName(), pinotConfig.getTopNLarge()), PinotQueryGenerator.PinotQueryFormat.PQL, ImmutableList.of(0, 1), 1, false, true);
@@ -172,6 +183,12 @@ public class TestPinotSplitManager
     public void testRealtimeSegmentSplitsManySegmentPerServer()
     {
         testSegmentSplitsHelperNoFilter(realtimeOnlyTable, Integer.MAX_VALUE, 2, false);
+    }
+
+    @Test
+    public void testOfflineSegmentSplitsManySegmentPerServer()
+    {
+        testSegmentSplitsHelperNoFilter(offlineOnlyTable, Integer.MAX_VALUE, 2, false);
     }
 
     @Test

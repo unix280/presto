@@ -41,6 +41,7 @@ import static com.facebook.presto.common.type.BigintType.BIGINT;
 import static com.facebook.presto.common.type.IntegerType.INTEGER;
 import static com.facebook.presto.common.type.StandardTypes.ARRAY;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
+import static com.facebook.presto.orc.NoOpOrcWriterStats.NOOP_WRITER_STATS;
 import static com.facebook.presto.orc.OrcEncoding.DWRF;
 import static com.facebook.presto.orc.OrcEncoding.ORC;
 import static com.facebook.presto.orc.OrcReader.INITIAL_BATCH_SIZE;
@@ -51,6 +52,7 @@ import static com.facebook.presto.orc.metadata.ColumnEncoding.ColumnEncodingKind
 import static com.facebook.presto.orc.metadata.ColumnEncoding.ColumnEncodingKind.DIRECT;
 import static com.facebook.presto.orc.metadata.ColumnEncoding.ColumnEncodingKind.DIRECT_V2;
 import static com.facebook.presto.orc.metadata.ColumnEncoding.ColumnEncodingKind.DWRF_DIRECT;
+import static com.facebook.presto.orc.metadata.ColumnEncoding.DEFAULT_SEQUENCE_ID;
 import static com.facebook.presto.orc.metadata.CompressionKind.SNAPPY;
 import static com.facebook.presto.orc.metadata.CompressionKind.ZSTD;
 import static com.google.common.base.Preconditions.checkState;
@@ -470,6 +472,7 @@ public class TestDictionaryColumnWriter
                 .build();
         return new SliceDictionaryColumnWriter(
                 COLUMN_ID,
+                DEFAULT_SEQUENCE_ID,
                 VARCHAR,
                 columnWriterOptions,
                 Optional.empty(),
@@ -822,7 +825,7 @@ public class TestDictionaryColumnWriter
     {
         List<Type> types = ImmutableList.of(type);
         try (TempFile tempFile = new TempFile()) {
-            OrcWriter writer = createOrcWriter(tempFile.getFile(), encoding, ZSTD, Optional.empty(), types, orcWriterOptions, new OrcWriterStats());
+            OrcWriter writer = createOrcWriter(tempFile.getFile(), encoding, ZSTD, Optional.empty(), types, orcWriterOptions, NOOP_WRITER_STATS);
 
             int index = 0;
             int batchId = 0;

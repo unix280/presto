@@ -102,6 +102,9 @@ import com.facebook.presto.spi.connector.ConnectorPartitioningMetadata;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingContext;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.constraints.PrimaryKeyConstraint;
+import com.facebook.presto.spi.constraints.TableConstraint;
+import com.facebook.presto.spi.constraints.UniqueConstraint;
 import com.facebook.presto.spi.function.SqlFunctionId;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
 import com.facebook.presto.spi.relation.RowExpression;
@@ -272,6 +275,7 @@ import static com.facebook.presto.hive.metastore.MetastoreUtil.PRESTO_QUERY_ID_N
 import static com.facebook.presto.hive.metastore.MetastoreUtil.createDirectory;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getMetastoreHeaders;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.toPartitionValues;
+import static com.facebook.presto.hive.metastore.NoopMetastoreCacheStats.NOOP_METASTORE_CACHE_STATS;
 import static com.facebook.presto.hive.metastore.PrestoTableType.MANAGED_TABLE;
 import static com.facebook.presto.hive.metastore.StorageFormat.fromHiveStorageFormat;
 import static com.facebook.presto.hive.rule.HiveFilterPushdown.pushdownFilter;
@@ -374,7 +378,7 @@ public abstract class AbstractTestHiveClient
             .add(new ColumnMetadata("ds", createUnboundedVarcharType()))
             .build();
 
-    private static final MaterializedResult CREATE_TABLE_PARTITIONED_DATA = new MaterializedResult(
+    protected static final MaterializedResult CREATE_TABLE_PARTITIONED_DATA = new MaterializedResult(
             CREATE_TABLE_DATA.getMaterializedRows().stream()
                     .map(row -> new MaterializedRow(row.getPrecision(), newArrayList(concat(row.getFields(), ImmutableList.of("2015-07-0" + row.getField(0))))))
                     .collect(toList()),
@@ -710,6 +714,23 @@ public abstract class AbstractTestHiveClient
     protected SchemaTableName tablePartitionSchemaChange;
     protected SchemaTableName tablePartitionSchemaChangeNonCanonical;
     protected SchemaTableName tableBucketEvolution;
+    protected SchemaTableName tableConstraintsSingleKeyRely;
+    protected SchemaTableName tableConstraintsMultiKeyRely;
+    protected SchemaTableName tableConstraintsSingleKeyNoRely;
+    protected SchemaTableName tableConstraintsMultiKeyNoRely;
+
+    protected List<SchemaTableName> constraintsTableList;
+
+    private static final List<TableConstraint<String>> constraintsSingleKeyRely = ImmutableList.of(new PrimaryKeyConstraint<>("", ImmutableSet.of("c1"), false, true),
+            new UniqueConstraint<>("uk1", ImmutableSet.of("c2"), false, true));
+    private static final List<TableConstraint<String>> constraintsMultiKeyRely = ImmutableList.of(new PrimaryKeyConstraint<>("", ImmutableSet.of("c1", "c2"), false, true),
+            new UniqueConstraint<>("uk2", ImmutableSet.of("c3", "c4"), false, true));
+    private static final List<TableConstraint<String>> constraintsSingleKeyNoRely = ImmutableList.of(new PrimaryKeyConstraint<>("", ImmutableSet.of("c1"), false, false),
+            new UniqueConstraint<>("uk3", ImmutableSet.of("c2"), false, false));
+    private static final List<TableConstraint<String>> constraintsMultiKeyNoRely = ImmutableList.of(new PrimaryKeyConstraint<>("", ImmutableSet.of("c1", "c2"), false, false),
+            new UniqueConstraint<>("uk4", ImmutableSet.of("c3", "c4"), false, false));
+
+    Map<SchemaTableName, List<TableConstraint<String>>> tableConstraintsMap;
 
     protected String invalidClientId;
     protected ConnectorTableHandle invalidTableHandle;
@@ -773,6 +794,20 @@ public abstract class AbstractTestHiveClient
         tablePartitionSchemaChange = new SchemaTableName(database, "presto_test_partition_schema_change");
         tablePartitionSchemaChangeNonCanonical = new SchemaTableName(database, "presto_test_partition_schema_change_non_canonical");
         tableBucketEvolution = new SchemaTableName(database, "presto_test_bucket_evolution");
+        tableConstraintsSingleKeyRely = new SchemaTableName(database, "test_constraints1");
+        tableConstraintsMultiKeyRely = new SchemaTableName(database, "test_constraints2");
+        tableConstraintsSingleKeyNoRely = new SchemaTableName(database, "test_constraints3");
+        tableConstraintsMultiKeyNoRely = new SchemaTableName(database, "test_constraints4");
+        constraintsTableList = ImmutableList.of(tableConstraintsSingleKeyRely,
+                tableConstraintsMultiKeyRely,
+                tableConstraintsSingleKeyNoRely,
+                tableConstraintsMultiKeyNoRely,
+                tablePartitionFormat);
+        tableConstraintsMap = ImmutableMap.of(tableConstraintsSingleKeyRely, constraintsSingleKeyRely,
+                tableConstraintsMultiKeyRely, constraintsMultiKeyRely,
+                tableConstraintsSingleKeyNoRely, constraintsSingleKeyNoRely,
+                tableConstraintsMultiKeyNoRely, constraintsMultiKeyNoRely,
+                tablePartitionFormat, ImmutableList.of());
 
         invalidClientId = "hive";
         invalidTableHandle = new HiveTableHandle(database, INVALID_TABLE);
@@ -792,6 +827,7 @@ public abstract class AbstractTestHiveClient
                 false,
                 "layout",
                 Optional.empty(),
+                false,
                 false);
 
         int partitionColumnIndex = MAX_PARTITION_KEY_COLUMN_INDEX;
@@ -861,6 +897,7 @@ public abstract class AbstractTestHiveClient
                         false,
                         "layout",
                         Optional.empty(),
+                        false,
                         false),
                 Optional.empty(),
                 withColumnDomains(ImmutableMap.of(
@@ -906,6 +943,7 @@ public abstract class AbstractTestHiveClient
                 false,
                 "layout",
                 Optional.empty(),
+                false,
                 false));
         timeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(ZoneId.of(timeZoneId)));
     }
@@ -922,6 +960,8 @@ public abstract class AbstractTestHiveClient
         }
 
         HiveCluster hiveCluster = new TestingHiveCluster(metastoreClientConfig, host, port);
+        HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveClientConfig, metastoreClientConfig), ImmutableSet.of());
+        hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
         ExtendedHiveMetastore metastore = new CachingHiveMetastore(
                 new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster, metastoreClientConfig, hdfsEnvironment), new HivePartitionMutator()),
                 executor,
@@ -930,7 +970,9 @@ public abstract class AbstractTestHiveClient
                 10000,
                 false,
                 MetastoreCacheScope.ALL,
-                0.0);
+                0.0,
+                metastoreClientConfig.getPartitionCacheColumnCountLimit(),
+                NOOP_METASTORE_CACHE_STATS);
 
         setup(databaseName, hiveClientConfig, cacheConfig, metastoreClientConfig, metastore);
     }
@@ -959,6 +1001,7 @@ public abstract class AbstractTestHiveClient
                 true,
                 getHiveClientConfig().getMaxPartitionBatchSize(),
                 getHiveClientConfig().getMaxPartitionsPerScan(),
+                10_000,
                 FUNCTION_AND_TYPE_MANAGER,
                 locationService,
                 FUNCTION_RESOLUTION,
@@ -1143,7 +1186,7 @@ public abstract class AbstractTestHiveClient
         return new HiveTransaction(transactionManager, metadataFactory.get());
     }
 
-    interface Transaction
+    protected interface Transaction
             extends AutoCloseable
     {
         ConnectorMetadata getMetadata();
@@ -2096,6 +2139,7 @@ public abstract class AbstractTestHiveClient
                     false,
                     "layout",
                     Optional.empty(),
+                    false,
                     false);
 
             List<ConnectorSplit> splits = getAllSplits(session, transaction, modifiedReadBucketCountLayoutHandle);
@@ -4624,7 +4668,13 @@ public abstract class AbstractTestHiveClient
     /**
      * @return query id
      */
-    private String insertData(SchemaTableName tableName, MaterializedResult data)
+    protected String insertData(SchemaTableName tableName, MaterializedResult data)
+            throws Exception
+    {
+        return insertData(tableName, data, newSession());
+    }
+
+    protected String insertData(SchemaTableName tableName, MaterializedResult data, ConnectorSession session)
             throws Exception
     {
         Path writePath;
@@ -4632,7 +4682,6 @@ public abstract class AbstractTestHiveClient
         String queryId;
         try (Transaction transaction = newTransaction()) {
             ConnectorMetadata metadata = transaction.getMetadata();
-            ConnectorSession session = newSession();
             ConnectorTableHandle tableHandle = getTableHandle(metadata, tableName);
             HiveInsertTableHandle insertTableHandle = (HiveInsertTableHandle) metadata.beginInsert(session, tableHandle);
             queryId = session.getQueryId();
@@ -5055,7 +5104,7 @@ public abstract class AbstractTestHiveClient
         return handle;
     }
 
-    private MaterializedResult readTable(
+    protected MaterializedResult readTable(
             Transaction transaction,
             ConnectorTableHandle hiveTableHandle,
             List<ColumnHandle> columnHandles,
@@ -5069,7 +5118,7 @@ public abstract class AbstractTestHiveClient
         return readTable(transaction, hiveTableHandle, layoutHandle, columnHandles, session, expectedSplitCount, expectedStorageFormat);
     }
 
-    private MaterializedResult readTable(
+    protected MaterializedResult readTable(
             Transaction transaction,
             ConnectorTableHandle hiveTableHandle,
             ConnectorTableLayoutHandle hiveTableLayoutHandle,
@@ -5635,6 +5684,42 @@ public abstract class AbstractTestHiveClient
             // verify the data
             MaterializedResult result = readTable(transaction, tableHandle, columnHandles, session, TupleDomain.all(), OptionalInt.empty(), Optional.of(storageFormat));
             assertEqualsIgnoreOrder(result.getMaterializedRows(), expectedData.getMaterializedRows());
+        }
+    }
+
+    @Test
+    public void testTableConstraints()
+    {
+        for (SchemaTableName table : constraintsTableList) {
+            List<TableConstraint<String>> tableConstraints = getTableConstraints(table);
+            List<TableConstraint<String>> expectedConstraints = tableConstraintsMap.get(table);
+            compareTableConstraints(tableConstraints, expectedConstraints);
+        }
+    }
+
+    private List<TableConstraint<String>> getTableConstraints(SchemaTableName tableName)
+    {
+        ConnectorSession session = newSession();
+        MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), Optional.empty(), false, HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
+        return metastoreClient.getTableConstraints(metastoreContext, tableName.getSchemaName(), tableName.getTableName());
+    }
+
+    private void compareTableConstraints(List<TableConstraint<String>> tableConstraints, List<TableConstraint<String>> expectedConstraints)
+    {
+        assertEquals(tableConstraints.size(), expectedConstraints.size());
+
+        for (int i = 0; i < tableConstraints.size(); i++) {
+            TableConstraint<String> constraint = tableConstraints.get(i);
+            TableConstraint<String> expectedConstraint = expectedConstraints.get(i);
+            // Hive primary key name is auto-generated, hence explicit comparison of members excluding name
+            if (constraint instanceof PrimaryKeyConstraint) {
+                assertEquals(constraint.getColumns(), expectedConstraint.getColumns());
+                assertEquals(constraint.isEnforced(), expectedConstraint.isEnforced());
+                assertEquals(constraint.isRely(), expectedConstraint.isRely());
+            }
+            else {
+                assertEquals(constraint, expectedConstraint);
+            }
         }
     }
 

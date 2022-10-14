@@ -52,6 +52,7 @@ import com.facebook.presto.spi.eventlistener.QueryInputMetadata;
 import com.facebook.presto.spi.eventlistener.QueryMetadata;
 import com.facebook.presto.spi.eventlistener.QueryOutputMetadata;
 import com.facebook.presto.spi.eventlistener.QueryStatistics;
+import com.facebook.presto.spi.eventlistener.QueryUpdatedEvent;
 import com.facebook.presto.spi.eventlistener.ResourceDistribution;
 import com.facebook.presto.spi.eventlistener.StageStatistics;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
@@ -137,6 +138,11 @@ public class QueryMonitor
                                 Optional.empty(),
                                 ImmutableList.of(),
                                 queryInfo.getSession().getTraceToken())));
+    }
+
+    public void queryUpdatedEvent(QueryInfo queryInfo)
+    {
+        eventListenerManager.queryUpdated(new QueryUpdatedEvent(createQueryMetadata(queryInfo)));
     }
 
     public void queryImmediateFailureEvent(BasicQueryInfo queryInfo, ExecutionFailureInfo failure)
@@ -328,7 +334,7 @@ public class QueryMonitor
                 queryStats.getCumulativeUserMemory(),
                 queryStats.getCumulativeTotalMemory(),
                 queryStats.getCompletedDrivers(),
-                queryInfo.isCompleteInfo(),
+                queryInfo.isFinalQueryInfo(),
                 queryStats.getRuntimeStats());
     }
 
@@ -414,7 +420,8 @@ public class QueryMonitor
                             queryInfo.getOutput().get().getSchema(),
                             queryInfo.getOutput().get().getTable(),
                             tableFinishInfo.map(TableFinishInfo::getSerializedConnectorOutputMetadata),
-                            tableFinishInfo.map(TableFinishInfo::isJsonLengthLimitExceeded)));
+                            tableFinishInfo.map(TableFinishInfo::isJsonLengthLimitExceeded),
+                            queryInfo.getOutput().get().getSerializedCommitOutput()));
         }
         return new QueryIOMetadata(inputs.build(), output);
     }

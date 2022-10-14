@@ -21,7 +21,6 @@ import com.facebook.presto.orc.DefaultOrcWriterFlushPolicy;
 import com.facebook.presto.orc.OrcWriteValidation.OrcWriteValidationMode;
 import com.facebook.presto.orc.OrcWriter;
 import com.facebook.presto.orc.OrcWriterOptions;
-import com.facebook.presto.orc.OrcWriterStats;
 import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
@@ -34,6 +33,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static com.facebook.presto.orc.DwrfEncryptionProvider.NO_ENCRYPTION;
+import static com.facebook.presto.orc.NoOpOrcWriterStats.NOOP_WRITER_STATS;
 import static com.facebook.presto.orc.OrcEncoding.ORC;
 import static com.facebook.presto.orc.metadata.CompressionKind.LZ4;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -100,7 +100,7 @@ public class TempFileWriter
                     UTC,
                     false,
                     OrcWriteValidationMode.BOTH,
-                    new OrcWriterStats());
+                    NOOP_WRITER_STATS);
         }
         catch (NotSupportedException e) {
             throw new PrestoException(NOT_SUPPORTED, e.getMessage(), e);

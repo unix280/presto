@@ -128,6 +128,11 @@ public abstract class AbstractTestQueryFramework
         return computeActual(sql).getOnlyValue();
     }
 
+    protected Object computeScalar(Session session, @Language("SQL") String sql)
+    {
+        return computeActual(session, sql).getOnlyValue();
+    }
+
     protected void assertQuery(@Language("SQL") String sql)
     {
         assertQuery(getSession(), sql);
@@ -146,6 +151,11 @@ public abstract class AbstractTestQueryFramework
     protected void assertQuery(Session session, @Language("SQL") String actual, @Language("SQL") String expected)
     {
         QueryAssertions.assertQuery(queryRunner, session, actual, expectedQueryRunner, expected, false, false);
+    }
+
+    protected void assertQuery(Session actualSession, @Language("SQL") String actual, Session expectedSession, @Language("SQL") String expected)
+    {
+        QueryAssertions.assertQuery(queryRunner, actualSession, actual, expectedQueryRunner, expectedSession, expected, false, false);
     }
 
     protected void assertQuery(Session session, @Language("SQL") String sql, Consumer<Plan> planAssertion)

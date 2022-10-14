@@ -23,6 +23,7 @@ import com.facebook.presto.common.type.Type;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.TableHandle;
+import com.facebook.presto.spi.constraints.TableConstraint;
 import com.facebook.presto.spi.plan.AggregationNode;
 import com.facebook.presto.spi.plan.Assignments;
 import com.facebook.presto.spi.plan.ExceptNode;
@@ -176,8 +177,9 @@ class RelationPlanner
             columns.put(variable, analysis.getColumn(field));
         }
 
+        List<TableConstraint<ColumnHandle>> tableConstraints = metadata.getTableMetadata(session, handle).getMetadata().getTableConstraints();
         List<VariableReferenceExpression> outputVariables = outputVariablesBuilder.build();
-        PlanNode root = new TableScanNode(getSourceLocation(node.getLocation()), idAllocator.getNextId(), handle, outputVariables, columns.build(), TupleDomain.all(), TupleDomain.all());
+        PlanNode root = new TableScanNode(getSourceLocation(node.getLocation()), idAllocator.getNextId(), handle, outputVariables, columns.build(), tableConstraints, TupleDomain.all(), TupleDomain.all());
         RelationPlan tableScan = new RelationPlan(root, scope, outputVariables);
         tableScan = addRowFilters(node, tableScan);
         tableScan = addColumnMasks(node, tableScan);

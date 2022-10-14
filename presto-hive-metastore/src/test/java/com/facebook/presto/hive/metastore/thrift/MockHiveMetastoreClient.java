@@ -35,13 +35,17 @@ import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.PrimaryKeysResponse;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.UniqueConstraintsResponse;
 import org.apache.hadoop.hive.metastore.api.UnlockRequest;
 import org.apache.thrift.TException;
 
@@ -59,6 +63,12 @@ public class MockHiveMetastoreClient
     public static final String TEST_DATABASE = "testdb";
     public static final String BAD_DATABASE = "baddb";
     public static final String TEST_TABLE = "testtbl";
+    public static final String TEST_TABLE_WITH_CONSTRAINTS = "testtbl_constraints";
+    public static final Map<String, List<FieldSchema>> SCHEMA_MAP = ImmutableMap.of(
+            TEST_DATABASE + TEST_TABLE, ImmutableList.of(new FieldSchema("key", "string", null)),
+            TEST_DATABASE + TEST_TABLE_WITH_CONSTRAINTS, ImmutableList.of(new FieldSchema("c1", "string", "Primary Key"), new FieldSchema("c2", "string", "Unique Key")));
+    public static final List<SQLPrimaryKey> TEST_PRIMARY_KEY = ImmutableList.of(new SQLPrimaryKey(TEST_DATABASE, TEST_TABLE_WITH_CONSTRAINTS, "c1", 0, "", true, false, true));
+    public static final List<SQLUniqueConstraint> TEST_UNIQUE_CONSTRAINT = ImmutableList.of(new SQLUniqueConstraint("", TEST_DATABASE, TEST_TABLE_WITH_CONSTRAINTS, "c2", 1, "", true, false, true));
     public static final String TEST_TOKEN = "token";
     public static final MetastoreContext TEST_METASTORE_CONTEXT = new MetastoreContext("test_user", "test_queryId", Optional.empty(), Optional.empty(), false, Optional.empty(), false, HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
     public static final String TEST_PARTITION1 = "key=testpartition1";
@@ -75,7 +85,19 @@ public class MockHiveMetastoreClient
             new RolePrincipalGrant("role2", "role1", ROLE, true, 0, "grantor2", ROLE));
 
     private static final StorageDescriptor DEFAULT_STORAGE_DESCRIPTOR =
-            new StorageDescriptor(ImmutableList.of(), "", null, null, false, 0, new SerDeInfo(TEST_TABLE, null, ImmutableMap.of()), null, null, ImmutableMap.of());
+            new StorageDescriptor(
+                    ImmutableList.of(
+                            new FieldSchema("col_bigint", "bigint", "comment"),
+                            new FieldSchema("col_string", "string", "comment")),
+                    "",
+                    null,
+                    null,
+                    false,
+                    0,
+                    new SerDeInfo(TEST_TABLE, null, ImmutableMap.of()),
+                    null,
+                    null,
+                    ImmutableMap.of());
 
     private final AtomicInteger accessCount = new AtomicInteger();
     private boolean throwException;
@@ -116,7 +138,7 @@ public class MockHiveMetastoreClient
         if (!dbName.equals(TEST_DATABASE)) {
             return ImmutableList.of(); // As specified by Hive specification
         }
-        return ImmutableList.of(TEST_TABLE);
+        return ImmutableList.of(TEST_TABLE, TEST_TABLE_WITH_CONSTRAINTS);
     }
 
     @Override
@@ -141,9 +163,10 @@ public class MockHiveMetastoreClient
         if (throwException) {
             throw new RuntimeException();
         }
-        if (!dbName.equals(TEST_DATABASE) || !tableName.equals(TEST_TABLE)) {
+        if (!dbName.equals(TEST_DATABASE) || (!tableName.equals(TEST_TABLE) && !tableName.equals(TEST_TABLE_WITH_CONSTRAINTS))) {
             throw new NoSuchObjectException();
         }
+
         return new Table(
                 TEST_TABLE,
                 TEST_DATABASE,
@@ -152,7 +175,7 @@ public class MockHiveMetastoreClient
                 0,
                 0,
                 DEFAULT_STORAGE_DESCRIPTOR,
-                ImmutableList.of(new FieldSchema("key", "string", null)),
+                SCHEMA_MAP.get(dbName + tableName),
                 null,
                 "",
                 "",
@@ -438,5 +461,24 @@ public class MockHiveMetastoreClient
     public void unlock(UnlockRequest request)
     {
         throw new UnsupportedOperationException();
+    }
+
+    public Optional<PrimaryKeysResponse> getPrimaryKey(String dbName, String tableName)
+    {
+        accessCount.incrementAndGet();
+        if (!dbName.equals(TEST_DATABASE) || !tableName.equals(TEST_TABLE_WITH_CONSTRAINTS)) {
+            throw new UnsupportedOperationException();
+        }
+        return Optional.of(new PrimaryKeysResponse(TEST_PRIMARY_KEY));
+    }
+
+    @Override
+    public Optional<UniqueConstraintsResponse> getUniqueConstraints(String catName, String dbName, String tableName)
+    {
+        accessCount.incrementAndGet();
+        if (!dbName.equals(TEST_DATABASE) || !tableName.equals(TEST_TABLE_WITH_CONSTRAINTS)) {
+            throw new UnsupportedOperationException();
+        }
+        return Optional.of(new UniqueConstraintsResponse(TEST_UNIQUE_CONSTRAINT));
     }
 }

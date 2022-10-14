@@ -138,6 +138,21 @@ public final class HiveQueryRunner
             Map<String, String> extraHiveProperties,
             Optional<Integer> workerCount,
             Optional<Path> baseDataDir,
+            Optional<BiFunction<Integer, URI, Process>> externalWorkerLauncher)
+            throws Exception
+    {
+        return createQueryRunner(tpchTables, tpcdsTableNames, extraProperties, extraCoordinatorProperties, security, extraHiveProperties, workerCount, baseDataDir, externalWorkerLauncher, Optional.empty());
+    }
+
+    public static DistributedQueryRunner createQueryRunner(
+            Iterable<TpchTable<?>> tpchTables,
+            Iterable<String> tpcdsTableNames,
+            Map<String, String> extraProperties,
+            Map<String, String> extraCoordinatorProperties,
+            String security,
+            Map<String, String> extraHiveProperties,
+            Optional<Integer> workerCount,
+            Optional<Path> baseDataDir,
             Optional<BiFunction<Integer, URI, Process>> externalWorkerLauncher,
             Optional<ExtendedHiveMetastore> externalMetastore)
             throws Exception

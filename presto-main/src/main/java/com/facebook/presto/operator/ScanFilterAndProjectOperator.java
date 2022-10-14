@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -56,6 +57,8 @@ import java.util.function.Supplier;
 import static com.facebook.airlift.concurrent.MoreFutures.toListenableFuture;
 import static com.facebook.presto.common.RuntimeMetricName.STORAGE_READ_DATA_BYTES;
 import static com.facebook.presto.common.RuntimeMetricName.STORAGE_READ_TIME_NANOS;
+import static com.facebook.presto.common.RuntimeUnit.BYTE;
+import static com.facebook.presto.common.RuntimeUnit.NANO;
 import static com.facebook.presto.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -144,9 +147,16 @@ public class ScanFilterAndProjectOperator
         this.split = split;
 
         Object splitInfo = split.getInfo();
-        if (splitInfo != null) {
+        Map<String, String> infoMap = split.getInfoMap();
+
+        //Make the implicit assumption that if infoMap is populated we can use that instead of the raw object.
+        if (infoMap != null && !infoMap.isEmpty()) {
+            operatorContext.setInfoSupplier(Suppliers.ofInstance(new SplitOperatorInfo(infoMap)));
+        }
+        else if (splitInfo != null) {
             operatorContext.setInfoSupplier(Suppliers.ofInstance(new SplitOperatorInfo(splitInfo)));
         }
+
         blocked.set(null);
 
         if (split.getConnectorSplit() instanceof EmptySplit) {
@@ -353,8 +363,8 @@ public class ScanFilterAndProjectOperator
         operatorContext.recordRawInputWithTiming(inputBytes, positionCount, inputBytesReadTime);
         RuntimeStats runtimeStats = pageSource.getRuntimeStats();
         if (runtimeStats != null) {
-            runtimeStats.addMetricValueIgnoreZero(STORAGE_READ_TIME_NANOS, inputBytesReadTime);
-            runtimeStats.addMetricValueIgnoreZero(STORAGE_READ_DATA_BYTES, inputBytes);
+            runtimeStats.addMetricValueIgnoreZero(STORAGE_READ_TIME_NANOS, NANO, inputBytesReadTime);
+            runtimeStats.addMetricValueIgnoreZero(STORAGE_READ_DATA_BYTES, BYTE, inputBytes);
             operatorContext.updateStats(runtimeStats);
         }
         completedBytes = endCompletedBytes;

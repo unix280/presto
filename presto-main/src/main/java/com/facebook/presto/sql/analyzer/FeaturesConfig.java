@@ -70,6 +70,7 @@ public class FeaturesConfig
     private boolean distributedIndexJoinsEnabled;
     private JoinDistributionType joinDistributionType = JoinDistributionType.AUTOMATIC;
     private DataSize joinMaxBroadcastTableSize = new DataSize(100, MEGABYTE);
+    private boolean sizeBasedJoinDistributionTypeEnabled = true;
     private boolean colocatedJoinsEnabled = true;
     private boolean groupedExecutionEnabled = true;
     private boolean recoverableGroupedExecutionEnabled;
@@ -86,21 +87,25 @@ public class FeaturesConfig
     private JoinReorderingStrategy joinReorderingStrategy = JoinReorderingStrategy.AUTOMATIC;
     private PartialMergePushdownStrategy partialMergePushdownStrategy = PartialMergePushdownStrategy.NONE;
     private int maxReorderedJoins = 9;
+    private boolean useHistoryBasedPlanStatistics;
+    private boolean useExternalPlanStatistics;
     private boolean redistributeWrites = true;
     private boolean scaleWriters;
-    private DataSize writerMinSize = new DataSize(32, DataSize.Unit.MEGABYTE);
+    private DataSize writerMinSize = new DataSize(32, MEGABYTE);
     private boolean optimizedScaleWriterProducerBuffer;
     private boolean optimizeMetadataQueries;
     private boolean optimizeMetadataQueriesIgnoreStats;
     private int optimizeMetadataQueriesCallThreshold = 100;
     private boolean optimizeHashGeneration = true;
     private boolean enableIntermediateAggregations;
+    private boolean optimizeCaseExpressionPredicate;
     private boolean pushTableWriteThroughUnion = true;
     private boolean exchangeCompressionEnabled;
     private boolean exchangeChecksumEnabled;
     private boolean legacyArrayAgg;
     private boolean reduceAggForComplexTypesEnabled = true;
     private boolean legacyLogFunction;
+    private boolean useAlternativeFunctionSignatures;
     private boolean groupByUsesEqualTo;
     private boolean legacyTimestamp = true;
     private boolean legacyMapSubscript;
@@ -132,7 +137,7 @@ public class FeaturesConfig
     private boolean orderByAggregationSpillEnabled = true;
     private boolean windowSpillEnabled = true;
     private boolean orderBySpillEnabled = true;
-    private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, DataSize.Unit.MEGABYTE);
+    private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
     private int spillerThreads = 4;
     private double spillMaxUsedSpaceThreshold = 0.9;
@@ -148,6 +153,7 @@ public class FeaturesConfig
     private double memoryRevokingThreshold = 0.7;
     private boolean parseDecimalLiteralsAsDouble;
     private boolean useMarkDistinct = true;
+    private boolean exploitConstraints;
     private boolean preferPartialAggregation = true;
     private PartialAggregationStrategy partialAggregationStrategy = PartialAggregationStrategy.ALWAYS;
     private double partialAggregationByteReductionThreshold = 0.5;
@@ -155,6 +161,7 @@ public class FeaturesConfig
     private boolean pushLimitThroughOuterJoin = true;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
+    private Duration queryAnalyzerTimeout = new Duration(3, MINUTES);
     private boolean enableDynamicFiltering;
     private int dynamicFilteringMaxPerDriverRowCount = 100;
     private DataSize dynamicFilteringMaxPerDriverSize = new DataSize(10, KILOBYTE);
@@ -187,6 +194,7 @@ public class FeaturesConfig
     private boolean pushdownDereferenceEnabled;
     private boolean inlineSqlFunctions = true;
     private boolean checkAccessControlOnUtilizedColumnsOnly;
+    private boolean checkAccessControlWithSubfields;
     private boolean skipRedundantSort = true;
     private boolean isAllowWindowOrderByLiterals = true;
 
@@ -215,8 +223,13 @@ public class FeaturesConfig
     private int hashBasedDistinctLimitThreshold = 10000;
 
     private boolean streamingForPartialAggregationEnabled;
+    private boolean preferMergeJoin;
+    private boolean segmentedAggregationEnabled;
 
     private int maxStageCountForEagerScheduling = 25;
+    private boolean quickDistinctLimitEnabled;
+
+    private double hyperloglogStandardErrorWarningThreshold = 0.004;
 
     private boolean hideUnauthorizedColumns;
 
@@ -411,6 +424,19 @@ public class FeaturesConfig
         return legacyLogFunction;
     }
 
+    @Config("use-alternative-function-signatures")
+    @ConfigDescription("Override intermediate aggregation type of some aggregation functions to be compatible with Velox")
+    public FeaturesConfig setUseAlternativeFunctionSignatures(boolean value)
+    {
+        this.useAlternativeFunctionSignatures = value;
+        return this;
+    }
+
+    public boolean isUseAlternativeFunctionSignatures()
+    {
+        return useAlternativeFunctionSignatures;
+    }
+
     @Config("deprecated.group-by-uses-equal")
     public FeaturesConfig setGroupByUsesEqualTo(boolean value)
     {
@@ -482,6 +508,18 @@ public class FeaturesConfig
     {
         this.joinMaxBroadcastTableSize = joinMaxBroadcastTableSize;
         return this;
+    }
+
+    @Config("optimizer.size-based-join-distribution-type-enabled")
+    public FeaturesConfig setSizeBasedJoinDistributionTypeEnabled(boolean considerTableSize)
+    {
+        this.sizeBasedJoinDistributionTypeEnabled = considerTableSize;
+        return this;
+    }
+
+    public boolean isSizeBasedJoinDistributionTypeEnabled()
+    {
+        return sizeBasedJoinDistributionTypeEnabled;
     }
 
     public boolean isGroupedExecutionEnabled()
@@ -694,6 +732,30 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isUseHistoryBasedPlanStatistics()
+    {
+        return useHistoryBasedPlanStatistics;
+    }
+
+    @Config("optimizer.use-history-based-plan-statistics")
+    public FeaturesConfig setUseHistoryBasedPlanStatistics(boolean useHistoryBasedPlanStatistics)
+    {
+        this.useHistoryBasedPlanStatistics = useHistoryBasedPlanStatistics;
+        return this;
+    }
+
+    public boolean isUseExternalPlanStatistics()
+    {
+        return useExternalPlanStatistics;
+    }
+
+    @Config("optimizer.use-external-plan-statistics")
+    public FeaturesConfig setUseExternalPlanStatistics(boolean useExternalPlanStatistics)
+    {
+        this.useExternalPlanStatistics = useExternalPlanStatistics;
+        return this;
+    }
+
     public AggregationPartitioningMergingStrategy getAggregationPartitioningMergingStrategy()
     {
         return aggregationPartitioningMergingStrategy;
@@ -807,6 +869,18 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isExploitConstraints()
+    {
+        return exploitConstraints;
+    }
+
+    @Config("optimizer.exploit-constraints")
+    public FeaturesConfig setExploitConstraints(boolean value)
+    {
+        this.exploitConstraints = value;
+        return this;
+    }
+
     public boolean isPreferPartialAggregation()
     {
         return preferPartialAggregation;
@@ -852,6 +926,18 @@ public class FeaturesConfig
     public FeaturesConfig setOptimizeTopNRowNumber(boolean optimizeTopNRowNumber)
     {
         this.optimizeTopNRowNumber = optimizeTopNRowNumber;
+        return this;
+    }
+
+    public boolean isOptimizeCaseExpressionPredicate()
+    {
+        return optimizeCaseExpressionPredicate;
+    }
+
+    @Config("optimizer.optimize-case-expression-predicate")
+    public FeaturesConfig setOptimizeCaseExpressionPredicate(boolean optimizeCaseExpressionPredicate)
+    {
+        this.optimizeCaseExpressionPredicate = optimizeCaseExpressionPredicate;
         return this;
     }
 
@@ -1090,6 +1176,19 @@ public class FeaturesConfig
     public FeaturesConfig setIterativeOptimizerTimeout(Duration timeout)
     {
         this.iterativeOptimizerTimeout = timeout;
+        return this;
+    }
+
+    public Duration getQueryAnalyzerTimeout()
+    {
+        return this.queryAnalyzerTimeout;
+    }
+
+    @Config("planner.query-analyzer-timeout")
+    @ConfigDescription("Maximum running time for the query analyzer in case the processing takes too long or is stuck in an infinite loop.")
+    public FeaturesConfig setQueryAnalyzerTimeout(Duration timeout)
+    {
+        this.queryAnalyzerTimeout = timeout;
         return this;
     }
 
@@ -1723,6 +1822,18 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isCheckAccessControlWithSubfields()
+    {
+        return checkAccessControlWithSubfields;
+    }
+
+    @Config("check-access-control-with-subfields")
+    public FeaturesConfig setCheckAccessControlWithSubfields(boolean checkAccessControlWithSubfields)
+    {
+        this.checkAccessControlWithSubfields = checkAccessControlWithSubfields;
+        return this;
+    }
+
     public boolean isSkipRedundantSort()
     {
         return skipRedundantSort;
@@ -1998,6 +2109,58 @@ public class FeaturesConfig
     public FeaturesConfig setMaxStageCountForEagerScheduling(int maxStageCountForEagerScheduling)
     {
         this.maxStageCountForEagerScheduling = maxStageCountForEagerScheduling;
+        return this;
+    }
+
+    public double getHyperloglogStandardErrorWarningThreshold()
+    {
+        return hyperloglogStandardErrorWarningThreshold;
+    }
+
+    @Config("hyperloglog-standard-error-warning-threshold")
+    @ConfigDescription("aggregation functions can produce low-precision results when the max standard error lower than this value.")
+    public FeaturesConfig setHyperloglogStandardErrorWarningThreshold(double hyperloglogStandardErrorWarningThreshold)
+    {
+        this.hyperloglogStandardErrorWarningThreshold = hyperloglogStandardErrorWarningThreshold;
+        return this;
+    }
+
+    public boolean isPreferMergeJoin()
+    {
+        return preferMergeJoin;
+    }
+
+    @Config("optimizer.prefer-merge-join")
+    @ConfigDescription("Prefer merge join for sorted join inputs, e.g., tables pre-sorted, pre-partitioned by join columns." +
+            "To make it work, the connector needs to guarantee and expose the data properties of the underlying table.")
+    public FeaturesConfig setPreferMergeJoin(boolean preferMergeJoin)
+    {
+        this.preferMergeJoin = preferMergeJoin;
+        return this;
+    }
+
+    public boolean isSegmentedAggregationEnabled()
+    {
+        return segmentedAggregationEnabled;
+    }
+
+    @Config("optimizer.segmented-aggregation-enabled")
+    public FeaturesConfig setSegmentedAggregationEnabled(boolean segmentedAggregationEnabled)
+    {
+        this.segmentedAggregationEnabled = segmentedAggregationEnabled;
+        return this;
+    }
+
+    public boolean isQuickDistinctLimitEnabled()
+    {
+        return quickDistinctLimitEnabled;
+    }
+
+    @Config("optimizer.quick-distinct-limit-enabled")
+    @ConfigDescription("Enable quick distinct limit queries that give results as soon as a new distinct value is found")
+    public FeaturesConfig setQuickDistinctLimitEnabled(boolean quickDistinctLimitEnabled)
+    {
+        this.quickDistinctLimitEnabled = quickDistinctLimitEnabled;
         return this;
     }
 }

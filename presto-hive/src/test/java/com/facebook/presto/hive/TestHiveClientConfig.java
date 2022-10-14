@@ -14,8 +14,8 @@
 package com.facebook.presto.hive;
 
 import com.facebook.airlift.configuration.testing.ConfigAssertions;
+import com.facebook.drift.transport.netty.codec.Protocol;
 import com.facebook.presto.hive.HiveClientConfig.HdfsAuthenticationType;
-import com.facebook.presto.hive.HiveClientConfig.HiveMetastoreAuthenticationType;
 import com.facebook.presto.hive.s3.S3FileSystemType;
 import com.facebook.presto.orc.OrcWriteValidation.OrcWriteValidationMode;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
@@ -40,6 +40,7 @@ import static com.facebook.presto.hive.HiveStorageFormat.DWRF;
 import static com.facebook.presto.hive.HiveStorageFormat.ORC;
 import static com.facebook.presto.hive.TestHiveUtil.nonDefaultTimeZone;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
+import static io.airlift.units.DataSize.Unit.BYTE;
 
 public class TestHiveClientConfig
 {
@@ -103,7 +104,6 @@ public class TestHiveClientConfig
                 .setOrcOptimizedWriterEnabled(true)
                 .setOrcWriterValidationPercentage(0.0)
                 .setOrcWriterValidationMode(OrcWriteValidationMode.BOTH)
-                .setHiveMetastoreAuthenticationType(HiveMetastoreAuthenticationType.NONE)
                 .setHdfsAuthenticationType(HdfsAuthenticationType.NONE)
                 .setHdfsImpersonationEnabled(false)
                 .setSkipDeletionForAlter(false)
@@ -126,7 +126,7 @@ public class TestHiveClientConfig
                 .setPartitionStatisticsBasedOptimizationEnabled(false)
                 .setS3SelectPushdownEnabled(false)
                 .setS3SelectPushdownMaxConnections(500)
-                .setStreamingAggregationEnabled(false)
+                .setOrderBasedExecutionEnabled(false)
                 .setTemporaryStagingDirectoryEnabled(true)
                 .setTemporaryStagingDirectoryPath("/tmp/presto-${USER}")
                 .setTemporaryTableSchema("default")
@@ -168,7 +168,9 @@ public class TestHiveClientConfig
                 .setHudiMetadataEnabled(false)
                 .setUseRecordPageSourceForCustomSplit(true)
                 .setFileSplittable(true)
-                .setHudiMetadataEnabled(false));
+                .setHudiMetadataEnabled(false)
+                .setThriftProtocol(Protocol.BINARY)
+                .setThriftBufferSize(new DataSize(128, BYTE)));
     }
 
     @Test
@@ -230,7 +232,6 @@ public class TestHiveClientConfig
                 .put("hive.orc.optimized-writer.enabled", "false")
                 .put("hive.orc.writer.validation-percentage", "0.16")
                 .put("hive.orc.writer.validation-mode", "DETAILED")
-                .put("hive.metastore.authentication.type", "KERBEROS")
                 .put("hive.hdfs.authentication.type", "KERBEROS")
                 .put("hive.hdfs.impersonation.enabled", "true")
                 .put("hive.skip-deletion-for-alter", "true")
@@ -254,7 +255,7 @@ public class TestHiveClientConfig
                 .put("hive.partition-statistics-based-optimization-enabled", "true")
                 .put("hive.s3select-pushdown.enabled", "true")
                 .put("hive.s3select-pushdown.max-connections", "1234")
-                .put("hive.streaming-aggregation-enabled", "true")
+                .put("hive.order-based-execution-enabled", "true")
                 .put("hive.temporary-staging-directory-enabled", "false")
                 .put("hive.temporary-staging-directory-path", "updated")
                 .put("hive.temporary-table-schema", "other")
@@ -295,9 +296,12 @@ public class TestHiveClientConfig
                 .put("hive.use-record-page-source-for-custom-split", "false")
                 .put("hive.file-splittable", "false")
                 .put("hive.hudi-metadata-enabled", "true")
+                .put("hive.internal-communication.thrift-transport-protocol", "COMPACT")
+                .put("hive.internal-communication.thrift-transport-buffer-size", "256B")
                 .build();
 
         HiveClientConfig expected = new HiveClientConfig()
+                .setHudiMetadataEnabled(true)
                 .setTimeZone(TimeZone.getTimeZone(ZoneId.of(nonDefaultTimeZone().getID())).getID())
                 .setMaxSplitSize(new DataSize(256, Unit.MEGABYTE))
                 .setMaxPartitionsPerScan(123)
@@ -352,7 +356,6 @@ public class TestHiveClientConfig
                 .setOrcOptimizedWriterEnabled(false)
                 .setOrcWriterValidationPercentage(0.16)
                 .setOrcWriterValidationMode(OrcWriteValidationMode.DETAILED)
-                .setHiveMetastoreAuthenticationType(HiveMetastoreAuthenticationType.KERBEROS)
                 .setHdfsAuthenticationType(HdfsAuthenticationType.KERBEROS)
                 .setHdfsImpersonationEnabled(true)
                 .setSkipDeletionForAlter(true)
@@ -376,7 +379,7 @@ public class TestHiveClientConfig
                 .setPartitionStatisticsBasedOptimizationEnabled(true)
                 .setS3SelectPushdownEnabled(true)
                 .setS3SelectPushdownMaxConnections(1234)
-                .setStreamingAggregationEnabled(true)
+                .setOrderBasedExecutionEnabled(true)
                 .setTemporaryStagingDirectoryEnabled(false)
                 .setTemporaryStagingDirectoryPath("updated")
                 .setTemporaryTableSchema("other")
@@ -417,7 +420,8 @@ public class TestHiveClientConfig
                 .setUseRecordPageSourceForCustomSplit(false)
                 .setFileSplittable(false)
                 .setUseRecordPageSourceForCustomSplit(false)
-                .setHudiMetadataEnabled(true);
+                .setThriftProtocol(Protocol.COMPACT)
+                .setThriftBufferSize(new DataSize(256, BYTE));
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

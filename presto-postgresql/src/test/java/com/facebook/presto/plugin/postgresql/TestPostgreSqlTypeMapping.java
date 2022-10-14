@@ -286,13 +286,58 @@ public class TestPostgreSqlTypeMapping
         // TODO timestamp is not correctly read (see comment in StandardColumnMappings.timestampColumnMapping), but testing this is hard because of #7122
     }
 
+    @Test
+    public void testJsonb()
+    {
+        jsonTestCases(jsonbDataType())
+                .execute(getQueryRunner(), postgresCreateAndInsert("tpch.postgresql_test_jsonb"));
+    }
+
+    private DataTypeTest jsonTestCases(DataType<String> jsonDataType)
+    {
+        return DataTypeTest.create()
+                .addRoundTrip(jsonDataType, "{}")
+                .addRoundTrip(jsonDataType, null)
+                .addRoundTrip(jsonDataType, "null")
+                .addRoundTrip(jsonDataType, "123.4")
+                .addRoundTrip(jsonDataType, "\"abc\"")
+                .addRoundTrip(jsonDataType, "\"text with \\\" quotations and ' apostrophes\"")
+                .addRoundTrip(jsonDataType, "\"\"")
+                .addRoundTrip(jsonDataType, "{\"a\":1,\"b\":2}")
+                .addRoundTrip(jsonDataType, "{\"a\":[1,2,3],\"b\":{\"aa\":11,\"bb\":[{\"a\":1,\"b\":2},{\"a\":0}]}}")
+                .addRoundTrip(jsonDataType, "[]");
+    }
+
+    private static DataType<String> jsonDataType()
+    {
+        return dataType(
+                "json",
+                JSON,
+                value -> "JSON " + formatStringLiteral(value),
+                identity());
+    }
+
+    public static DataType<String> jsonbDataType()
+    {
+        return dataType(
+                "jsonb",
+                JSON,
+                value -> "JSON " + formatStringLiteral(value),
+                identity());
+    }
+
+    public static String formatStringLiteral(String value)
+    {
+        return "'" + value.replace("'", "''") + "'";
+    }
+
     private void testUnsupportedDataType(String databaseDataType)
     {
         JdbcSqlExecutor jdbcSqlExecutor = new JdbcSqlExecutor(postgreSqlServer.getJdbcUrl());
         jdbcSqlExecutor.execute(format("CREATE TABLE tpch.test_unsupported_data_type(key varchar(5), unsupported_column %s)", databaseDataType));
         try {
             assertQuery(
-                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'tpch' AND TABLE_NAME = 'test_unsupported_data_type'",
+                    "SELECT column_name FROM information_schema.columns WHERE table_schema = 'tpch' AND table_name = 'test_unsupported_data_type'",
                     "VALUES 'key'"); // no 'unsupported_column'
         }
         finally {

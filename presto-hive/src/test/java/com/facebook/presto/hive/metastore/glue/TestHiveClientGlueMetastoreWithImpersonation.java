@@ -138,6 +138,12 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         assertEquals(stats.getGetDatabases().getTotalFailures().getTotalCount(), initialFailureCount);
     }
 
+    @Override
+    public void testTableConstraints()
+    {
+        // GlueMetastore has no support for table constraints
+    }
+
     @Test
     public void testGetDatabaseFailureLogsStats()
     {

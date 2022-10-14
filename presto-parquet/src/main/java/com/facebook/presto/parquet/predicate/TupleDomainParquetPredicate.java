@@ -463,7 +463,7 @@ public class TupleDomainParquetPredicate
     // Caller should verify isCorruptedColumnIndex is false first
     private boolean isEmptyColumnIndex(ColumnIndex columnIndex)
     {
-        return columnIndex.getMaxValues().size() == 0;
+        return columnIndex.getMaxValues().isEmpty();
     }
 
     public FilterPredicate getParquetUserDefinedPredicate()

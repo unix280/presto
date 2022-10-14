@@ -158,7 +158,7 @@ public class OrcReader
         this.orcDataSource = orcDataSource;
         requireNonNull(orcEncoding, "orcEncoding is null");
         this.runtimeStats = requireNonNull(runtimeStats, "runtimeStats is null");
-        this.metadataReader = new ExceptionWrappingMetadataReader(orcDataSource.getId(), orcEncoding.createMetadataReader(runtimeStats));
+        this.metadataReader = new ExceptionWrappingMetadataReader(orcDataSource.getId(), orcEncoding.createMetadataReader(runtimeStats, orcReaderOptions));
 
         this.writeValidation = requireNonNull(writeValidation, "writeValidation is null");
 
@@ -179,7 +179,7 @@ public class OrcReader
                 orcFileTail.getFooterSize())) {
             this.footer = metadataReader.readFooter(hiveWriterVersion, footerInputStream, dwrfEncryptionProvider, dwrfKeyProvider, orcDataSource, decompressor);
         }
-        if (this.footer.getTypes().size() == 0) {
+        if (this.footer.getTypes().isEmpty()) {
             throw new OrcCorruptionException(orcDataSource.getId(), "File has no columns");
         }
 

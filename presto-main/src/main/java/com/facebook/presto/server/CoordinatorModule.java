@@ -34,6 +34,7 @@ import com.facebook.presto.event.QueryMonitorConfig;
 import com.facebook.presto.execution.ClusterSizeMonitor;
 import com.facebook.presto.execution.ExplainAnalyzeContext;
 import com.facebook.presto.execution.ForQueryExecution;
+import com.facebook.presto.execution.ForTimeoutThread;
 import com.facebook.presto.execution.NodeResourceStatusConfig;
 import com.facebook.presto.execution.PartialResultQueryManager;
 import com.facebook.presto.execution.QueryExecution;
@@ -72,6 +73,7 @@ import com.facebook.presto.resourcemanager.ForResourceManager;
 import com.facebook.presto.resourcemanager.ResourceManagerProxy;
 import com.facebook.presto.server.protocol.ExecutingStatementResource;
 import com.facebook.presto.server.protocol.LocalQueryProvider;
+import com.facebook.presto.server.protocol.QueryBlockingRateLimiter;
 import com.facebook.presto.server.protocol.QueuedStatementResource;
 import com.facebook.presto.server.protocol.RetryCircuitBreaker;
 import com.facebook.presto.server.remotetask.HttpRemoteTaskFactory;
@@ -105,6 +107,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import static com.facebook.airlift.concurrent.Threads.daemonThreadsNamed;
 import static com.facebook.airlift.concurrent.Threads.threadsNamed;
@@ -185,6 +188,9 @@ public class CoordinatorModule
         binder.bind(LegacyResourceGroupConfigurationManager.class).in(Scopes.SINGLETON);
         binder.bind(RetryCircuitBreaker.class).in(Scopes.SINGLETON);
         newExporter(binder).export(RetryCircuitBreaker.class).withGeneratedName();
+
+        binder.bind(QueryBlockingRateLimiter.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(QueryBlockingRateLimiter.class).withGeneratedName();
 
         binder.bind(LocalQueryProvider.class).in(Scopes.SINGLETON);
 
@@ -374,6 +380,16 @@ public class CoordinatorModule
             @ForTransactionManager ExecutorService finishingExecutor)
     {
         return InMemoryTransactionManager.create(config, idleCheckExecutor, catalogManager, finishingExecutor);
+    }
+
+    @Provides
+    @Singleton
+    @ForTimeoutThread
+    public static ScheduledExecutorService createTimeoutThreadExecutor()
+    {
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1, daemonThreadsNamed("thread-timeout"));
+        executor.setRemoveOnCancelPolicy(true);
+        return executor;
     }
 
     private void bindLowMemoryKiller(String name, Class<? extends LowMemoryKiller> clazz)
