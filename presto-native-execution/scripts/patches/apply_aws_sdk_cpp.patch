@@ -1,0 +1,12 @@
+diff --git a/cmake/compiler_settings.cmake b/cmake/compiler_settings.cmake
+index cae5b9224..9b6ee48c6 100644
+--- a/cmake/compiler_settings.cmake
++++ b/cmake/compiler_settings.cmake
+@@ -26,7 +26,6 @@ endfunction()
+ 
+ function(set_compiler_warnings target)
+     if(NOT MSVC)
+-        set_gcc_warnings()
+         target_compile_options(${target} PRIVATE "${AWS_COMPILER_WARNINGS}")
+     endif()
+ endfunction()
