@@ -256,7 +256,7 @@ function install_aws_sdk_cpp {
 
 function install_double_conversion {
   github_checkout google/double-conversion v3.1.5
-  cmake_install -DBUILD_TESTING=OFF
+  cmake_install -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF
 }
 
 function run_and_time {
