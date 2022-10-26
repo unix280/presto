@@ -16,6 +16,7 @@ package com.facebook.presto.cache.alluxio;
 import alluxio.client.file.CacheContext;
 import alluxio.client.file.URIStatus;
 import alluxio.hadoop.LocalCacheFileSystem;
+import alluxio.metrics.MetricsSystem;
 import alluxio.shaded.client.com.codahale.metrics.Meter;
 import alluxio.wire.FileInfo;
 import com.facebook.presto.cache.CachingFileSystem;
@@ -34,6 +35,7 @@ import static alluxio.conf.PropertyKey.USER_CLIENT_CACHE_QUOTA_ENABLED;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_READ_CACHE;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_HIT_RATE;
+import static alluxio.metrics.MetricKey.CLIENT_CACHE_PAGES_EVICTED;
 import static alluxio.metrics.MetricsSystem.getMetricName;
 import static alluxio.metrics.MetricsSystem.meter;
 import static alluxio.metrics.MetricsSystem.registerGaugeIfAbsent;
@@ -98,6 +100,10 @@ public class AlluxioCachingFileSystem
         // in progress. Once we upgrade to alluxio version with this fix, we can safely remove
         // the below call and associated changes.
         Metrics.registerGauges();
+        // In recent changes of alluxio, the below metric was inlined, so unless there is a cache
+        // eviction during a query run, it was not being registered. To make it appear after the
+        // initialization of this class, adding it here.
+        MetricsSystem.meter(CLIENT_CACHE_PAGES_EVICTED.getName());
     }
 
     @Override

@@ -136,6 +136,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, 100);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, 0);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 0);
         validateBuffer(data, pageOffset + 10, buffer, 0, 100);
 
         // read within the cached page
@@ -145,6 +146,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, 0);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, 0);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, 0);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 0);
         validateBuffer(data, pageOffset + 20, buffer, 0, 90);
 
         // read partially after the range of the cache
@@ -154,6 +156,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, 90);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, 0);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 0);
         validateBuffer(data, pageOffset + PAGE_SIZE - 10, buffer, 0, 100);
 
         // read partially before the range of the cache
@@ -163,6 +166,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, 10);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, 0);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 0);
         validateBuffer(data, pageOffset - 10, buffer, 10, 50);
 
         // skip one page
@@ -172,6 +176,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, 50);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, 0);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 0);
         validateBuffer(data, pageOffset + PAGE_SIZE * 3, buffer, 40, 50);
 
         // read between cached pages
@@ -181,6 +186,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, 0);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 0);
         validateBuffer(data, pageOffset + PAGE_SIZE * 2 - 10, buffer, 400, PAGE_SIZE + 20);
     }
 
@@ -366,6 +372,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, 9000 - PAGE_SIZE + 47);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, (9000 / PAGE_SIZE) * PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, (9000 / PAGE_SIZE) * PAGE_SIZE);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 8);
         validateBuffer(data, 47, buffer, 0, 9000);
     }
 
@@ -395,6 +402,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, 9000);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, (9000 / PAGE_SIZE + 1) * PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, (9000 / PAGE_SIZE) * PAGE_SIZE);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 8);
         validateBuffer(data, 0, buffer, 0, 9000);
 
         // read again within an updated larger cache quota
@@ -405,6 +413,7 @@ public class TestAlluxioCachingFileSystem
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL, (9000 / PAGE_SIZE) * PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL, (9000 / PAGE_SIZE) * PAGE_SIZE);
         checkMetrics(MetricKey.CLIENT_CACHE_BYTES_EVICTED, 0);
+        checkMetrics(MetricKey.CLIENT_CACHE_PAGES_EVICTED, 0);
         validateBuffer(data, 0, buffer, 0, 9000);
     }
 
@@ -483,6 +492,7 @@ public class TestAlluxioCachingFileSystem
         updateBaseline(MetricKey.CLIENT_CACHE_BYTES_READ_EXTERNAL);
         updateBaseline(MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL);
         updateBaseline(MetricKey.CLIENT_CACHE_BYTES_EVICTED);
+        updateBaseline(MetricKey.CLIENT_CACHE_PAGES_EVICTED);
     }
 
     private void updateBaseline(MetricKey metricsKey)
