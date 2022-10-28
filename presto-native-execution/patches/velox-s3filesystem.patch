@@ -1,0 +1,60 @@
+--- a/velox/velox/connectors/hive/storage_adapters/s3fs/S3FileSystem.cpp
++++ b/velox/velox/connectors/hive/storage_adapters/s3fs/S3FileSystem.cpp
+@@ -214,6 +214,38 @@ class S3Config {
+         "hive.s3.iam-role-session-name", std::string("velox-session"));
+   }
+ 
++  std::string region() const {
++    if (config_->get("hive.s3.pin-client-to-current-region", false)) {
++      // Let the SDK auto infer the region.
++      return "";
++    }
++    return config_->get<std::string>("hive.s3.region", Aws::Region::US_EAST_1);
++  }
++
++  Aws::Utils::Logging::LogLevel logLevel() const {
++    auto level = config_->get(
++        "hive.s3.log-level", std::string(""));
++    if (level == "Info") {
++      return Aws::Utils::Logging::LogLevel::Info;
++    }
++    if (level == "Debug") {
++      return Aws::Utils::Logging::LogLevel::Debug;
++    }
++    if (level == "Trace") {
++      return Aws::Utils::Logging::LogLevel::Trace;
++    }
++    if (level == "Warn") {
++      return Aws::Utils::Logging::LogLevel::Warn;
++    }
++    if (level == "Error") {
++      return Aws::Utils::Logging::LogLevel::Error;
++    }
++    if (level == "Off") {
++      return Aws::Utils::Logging::LogLevel::Off;
++    }
++    return Aws::Utils::Logging::LogLevel::Fatal;
++  }
++
+  private:
+   const Config* FOLLY_NONNULL config_;
+ };
+@@ -224,7 +256,7 @@ class S3FileSystem::Impl {
+     const size_t origCount = initCounter_++;
+     if (origCount == 0) {
+       Aws::SDKOptions awsOptions;
+-      awsOptions.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Fatal;
++      awsOptions.loggingOptions.logLevel = s3Config_.logLevel();
+       Aws::InitAPI(awsOptions);
+     }
+   }
+@@ -306,6 +338,9 @@ class S3FileSystem::Impl {
+     Aws::Client::ClientConfiguration clientConfig;
+ 
+     clientConfig.endpointOverride = s3Config_.endpoint();
++    clientConfig.requestTimeoutMs = 5000;
++    clientConfig.connectTimeoutMs = 5000;
++    clientConfig.region = s3Config_.region();
+ 
+     if (s3Config_.useSSL()) {
+       clientConfig.scheme = Aws::Http::Scheme::HTTPS;

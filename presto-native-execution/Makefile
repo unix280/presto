@@ -52,7 +52,10 @@ velox-submodule:		#: Check out code for velox submodule
 	git submodule sync --recursive
 	git submodule update --init --recursive
 
-submodules: velox-submodule
+velox-patches:
+	git apply ./patches/velox-s3filesystem.patch
+
+submodules: velox-submodule velox-patches
 
 cmake: submodules		#: Use CMake to create a Makefile build system
 	cmake -B "$(BUILD_BASE_DIR)/$(BUILD_DIR)" $(FORCE_COLOR) $(CMAKE_FLAGS)
