@@ -19,7 +19,7 @@ set(VELOX_ROOT ${CMAKE_BINARY_DIR}/velox)
 execute_process(
   COMMAND
     bash -c
-    "( source ${CMAKE_CURRENT_SOURCE_DIR}/velox/scripts/setup-helper-functions.sh && echo -n $(get_cxx_flags $ENV{CPU_TARGET}))"
+    "( source ${CMAKE_CURRENT_SOURCE_DIR}/scripts/setup-amazon2022.sh && echo -n $(get_cxx_flags $ENV{CPU_TARGET}))"
   OUTPUT_VARIABLE SCRIPT_CXX_FLAGS
   RESULT_VARIABLE COMMAND_STATUS)
 

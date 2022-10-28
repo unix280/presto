@@ -1,0 +1,11 @@
+--- /usr/local/lib64/cmake/AWSSDK/AWSSDKConfig.cmake    2022-09-02 15:42:33.000000000 +0000
++++ /usr/local/lib64/cmake/AWSSDK/AWSSDKConfig.cmake    2022-10-25 20:20:50.251007558 +0000
+@@ -129,7 +129,7 @@
+ get_filename_component(TEMP_PATH "${AWSSDK_CORE_LIB_FILE}" PATH)
+ get_filename_component(TEMP_NAME "${TEMP_PATH}" NAME)
+
+-while (NOT TEMP_NAME STREQUAL ${LIB_SEARCH_PREFIX})
++while (NOT TEMP_NAME STREQUAL "${LIB_SEARCH_PREFIX}")
+     set(TEMP_PLATFORM_PREFIX "${TEMP_NAME}/${TEMP_PLATFORM_PREFIX}")
+     get_filename_component(TEMP_PATH "${TEMP_PATH}" PATH)
+     get_filename_component(TEMP_NAME "${TEMP_PATH}" NAME)

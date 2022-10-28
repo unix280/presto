@@ -1,0 +1,54 @@
+ARG PRESTO_VERSION
+
+FROM 299095523242.dkr.ecr.us-east-1.amazonaws.com/ahanaio/devops/prestocpp-builder:20221024H979f85d as Builder
+
+WORKDIR  /app
+COPY . .
+RUN cd presto-native-execution && \
+    patch -d/ -p0 < ./scripts/patches/apply_aws_cmake.patch && \
+    TREAT_WARNINGS_AS_ERRORS=0 make release NUM_THREADS=8 MAX_HIGH_MEM_JOBS=8 MAX_LINK_JOBS=8 && \
+    mkdir -p prestissimo/lib prestissimo/lib64 && \
+    cp _build/release/presto_cpp/main/presto_server prestissimo && \
+    cp /usr/local/lib/lib*so* prestissimo/lib && \
+    cp /usr/local/lib64/lib*so* prestissimo/lib64 && \
+    tar cvf prestissimo.tar entrypoint.sh prestissimo
+
+##
+
+FROM amazonlinux:2022
+ENV PRESTO_HOME="/opt/presto-server"
+
+RUN dnf update && dnf install -y \
+        awscli \
+        bison \
+        flex \
+        gperf \
+        iproute \
+        lsof \
+        procps \
+        python3 \
+        boost-devel \
+        openssl-devel \
+        protobuf-devel \
+        lzo-devel \
+        snappy-devel \
+        libevent-devel \
+        sysstat \
+        tar \
+        vim \
+        wget \
+        which \
+        && \
+    mkdir -p $PRESTO_HOME/etc/catalog && \
+    mkdir -p /var/lib/presto/data
+
+WORKDIR  /app
+COPY --from=Builder /app/presto-native-execution/prestissimo.tar .
+RUN tar xvf prestissimo.tar && \
+    mv prestissimo/presto_server /usr/local/bin/ && \
+    mv prestissimo/lib/* /usr/local/lib/ && \
+    mv prestissimo/lib64/* /usr/local/lib64/ && \
+    mv entrypoint.sh /opt/ && \
+    touch /opt/presto-native-execution-${PRESTO_VERSION}
+
+ENTRYPOINT ["/opt/entrypoint.sh"]

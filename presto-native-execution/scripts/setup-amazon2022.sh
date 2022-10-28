@@ -49,7 +49,7 @@ function github_checkout {
     rm -rf "${DIRNAME}"
   fi
   if [ ! -d "${DIRNAME}" ]; then
-    git clone -q -b $VERSION $GIT_CLONE_PARAMS "https://github.com/${REPO}.git"
+    git clone --depth 1 -q -b $VERSION $GIT_CLONE_PARAMS "https://github.com/${REPO}.git"
   fi
   cd "${DIRNAME}"
 }
@@ -183,7 +183,7 @@ function install_fmt {
 
 function install_folly {
   github_checkout facebook/folly "${FB_OS_VERSION}"
-  patch -p1 < ../patches/apply_folly.patch
+  patch -p1 < ../../scripts/patches/apply_folly.patch
   cmake_install -DBUILD_TESTS=OFF
 }
 
@@ -249,8 +249,8 @@ function install_aws_sdk_cpp {
   local AWS_REPO_NAME="aws/aws-sdk-cpp"
   local AWS_SDK_VERSION="1.9.96"
 
-  github_checkout $AWS_REPO_NAME $AWS_SDK_VERSION --depth 1 --recurse-submodules
-  patch -p1 < ../patches/apply_aws_sdk_cpp.patch
+  github_checkout $AWS_REPO_NAME $AWS_SDK_VERSION --recurse-submodules
+  patch -p1 < ../../scripts/patches/apply_aws_sdk_cpp.patch
   cmake_install -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMINIMIZE_SIZE:BOOL=ON -DENABLE_TESTING:BOOL=OFF -DBUILD_ONLY:STRING="s3;identity-management"
 }
 

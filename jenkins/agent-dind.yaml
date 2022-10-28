@@ -3,22 +3,19 @@ kind: Pod
 metadata:
   namespace: jenkins-agent
   labels:
-    containers: maven
+    containers: dind
 spec:
   serviceAccountName: jenkins-agent
   containers:
-  - name: maven
-    image: maven:3.8.6-openjdk-8-slim
+  - name: dind
+    image: docker:20.10.16-dind-alpine3.15
     tty: true
     resources:
       requests:
-        memory: "12Gi"
+        memory: "16Gi"
         cpu: "4000m"
       limits:
-        memory: "12Gi"
+        memory: "16Gi"
         cpu: "4000m"
-    env:
-    - name: MAVEN_OPTS
-      value: "-Xmx11g -Xms11g"
-    command:
-    - cat
+    securityContext:
+      privileged: true
