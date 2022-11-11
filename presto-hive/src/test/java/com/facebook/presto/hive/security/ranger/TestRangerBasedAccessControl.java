@@ -43,6 +43,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 import static org.testng.Assert.assertThrows;
 
 public class TestRangerBasedAccessControl
@@ -50,6 +52,7 @@ public class TestRangerBasedAccessControl
     public static final ConnectorTransactionHandle TRANSACTION_HANDLE = new ConnectorTransactionHandle() {};
     public static final AccessControlContext CONTEXT = new AccessControlContext(new QueryId("query_id"), Optional.empty(), Optional.empty());
     public static final ImmutableSet<Subfield> COLUMN1 = ImmutableSet.of(new Subfield("column1"));
+    Map<String, Set<String>> userRolesSet;
 
     @Test
     public void testTablePriviledgesRolesNotAllowed()
@@ -223,22 +226,21 @@ public class TestRangerBasedAccessControl
         Users users = jsonParse(new File(usersFilePath), Users.class);
         HashMap<String, Set<String>> userRoles = Arrays.stream(jsonParse(new File(rolesFilePath), HashMap[].class)).findFirst().get();
 
-        Map<String, Set<String>> userRolesSet =
-                userRoles.entrySet().stream().collect(Collectors.toMap(
-                        entry -> entry.getKey(),
-                        entry -> new HashSet(entry.getValue())));
+        userRolesSet = userRoles.entrySet().stream().collect(Collectors.toMap(
+                entry -> entry.getKey(),
+                entry -> new HashSet(entry.getValue())));
 
         Map<String, Set<String>> userGroupsSet =
                 users.getvXUsers().stream().collect(Collectors.toMap(
                         entry -> entry.getName(),
                         entry -> new HashSet(entry.getGroupNameList())));
 
-        RangerBasedAccessControl rangerBasedAccessControl = new RangerBasedAccessControl();
+        RangerBasedAccessControl rangerBasedAccessControl = spy(new RangerBasedAccessControl());
         RangerBasedAccessControlConfig config = new RangerBasedAccessControlConfig().setRangerHiveServiceName("hive").setRangerHiveAuditPath(auditFilePath);
         RangerAuthorizer rangerAuthorizer = new RangerAuthorizer(servicePolicies, config);
         rangerBasedAccessControl.setRangerAuthorizer(rangerAuthorizer);
-        rangerBasedAccessControl.setUserRoles(userRolesSet);
         rangerBasedAccessControl.setUserGroups(userGroupsSet);
+        loadUserRoles(rangerBasedAccessControl);
         return rangerBasedAccessControl;
     }
 
@@ -249,6 +251,18 @@ public class TestRangerBasedAccessControl
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         return mapper.readValue(bufferedReader, clazz);
+    }
+
+    private void loadUserRoles(RangerBasedAccessControl rangerBasedAccessControl)
+    {
+        doReturn(userRolesSet.get("admin")).when(rangerBasedAccessControl).getRolesForUser("admin");
+        doReturn(userRolesSet.get("anyuser")).when(rangerBasedAccessControl).getRolesForUser("anyuser");
+        doReturn(userRolesSet.get("joe")).when(rangerBasedAccessControl).getRolesForUser("joe");
+        doReturn(userRolesSet.get("alice")).when(rangerBasedAccessControl).getRolesForUser("alice");
+        doReturn(userRolesSet.get("bob")).when(rangerBasedAccessControl).getRolesForUser("bob");
+        doReturn(userRolesSet.get("maria")).when(rangerBasedAccessControl).getRolesForUser("maria");
+        doReturn(userRolesSet.get("sam")).when(rangerBasedAccessControl).getRolesForUser("sam");
+        doReturn(userRolesSet.get("raj")).when(rangerBasedAccessControl).getRolesForUser("raj");
     }
 
     private static void assertDenied(ThrowingRunnable runnable)

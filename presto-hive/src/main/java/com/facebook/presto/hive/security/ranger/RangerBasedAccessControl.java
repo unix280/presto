@@ -74,7 +74,6 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameC
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowCreateTable;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static java.lang.String.format;
 import static java.util.Objects.isNull;
@@ -91,7 +90,9 @@ public class RangerBasedAccessControl
 
     private RangerAuthorizer rangerAuthorizer;
     private Map<String, Set<String>> userGroupsMapping = new HashMap<>();
-    private Map<String, Set<String>> userRolesMapping = new HashMap<>();
+
+    private OkHttpClient client;
+    private String rangerEndPoint;
 
     @TestOnly
     public RangerBasedAccessControl()
@@ -106,7 +107,8 @@ public class RangerBasedAccessControl
 
         ServicePolicies servicePolicies;
         try {
-            OkHttpClient client = getAuthHttpClient(config);
+            this.client = getAuthHttpClient(config);
+            this.rangerEndPoint = config.getRangerHttpEndPoint();
 
             long startTime = System.nanoTime();
             servicePolicies = getHiveServicePolicies(client, config);
@@ -115,9 +117,6 @@ public class RangerBasedAccessControl
             userGroupsMapping = getUserGroupsMappings(client, config.getRangerHttpEndPoint());
             log.debug("User Group retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
             rangerAuthorizer = new RangerAuthorizer(servicePolicies, config);
-            startTime = System.nanoTime();
-            userRolesMapping = getRolesForUserList(client, config.getRangerHttpEndPoint());
-            log.debug("Roles retrieval time (milliseconds) : " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
 
             log.info("Retrieved policies count " + servicePolicies.getPolicies().size());
         }
@@ -164,27 +163,16 @@ public class RangerBasedAccessControl
         return vXUsers.build();
     }
 
-    private Map<String, Set<String>> getRolesForUserList(OkHttpClient client, String rangerEndPoint)
+    public Set<String> getRolesForUser(String user)
     {
-        List<VXUser> users = getUsers(client, rangerEndPoint);
-        List<String> usersList = users.stream().map(VXUser::getName).collect(toImmutableList());
-        HttpUrl getRolesUrl;
-        for (String user : usersList) {
-            getRolesUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))
-                    .appendPath(RANGER_REST_USER_ROLES_URL + "/" + user)
-                    .build()));
-            userRolesMapping.put(user, getRolesForUser(client, getRolesUrl));
-        }
-        return userRolesMapping;
-    }
-
-    private Set<String> getRolesForUser(OkHttpClient client, HttpUrl endPtUri)
-    {
-        Request request = new Request.Builder().url(endPtUri).header("Accept", "application/json").build();
+        HttpUrl getRolesUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(rangerEndPoint))
+                .appendPath(RANGER_REST_USER_ROLES_URL + "/" + user)
+                .build()));
+        Request request = new Request.Builder().url(getRolesUrl).header("Accept", "application/json").build();
         JsonCodec<List> rolesJsonCodec = jsonCodec(List.class);
         JsonResponse<List> roles = JsonResponse.execute(rolesJsonCodec, client, request);
         if (!roles.hasValue()) {
-            throw new RuntimeException(format("Request to %s failed: %s [Error: %s]", endPtUri, roles, roles.getResponseBody()));
+            throw new RuntimeException(format("Request to %s failed: %s [Error: %s]", getRolesUrl, roles, roles.getResponseBody()));
         }
         return new HashSet<>(roles.getValue());
     }
@@ -199,12 +187,6 @@ public class RangerBasedAccessControl
     public void setUserGroups(Map<String, Set<String>> userGroupsMapping)
     {
         this.userGroupsMapping = userGroupsMapping;
-    }
-
-    @TestOnly
-    public void setUserRoles(Map<String, Set<String>> userRolesMapping)
-    {
-        this.userRolesMapping = userRolesMapping;
     }
 
     private static <T> T jsonParse(Response response, Class<T> clazz)
@@ -240,7 +222,7 @@ public class RangerBasedAccessControl
     private boolean checkAccess(ConnectorIdentity identity, SchemaTableName tableName, String column, HiveAccessType accessType)
     {
         return rangerAuthorizer.authorizeHiveResource(tableName.getSchemaName(), tableName.getTableName(), column,
-                accessType.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), userRolesMapping.get(identity.getUser()));
+                accessType.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), getRolesForUser(identity.getUser()));
     }
 
     /**
@@ -251,7 +233,7 @@ public class RangerBasedAccessControl
     public void checkCanCreateSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
         if (!rangerAuthorizer.authorizeHiveResource(schemaName, null, null,
-                HiveAccessType.CREATE.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
+                HiveAccessType.CREATE.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), getRolesForUser(identity.getUser()))) {
             denyCreateSchema(schemaName, format("Access denied - User [ %s ] does not have [CREATE] " +
                     "privilege on [ %s ] ", identity.getUser(), schemaName));
         }
@@ -265,7 +247,7 @@ public class RangerBasedAccessControl
     public void checkCanDropSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, AccessControlContext context, String schemaName)
     {
         if (!rangerAuthorizer.authorizeHiveResource(schemaName, null, null,
-                HiveAccessType.DROP.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), userRolesMapping.get(identity.getUser()))) {
+                HiveAccessType.DROP.toString(), identity.getUser(), userGroupsMapping.get(identity.getUser()), getRolesForUser(identity.getUser()))) {
             denyDropSchema(schemaName, format("Access denied - User [ %s ] does not have [DROP] " +
                     "privilege on [ %s ] ", identity.getUser(), schemaName));
         }
@@ -293,7 +275,7 @@ public class RangerBasedAccessControl
     {
         Set<String> allowedSchemas = new HashSet<>();
         Set<String> groups = userGroupsMapping.get(identity.getUser());
-        Set<String> roles = userRolesMapping.get(identity.getUser());
+        Set<String> roles = getRolesForUser(identity.getUser());
 
         for (String schema : schemaNames) {
             if (rangerAuthorizer.authorizeHiveResource(schema, null, null, RangerPolicyEngine.ANY_ACCESS, identity.getUser(), groups, roles)) {
@@ -339,7 +321,7 @@ public class RangerBasedAccessControl
     {
         Set<SchemaTableName> allowedTables = new HashSet<>();
         Set<String> groups = userGroupsMapping.get(identity.getUser());
-        Set<String> roles = userRolesMapping.get(identity.getUser());
+        Set<String> roles = getRolesForUser(identity.getUser());
 
         for (SchemaTableName table : tableNames) {
             if (rangerAuthorizer.authorizeHiveResource(table.getSchemaName(), table.getTableName(), null, RangerPolicyEngine.ANY_ACCESS, identity.getUser(), groups, roles)) {
