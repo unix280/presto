@@ -18,4 +18,3 @@ docker buildx build --load --platform linux/amd64 --progress plain -t ${DOCKER_I
 rm -fr cpp/
 aws ecr get-login-password --region ${AWS_REGION} --profile ${AWS_PROFILE} | docker login --username AWS --password-stdin ${AWS_ECR}
 docker push ${DOCKER_IMAGE}
- 

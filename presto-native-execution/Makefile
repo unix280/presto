@@ -51,6 +51,8 @@ clean:					#: Delete all build artifacts
 velox-submodule:		#: Check out code for velox submodule
 	git submodule sync --recursive
 	git submodule update --init --recursive
+	# Cleanup local changes
+	git submodule foreach git reset --hard
 
 velox-patches:
 	git apply ./patches/velox-s3filesystem.patch
