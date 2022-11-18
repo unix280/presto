@@ -11,6 +11,7 @@ pipeline {
     }
 
     options {
+        disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '500'))
         timeout(time: 2, unit: 'HOURS')
     }
@@ -18,7 +19,8 @@ pipeline {
     parameters {
         booleanParam(name: 'PUBLISH_ARTIFACTS_ON_CURRENT_BRANCH',
                      defaultValue: false,
-                     description: 'whether to publish tar and docker image even if current branch is not master'
+                     description: 'artifacts built with branch develop are always published,\n' +
+                                  'for any other branch/PR, you need to check this to publish artifacts'
         )
     }
 
@@ -151,7 +153,7 @@ pipeline {
                     when {
                         anyOf {
                             expression { params.PUBLISH_ARTIFACTS_ON_CURRENT_BRANCH }
-                            branch "master"
+                            branch "develop"
                         }
                         beforeAgent true
                     }
