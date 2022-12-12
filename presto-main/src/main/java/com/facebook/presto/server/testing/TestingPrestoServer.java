@@ -58,7 +58,6 @@ import com.facebook.presto.server.GracefulShutdownHandler;
 import com.facebook.presto.server.PluginManager;
 import com.facebook.presto.server.ServerInfoResource;
 import com.facebook.presto.server.ServerMainModule;
-import com.facebook.presto.server.SessionPropertyDefaults;
 import com.facebook.presto.server.ShutdownAction;
 import com.facebook.presto.server.security.ServerSecurityModule;
 import com.facebook.presto.spi.ConnectorId;
@@ -151,7 +150,6 @@ public class TestingPrestoServer
     private final TestingAccessControlManager accessControl;
     private final ProcedureTester procedureTester;
     private final Optional<InternalResourceGroupManager<?>> resourceGroupManager;
-    private final SessionPropertyDefaults sessionPropertyDefaults;
     private final SplitManager splitManager;
     private final PageSourceManager pageSourceManager;
     private final NodePartitioningManager nodePartitioningManager;
@@ -168,6 +166,7 @@ public class TestingPrestoServer
     private final ShutdownAction shutdownAction;
     private final RequestBlocker requestBlocker;
     private final boolean resourceManager;
+    private final boolean catalogServer;
     private final boolean coordinator;
     private final ServerInfoResource serverInfoResource;
     private final ResourceManagerClusterStateProvider clusterStateProvider;
@@ -238,12 +237,25 @@ public class TestingPrestoServer
             Optional<Path> baseDataDir)
             throws Exception
     {
-        this(false, false, coordinator, properties, environment, discoveryUri, parserOptions, additionalModules, baseDataDir);
+        this(
+                false,
+                false,
+                false,
+                false,
+                coordinator,
+                properties,
+                environment,
+                discoveryUri,
+                parserOptions,
+                additionalModules,
+                baseDataDir);
     }
 
     public TestingPrestoServer(
             boolean resourceManager,
             boolean resourceManagerEnabled,
+            boolean catalogServer,
+            boolean catalogServerEnabled,
             boolean coordinator,
             Map<String, String> properties,
             String environment,
@@ -254,6 +266,7 @@ public class TestingPrestoServer
             throws Exception
     {
         this.resourceManager = resourceManager;
+        this.catalogServer = catalogServer;
         this.coordinator = coordinator;
 
         this.baseDataDir = baseDataDir.orElseGet(TestingPrestoServer::tempDirectory);
@@ -265,7 +278,7 @@ public class TestingPrestoServer
             coordinatorPort = "0";
         }
 
-        Map<String, String> serverProperties = getServerProperties(resourceManagerEnabled, properties, environment, discoveryUri);
+        Map<String, String> serverProperties = getServerProperties(resourceManagerEnabled, catalogServerEnabled, properties, environment, discoveryUri);
 
         ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
                 .add(new TestingNodeModule(Optional.ofNullable(environment)))
@@ -351,7 +364,6 @@ public class TestingPrestoServer
             this.resourceGroupManager = resourceGroupManager instanceof InternalResourceGroupManager
                     ? Optional.of((InternalResourceGroupManager<?>) resourceGroupManager)
                     : Optional.empty();
-            sessionPropertyDefaults = injector.getInstance(SessionPropertyDefaults.class);
             nodePartitioningManager = injector.getInstance(NodePartitioningManager.class);
             planOptimizerManager = injector.getInstance(ConnectorPlanOptimizerManager.class);
             clusterMemoryManager = injector.getInstance(ClusterMemoryManager.class);
@@ -363,7 +375,6 @@ public class TestingPrestoServer
             dispatchManager = null;
             queryManager = injector.getInstance(QueryManager.class);
             resourceGroupManager = Optional.empty();
-            sessionPropertyDefaults = null;
             nodePartitioningManager = injector.getInstance(NodePartitioningManager.class);
             planOptimizerManager = injector.getInstance(ConnectorPlanOptimizerManager.class);
             clusterMemoryManager = null;
@@ -371,11 +382,21 @@ public class TestingPrestoServer
             eventListenerManager = ((TestingEventListenerManager) injector.getInstance(EventListenerManager.class));
             clusterStateProvider = injector.getInstance(ResourceManagerClusterStateProvider.class);
         }
+        else if (catalogServer) {
+            dispatchManager = null;
+            queryManager = null;
+            resourceGroupManager = Optional.empty();
+            nodePartitioningManager = null;
+            planOptimizerManager = null;
+            clusterMemoryManager = null;
+            statsCalculator = null;
+            eventListenerManager = null;
+            clusterStateProvider = null;
+        }
         else {
             dispatchManager = null;
             queryManager = null;
             resourceGroupManager = Optional.empty();
-            sessionPropertyDefaults = null;
             nodePartitioningManager = null;
             planOptimizerManager = null;
             clusterMemoryManager = null;
@@ -403,18 +424,25 @@ public class TestingPrestoServer
         refreshNodes();
     }
 
-    private Map<String, String> getServerProperties(boolean resourceManagerEnabled, Map<String, String> properties, String environment, URI discoveryUri)
+    private Map<String, String> getServerProperties(
+            boolean resourceManagerEnabled,
+            boolean catalogServerEnabled,
+            Map<String, String> properties,
+            String environment,
+            URI discoveryUri)
     {
         Map<String, String> serverProperties = new HashMap<>();
         serverProperties.put("coordinator", String.valueOf(coordinator));
         serverProperties.put("resource-manager", String.valueOf(resourceManager));
         serverProperties.put("resource-manager-enabled", String.valueOf(resourceManagerEnabled));
+        serverProperties.put("catalog-server", String.valueOf(catalogServer));
+        serverProperties.put("catalog-server-enabled", String.valueOf(catalogServerEnabled));
         serverProperties.put("presto.version", "testversion");
         serverProperties.put("task.concurrency", "4");
         serverProperties.put("task.max-worker-threads", "4");
         serverProperties.put("exchange.client-threads", "4");
         serverProperties.put("optimizer.ignore-stats-calculator-failures", "false");
-        if (coordinator || resourceManager) {
+        if (coordinator || resourceManager || catalogServer) {
             // enabling failure detector in tests can make them flakey
             serverProperties.put("failure-detector.enabled", "false");
         }
@@ -580,11 +608,6 @@ public class TestingPrestoServer
     public InternalNodeManager getNodeManager()
     {
         return nodeManager;
-    }
-
-    public SessionPropertyDefaults getSessionPropertyDefaults()
-    {
-        return sessionPropertyDefaults;
     }
 
     public NodePartitioningManager getNodePartitioningManager()

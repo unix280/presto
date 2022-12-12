@@ -22,6 +22,7 @@ import com.facebook.presto.common.block.DictionaryBlock;
 import com.facebook.presto.common.block.RunLengthEncodedBlock;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.function.aggregation.GroupByIdBlock;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -261,6 +262,12 @@ public class MultiChannelGroupByHash
     public boolean contains(int position, Page page, int[] hashChannels)
     {
         long rawHash = hashStrategy.hashRow(position, page);
+        return contains(position, page, hashChannels, rawHash);
+    }
+
+    @Override
+    public boolean contains(int position, Page page, int[] hashChannels, long rawHash)
+    {
         int hashPosition = (int) getHashPosition(rawHash, mask);
 
         // look for a slot containing this key

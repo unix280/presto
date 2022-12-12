@@ -36,4 +36,6 @@ public interface Node
     boolean isResourceManager();
 
     String getType();
+
+    boolean isCatalogServer();
 }

@@ -18,8 +18,10 @@ import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.sql.analyzer.MaterializedViewQueryOptimizer;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
 import com.facebook.presto.sql.parser.SqlParser;
+import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Node;
@@ -32,7 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.facebook.presto.sql.rewrite.MaterializedViewOptimizationRewriteUtils.optimizeQueryUsingMaterializedView;
+import static com.facebook.presto.common.RuntimeMetricName.OPTIMIZED_WITH_MATERIALIZED_VIEW_COUNT;
+import static com.facebook.presto.common.RuntimeUnit.NONE;
 import static java.util.Objects.requireNonNull;
 
 public class MaterializedViewOptimizationRewrite
@@ -50,7 +53,9 @@ public class MaterializedViewOptimizationRewrite
             AccessControl accessControl,
             WarningCollector warningCollector)
     {
-        return (Statement) new MaterializedViewOptimizationRewrite.Visitor(metadata, session, parser, accessControl).process(node, null);
+        return (Statement) new MaterializedViewOptimizationRewrite
+                .Visitor(metadata, session, parser, accessControl)
+                .process(node, null);
     }
 
     private static final class Visitor
@@ -86,5 +91,28 @@ public class MaterializedViewOptimizationRewrite
             }
             return query;
         }
+    }
+
+    private static Query optimizeQueryUsingMaterializedView(
+            Metadata metadata,
+            Session session,
+            SqlParser sqlParser,
+            AccessControl accessControl,
+            Query node)
+    {
+        Query rewritten = (Query) new MaterializedViewQueryOptimizer(
+                metadata,
+                session,
+                sqlParser,
+                accessControl,
+                new RowExpressionDomainTranslator(metadata))
+                .process(node);
+
+        if (rewritten != node) {
+            session.getRuntimeStats().addMetricValue(OPTIMIZED_WITH_MATERIALIZED_VIEW_COUNT, NONE, 1);
+            return rewritten;
+        }
+
+        return node;
     }
 }

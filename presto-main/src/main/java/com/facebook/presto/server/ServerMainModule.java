@@ -15,6 +15,7 @@ package com.facebook.presto.server;
 
 import com.facebook.airlift.concurrent.BoundedExecutor;
 import com.facebook.airlift.configuration.AbstractConfigurationAwareModule;
+import com.facebook.airlift.discovery.client.ServiceAnnouncement;
 import com.facebook.airlift.http.server.TheServlet;
 import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.airlift.stats.GcMonitor;
@@ -29,6 +30,9 @@ import com.facebook.presto.GroupByHashPageIndexerFactory;
 import com.facebook.presto.PagesIndexPageSorter;
 import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.block.BlockJsonSerde;
+import com.facebook.presto.catalogserver.CatalogServerClient;
+import com.facebook.presto.catalogserver.RandomCatalogServerAddressSelector;
+import com.facebook.presto.catalogserver.RemoteMetadataManager;
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.client.ServerInfo;
 import com.facebook.presto.common.block.Block;
@@ -118,6 +122,7 @@ import com.facebook.presto.resourcemanager.ClusterMemoryManagerService;
 import com.facebook.presto.resourcemanager.ClusterStatusSender;
 import com.facebook.presto.resourcemanager.ForResourceManager;
 import com.facebook.presto.resourcemanager.NoopResourceGroupService;
+import com.facebook.presto.resourcemanager.RaftConfig;
 import com.facebook.presto.resourcemanager.RandomResourceManagerAddressSelector;
 import com.facebook.presto.resourcemanager.ResourceGroupService;
 import com.facebook.presto.resourcemanager.ResourceManagerClient;
@@ -131,7 +136,9 @@ import com.facebook.presto.server.thrift.ThriftServerInfoClient;
 import com.facebook.presto.server.thrift.ThriftServerInfoService;
 import com.facebook.presto.server.thrift.ThriftTaskClient;
 import com.facebook.presto.server.thrift.ThriftTaskService;
+import com.facebook.presto.spi.ConnectorMetadataUpdateHandle;
 import com.facebook.presto.spi.ConnectorSplit;
+import com.facebook.presto.spi.ConnectorTypeSerde;
 import com.facebook.presto.spi.PageIndexerFactory;
 import com.facebook.presto.spi.PageSorter;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
@@ -202,6 +209,7 @@ import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
+import com.google.inject.TypeLiteral;
 import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
@@ -268,6 +276,9 @@ public class ServerMainModule
 
         if (serverConfig.isResourceManager()) {
             install(new ResourceManagerModule());
+        }
+        else if (serverConfig.isCatalogServer()) {
+            install(new CatalogServerModule());
         }
         else if (serverConfig.isCoordinator()) {
             install(new CoordinatorModule());
@@ -379,6 +390,13 @@ public class ServerMainModule
                     }
                     return new ExceptionClassification(Optional.of(true), NORMAL);
                 });
+
+        binder.bind(RandomCatalogServerAddressSelector.class).in(Scopes.SINGLETON);
+        driftClientBinder(binder)
+                .bindDriftClient(CatalogServerClient.class)
+                .withAddressSelector((addressSelectorBinder, annotation, prefix) ->
+                        addressSelectorBinder.bind(AddressSelector.class).annotatedWith(annotation).to(RandomCatalogServerAddressSelector.class));
+
         newOptionalBinder(binder, ClusterMemoryManagerService.class);
         install(installModuleIf(
                 ServerConfig.class,
@@ -483,6 +501,7 @@ public class ServerMainModule
         smileCodecBinder(binder).bindSmileCodec(TaskStatus.class);
         smileCodecBinder(binder).bindSmileCodec(TaskInfo.class);
         thriftCodecBinder(binder).bindThriftCodec(TaskStatus.class);
+        thriftCodecBinder(binder).bindThriftCodec(TaskInfo.class);
         jaxrsBinder(binder).bind(PagesResponseWriter.class);
 
         // exchange client
@@ -528,6 +547,12 @@ public class ServerMainModule
         // connector metadata update handle serde manager
         binder.bind(ConnectorTypeSerdeManager.class).in(Scopes.SINGLETON);
 
+        // connector metadata update handle json serde
+        binder.bind(new TypeLiteral<ConnectorTypeSerde<ConnectorMetadataUpdateHandle>>(){})
+                .annotatedWith(ForJsonMetadataUpdateHandle.class)
+                .to(ConnectorMetadataUpdateHandleJsonSerde.class)
+                .in(Scopes.SINGLETON);
+
         // page sink provider
         binder.bind(PageSinkManager.class).in(Scopes.SINGLETON);
         binder.bind(PageSinkProvider.class).to(PageSinkManager.class).in(Scopes.SINGLETON);
@@ -539,7 +564,14 @@ public class ServerMainModule
         configBinder(binder).bindConfig(StaticFunctionNamespaceStoreConfig.class);
         binder.bind(FunctionAndTypeManager.class).in(Scopes.SINGLETON);
         binder.bind(MetadataManager.class).in(Scopes.SINGLETON);
-        binder.bind(Metadata.class).to(MetadataManager.class).in(Scopes.SINGLETON);
+
+        if (serverConfig.isCatalogServerEnabled() && serverConfig.isCoordinator()) {
+            binder.bind(RemoteMetadataManager.class).in(Scopes.SINGLETON);
+            binder.bind(Metadata.class).to(RemoteMetadataManager.class).in(Scopes.SINGLETON);
+        }
+        else {
+            binder.bind(Metadata.class).to(MetadataManager.class).in(Scopes.SINGLETON);
+        }
 
         // row expression utils
         binder.bind(DomainTranslator.class).to(RowExpressionDomainTranslator.class).in(Scopes.SINGLETON);
@@ -613,12 +645,22 @@ public class ServerMainModule
         // presto announcement
         checkArgument(!(serverConfig.isResourceManager() && serverConfig.isCoordinator()),
                 "Server cannot be configured as both resource manager and coordinator");
-        discoveryBinder(binder).bindHttpAnnouncement("presto")
+
+        checkArgument(!(serverConfig.isCatalogServer() && serverConfig.isCoordinator()),
+                "Server cannot be configured as both catalog server and coordinator");
+
+        ServiceAnnouncement.ServiceAnnouncementBuilder serviceAnnouncementBuilder = discoveryBinder(binder).bindHttpAnnouncement("presto")
                 .addProperty("node_version", nodeVersion.toString())
                 .addProperty("coordinator", String.valueOf(serverConfig.isCoordinator()))
                 .addProperty("resource_manager", String.valueOf(serverConfig.isResourceManager()))
-                .addProperty("connectorIds", nullToEmpty(serverConfig.getDataSources()))
-                .addProperty("node_type", serverConfig.getNodeType().toString());
+                .addProperty("node_type", serverConfig.getNodeType().toString())
+                .addProperty("catalog_server", String.valueOf(serverConfig.isCatalogServer()))
+                .addProperty("connectorIds", nullToEmpty(serverConfig.getDataSources()));
+
+        RaftConfig raftConfig = buildConfigObject(RaftConfig.class);
+        if (serverConfig.isResourceManager() && raftConfig.isEnabled()) {
+            serviceAnnouncementBuilder.addProperty("raftPort", String.valueOf(raftConfig.getPort()));
+        }
 
         // server info resource
         jaxrsBinder(binder).bind(ServerInfoResource.class);

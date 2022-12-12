@@ -74,6 +74,7 @@ public class TestDistributedClusterStatsResource
                 ImmutableMap.of(
                         "resource-manager.query-expiration-timeout", "4m",
                         "resource-manager.completed-query-expiration-timeout", "4m"),
+                ImmutableMap.of(),
                 ImmutableMap.of(
                         "query.client.timeout", "20s",
                         "resource-manager.query-heartbeat-interval", "100ms",
@@ -81,8 +82,7 @@ public class TestDistributedClusterStatsResource
                         "concurrency-threshold-to-enable-resource-group-refresh", "0.1"),
                 ImmutableMap.of(),
                 COORDINATOR_COUNT,
-                SPOT_NODE_COUNT,
-                false);
+                SPOT_NODE_COUNT);
         coordinator1 = runner.getCoordinator(0);
         coordinator2 = runner.getCoordinator(1);
         Optional<TestingPrestoServer> resourceManager = runner.getResourceManager();
