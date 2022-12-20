@@ -124,6 +124,9 @@ public final class DiscoveryNodeManager
     private Set<InternalNode> resourceManagers;
 
     @GuardedBy("this")
+    private Set<InternalNode> catalogServers;
+
+    @GuardedBy("this")
     private final List<Consumer<AllNodes>> listeners = new ArrayList<>();
 
     @Inject
@@ -165,8 +168,19 @@ public final class DiscoveryNodeManager
             OptionalInt thriftPort = getThriftServerPort(service);
             NodeVersion nodeVersion = getNodeVersion(service);
             NodeType nodeType = getNodeType(service);
+            OptionalInt raftPort = getRaftPort(service);
             if (uri != null && nodeVersion != null) {
-                InternalNode node = new InternalNode(service.getNodeId(), uri, thriftPort, nodeVersion, isCoordinator(service), isResourceManager(service), ALIVE, nodeType);
+                InternalNode node = new InternalNode(
+                        service.getNodeId(),
+                        uri,
+                        thriftPort,
+                        nodeVersion,
+                        isCoordinator(service),
+                        isResourceManager(service),
+                        isCatalogServer(service),
+                        ALIVE,
+                        nodeType,
+                        raftPort);
 
                 if (node.getNodeIdentifier().equals(currentNodeId)) {
                     checkState(
@@ -264,6 +278,7 @@ public final class DiscoveryNodeManager
         ImmutableSet.Builder<InternalNode> shuttingDownNodesBuilder = ImmutableSet.builder();
         ImmutableSet.Builder<InternalNode> coordinatorsBuilder = ImmutableSet.builder();
         ImmutableSet.Builder<InternalNode> resourceManagersBuilder = ImmutableSet.builder();
+        ImmutableSet.Builder<InternalNode> catalogServersBuilder = ImmutableSet.builder();
         ImmutableSetMultimap.Builder<ConnectorId, InternalNode> byConnectorIdBuilder = ImmutableSetMultimap.builder();
         Map<String, InternalNode> nodes = new HashMap<>();
         SetMultimap<String, ConnectorId> connectorIdsByNodeId = HashMultimap.create();
@@ -287,8 +302,10 @@ public final class DiscoveryNodeManager
             // take the form of a coordinator, hence these flags are not exclusive.
             boolean coordinator = isCoordinator(service);
             boolean resourceManager = isResourceManager(service);
+            boolean catalogServer = isCatalogServer(service);
+            OptionalInt raftPort = getRaftPort(service);
             if (uri != null && nodeVersion != null) {
-                InternalNode node = new InternalNode(service.getNodeId(), uri, thriftPort, nodeVersion, coordinator, resourceManager, ALIVE, nodeType);
+                InternalNode node = new InternalNode(service.getNodeId(), uri, thriftPort, nodeVersion, coordinator, resourceManager, catalogServer, ALIVE, nodeType, raftPort);
                 NodeState nodeState = getNodeState(node);
 
                 switch (nodeState) {
@@ -299,6 +316,9 @@ public final class DiscoveryNodeManager
                         }
                         if (resourceManager) {
                             resourceManagersBuilder.add(node);
+                        }
+                        if (catalogServer) {
+                            catalogServersBuilder.add(node);
                         }
 
                         nodes.put(node.getNodeIdentifier(), node);
@@ -352,7 +372,7 @@ public final class DiscoveryNodeManager
                 InternalNode deadNode = nodes.get(nodeId);
                 Set<ConnectorId> deadNodeConnectorIds = connectorIdsByNodeId.get(nodeId);
                 for (ConnectorId id : deadNodeConnectorIds) {
-                    byConnectorIdBuilder.put(id, new InternalNode(deadNode.getNodeIdentifier(), deadNode.getInternalUri(), deadNode.getThriftPort(), deadNode.getNodeVersion(), deadNode.isCoordinator(), deadNode.isResourceManager(), DEAD, deadNode.getNodeType()));
+                    byConnectorIdBuilder.put(id, new InternalNode(deadNode.getNodeIdentifier(), deadNode.getInternalUri(), deadNode.getThriftPort(), deadNode.getNodeVersion(), deadNode.isCoordinator(), deadNode.isResourceManager(), deadNode.isCatalogServer(), DEAD, deadNode.getNodeType(), deadNode.getRaftPort()));
                 }
             }
         }
@@ -360,13 +380,20 @@ public final class DiscoveryNodeManager
         this.nodesByConnectorId = byConnectorIdBuilder.build();
         this.connectorIdsByNodeId = ImmutableSetMultimap.copyOf(connectorIdsByNodeId);
 
-        AllNodes allNodes = new AllNodes(activeNodesBuilder.build(), inactiveNodesBuilder.build(), shuttingDownNodesBuilder.build(), coordinatorsBuilder.build(), resourceManagersBuilder.build());
+        AllNodes allNodes = new AllNodes(
+                activeNodesBuilder.build(),
+                inactiveNodesBuilder.build(),
+                shuttingDownNodesBuilder.build(),
+                coordinatorsBuilder.build(),
+                resourceManagersBuilder.build(),
+                catalogServersBuilder.build());
         // only update if all nodes actually changed (note: this does not include the connectors registered with the nodes)
         if (!allNodes.equals(this.allNodes)) {
             // assign allNodes to a local variable for use in the callback below
             this.allNodes = allNodes;
             coordinators = coordinatorsBuilder.build();
             resourceManagers = resourceManagersBuilder.build();
+            catalogServers = catalogServersBuilder.build();
 
             // notify listeners
             List<Consumer<AllNodes>> listeners = ImmutableList.copyOf(this.listeners);
@@ -472,6 +499,12 @@ public final class DiscoveryNodeManager
     }
 
     @Override
+    public synchronized Set<InternalNode> getCatalogServers()
+    {
+        return catalogServers;
+    }
+
+    @Override
     public synchronized void addNodeChangeListener(Consumer<AllNodes> listener)
     {
         listeners.add(requireNonNull(listener, "listener is null"));
@@ -511,6 +544,20 @@ public final class DiscoveryNodeManager
         return OptionalInt.empty();
     }
 
+    private static OptionalInt getRaftPort(ServiceDescriptor descriptor)
+    {
+        String port = descriptor.getProperties().get("raftPort");
+        if (port != null) {
+            try {
+                return OptionalInt.of(Integer.parseInt(port));
+            }
+            catch (IllegalArgumentException exception) {
+                log.error("Error getting raft port %s", port);
+            }
+        }
+        return OptionalInt.empty();
+    }
+
     private static NodeVersion getNodeVersion(ServiceDescriptor descriptor)
     {
         String nodeVersion = descriptor.getProperties().get("node_version");
@@ -533,22 +580,33 @@ public final class DiscoveryNodeManager
         return Boolean.parseBoolean(service.getProperties().get("resource_manager"));
     }
 
+    private static boolean isCatalogServer(ServiceDescriptor service)
+    {
+        return Boolean.parseBoolean(service.getProperties().get("catalog_server"));
+    }
+
     /**
      * The predicate filters out the services to allow selecting relevant nodes
      * for discovery and sending heart beat.
      * Coordinator      -> All Nodes
      * Resource Manager -> All Nodes
-     * Worker           -> Resource Managers
+     * Catalog Server   -> All Nodes
+     * Worker           -> Resource Managers or Catalog Servers
      *
      * @return Predicate to filter Service Descriptor for Nodes
      */
     private Predicate<ServiceDescriptor> filterRelevantNodes()
     {
-        if (currentNode.isCoordinator() || currentNode.isResourceManager()) {
+        if (currentNode.isCoordinator() || currentNode.isResourceManager() || currentNode.isCatalogServer()) {
             // Allowing coordinator node in the list of services, even if it's not allowed by nodeStatusService with currentNode check
-            return service -> !nodeStatusService.isPresent() || nodeStatusService.get().isAllowed(service.getLocation()) || isCoordinator(service) || isResourceManager(service);
+            return service ->
+                    !nodeStatusService.isPresent()
+                            || nodeStatusService.get().isAllowed(service.getLocation())
+                            || isCoordinator(service)
+                            || isResourceManager(service)
+                            || isCatalogServer(service);
         }
 
-        return DiscoveryNodeManager::isResourceManager;
+        return service -> isResourceManager(service) || isCatalogServer(service);
     }
 }

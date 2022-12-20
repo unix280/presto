@@ -172,6 +172,7 @@ import static com.facebook.presto.spark.SparkErrorCode.SPARK_EXECUTOR_OOM;
 import static com.facebook.presto.spark.SparkErrorCode.UNSUPPORTED_STORAGE_TYPE;
 import static com.facebook.presto.spark.classloader_interface.ScalaUtils.collectScalaIterator;
 import static com.facebook.presto.spark.classloader_interface.ScalaUtils.emptyScalaIterator;
+import static com.facebook.presto.spark.planner.PrestoSparkRddFactory.getRDDName;
 import static com.facebook.presto.spark.util.PrestoSparkFailureUtils.toPrestoSparkFailure;
 import static com.facebook.presto.spark.util.PrestoSparkUtils.classTag;
 import static com.facebook.presto.spark.util.PrestoSparkUtils.computeNextTimeout;
@@ -1203,7 +1204,7 @@ public class PrestoSparkQueryExecutionFactory
                 }
                 else {
                     RddAndMore<PrestoSparkMutableRow> childRdd = createRdd(child, PrestoSparkMutableRow.class);
-                    rddInputs.put(childFragment.getId(), partitionBy(childRdd.getRdd(), child.getFragment().getPartitioningScheme()));
+                    rddInputs.put(childFragment.getId(), partitionBy(childFragment.getId().getId(), childRdd.getRdd(), child.getFragment().getPartitioningScheme()));
                     broadcastDependencies.addAll(childRdd.getBroadcastDependencies());
                 }
             }
@@ -1222,6 +1223,7 @@ public class PrestoSparkQueryExecutionFactory
         }
 
         private static JavaPairRDD<MutablePartitionId, PrestoSparkMutableRow> partitionBy(
+                int planFragmentId,
                 JavaPairRDD<MutablePartitionId, PrestoSparkMutableRow> rdd,
                 PartitioningScheme partitioningScheme)
         {
@@ -1229,6 +1231,7 @@ public class PrestoSparkQueryExecutionFactory
             JavaPairRDD<MutablePartitionId, PrestoSparkMutableRow> javaPairRdd = rdd.partitionBy(partitioner);
             ShuffledRDD<MutablePartitionId, PrestoSparkMutableRow, PrestoSparkMutableRow> shuffledRdd = (ShuffledRDD<MutablePartitionId, PrestoSparkMutableRow, PrestoSparkMutableRow>) javaPairRdd.rdd();
             shuffledRdd.setSerializer(new PrestoSparkShuffleSerializer());
+            shuffledRdd.setName(getRDDName(planFragmentId));
             return JavaPairRDD.fromRDD(
                     shuffledRdd,
                     classTag(MutablePartitionId.class),

@@ -56,7 +56,7 @@ public class TestClusterStatsResource
             throws Exception
     {
         client = new JettyHttpClient();
-        DistributedQueryRunner runner = createQueryRunner(ImmutableMap.of("query.client.timeout", "10s"), false, 1, 2);
+        DistributedQueryRunner runner = createQueryRunner(ImmutableMap.of("query.client.timeout", "10s"), 1, 2);
         server = runner.getCoordinator();
         server.getResourceGroupManager().get().addConfigurationManagerFactory(new FileResourceGroupConfigurationManagerFactory());
         server.getResourceGroupManager().get()

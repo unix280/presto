@@ -41,7 +41,9 @@ public class TestServerConfig
                 .setQueryResultsCompressionEnabled(true)
                 .setResourceManagerEnabled(false)
                 .setResourceManager(false)
-                .setNodeType(NORMAL));
+                .setNodeType(NORMAL)
+                .setCatalogServer(false)
+                .setCatalogServerEnabled(false));
     }
 
     @Test
@@ -58,6 +60,8 @@ public class TestServerConfig
                 .put("resource-manager-enabled", "true")
                 .put("resource-manager", "true")
                 .put("node.type", "spot")
+                .put("catalog-server-enabled", "true")
+                .put("catalog-server", "true")
                 .build();
 
         ServerConfig expected = new ServerConfig()
@@ -70,7 +74,9 @@ public class TestServerConfig
                 .setQueryResultsCompressionEnabled(false)
                 .setResourceManagerEnabled(true)
                 .setResourceManager(true)
-                .setNodeType(SPOT);
+                .setNodeType(SPOT)
+                .setCatalogServer(true)
+                .setCatalogServerEnabled(true);
 
         assertFullMapping(properties, expected);
     }

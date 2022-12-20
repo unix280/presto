@@ -34,10 +34,10 @@ import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
@@ -82,23 +82,22 @@ public class HudiPageSourceProvider
     {
         HudiTableLayoutHandle layout = (HudiTableLayoutHandle) layoutHandle;
         HudiSplit hudiSplit = (HudiSplit) split;
-        HudiFile baseFile = hudiSplit.getBaseFile().orElseThrow(() ->
-                new PrestoException(HUDI_CANNOT_OPEN_SPLIT, "Split without base file is invalid"));
-        Path path = new Path(baseFile.getPath());
-
-        Configuration configuration = hdfsEnvironment.getConfiguration(
-                new HdfsContext(session,
-                        layout.getTable().getSchemaName(),
-                        layout.getTable().getTableName(),
-                        baseFile.getPath(),
-                        false),
-                path);
         HudiTableType tableType = layout.getTable().getTableType();
         List<HudiColumnHandle> hudiColumnHandles = columns.stream().map(HudiColumnHandle.class::cast).collect(toList());
         List<HudiColumnHandle> dataColumns = hudiColumnHandles.stream().filter(HudiColumnHandle::isRegularColumn).collect(toList());
 
         final ConnectorPageSource dataColumnPageSource;
         if (tableType == HudiTableType.COW) {
+            HudiFile baseFile = hudiSplit.getBaseFile().orElseThrow(() ->
+                    new PrestoException(HUDI_CANNOT_OPEN_SPLIT, "Split without base file is invalid"));
+            Path path = new Path(baseFile.getPath());
+            Configuration configuration = hdfsEnvironment.getConfiguration(
+                    new HdfsContext(session,
+                            layout.getTable().getSchemaName(),
+                            layout.getTable().getTableName(),
+                            baseFile.getPath(),
+                            false),
+                    path);
             dataColumnPageSource = createParquetPageSource(
                     typeManager,
                     hdfsEnvironment,
@@ -131,7 +130,7 @@ public class HudiPageSourceProvider
                     schema,
                     hudiSplit,
                     dataColumns,
-                    DateTimeZone.UTC, // TODO configurable
+                    ZoneId.of("UTC"), // TODO configurable
                     typeManager);
             List<Type> types = dataColumns.stream()
                     .map(column -> column.getHiveType().getType(typeManager))

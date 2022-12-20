@@ -38,6 +38,9 @@ function install_wangle {
 
 function install_fbthrift {
   github_checkout facebook/fbthrift "${FB_OS_VERSION}"
+  # This fix is only for Ahana develop branch on 0.275 rebase.
+  # When the FB_OS_VERSION is upgraded in future releases, re-evaluate this fix.
+  sed -i '' '35s/^/#include <fstream>\n/' thrift/compiler/compiler.cc
   OPENSSL_ROOT_DIR=$(brew --prefix openssl@1.1) \
     cmake_install -DBUILD_TESTS=OFF
 }
