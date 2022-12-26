@@ -230,7 +230,8 @@ public final class HiveTestUtils
                         new PrestoS3ConfigurationUpdater(new HiveS3Config()),
                         new HiveGcsConfigurationInitializer(new HiveGcsConfig()),
                         ImmutableSet.of()),
-                ImmutableSet.of());
+                ImmutableSet.of(),
+                config);
         return new HdfsEnvironment(hdfsConfig, metastoreClientConfig, new NoHdfsAuthentication());
     }
 
@@ -247,7 +248,8 @@ public final class HiveTestUtils
                                 new PrestoS3ConfigurationUpdater(new HiveS3Config()),
                                 new HiveGcsConfigurationInitializer(new HiveGcsConfig()),
                                 ImmutableSet.of()),
-                        ImmutableSet.of(new AlluxioCachingConfigurationProvider(cacheConfig, new AlluxioCacheConfig()))),
+                        ImmutableSet.of(new AlluxioCachingConfigurationProvider(cacheConfig, new AlluxioCacheConfig())),
+                config),
                 cacheConfig,
                 new NoOpCacheManager(),
                 new CacheFactory());

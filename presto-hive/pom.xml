@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.275</version>
+        <version>0.276</version>
     </parent>
 
     <artifactId>presto-hive</artifactId>
@@ -72,6 +72,12 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-cache</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.alluxio</groupId>
+                    <artifactId>alluxio-shaded-client</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -92,6 +98,12 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-hive-metastore</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.alluxio</groupId>
+                    <artifactId>alluxio-shaded-client</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -813,6 +825,12 @@
             <artifactId>presto-hive-metastore</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.alluxio</groupId>
+                    <artifactId>alluxio-shaded-client</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

@@ -14,7 +14,6 @@
 package com.facebook.presto.plugin.mysql;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.plugin.geospatial.GeoPlugin;
 import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.testing.mysql.TestingMySqlServer;
 import com.facebook.presto.tests.DistributedQueryRunner;
@@ -72,8 +71,6 @@ public final class MySqlQueryRunner
             connectorProperties.putIfAbsent("allow-drop-table", "true");
 
             queryRunner.installPlugin(new MySqlPlugin());
-            // added for geometry type related test cases in TestMySqlTypeMapping.java
-            queryRunner.installPlugin(new GeoPlugin());
             queryRunner.createCatalog("mysql", "mysql", connectorProperties);
 
             copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, createSession(), tables);

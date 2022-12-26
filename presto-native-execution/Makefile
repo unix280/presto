@@ -17,6 +17,7 @@ BUILD_TYPE=Release
 TREAT_WARNINGS_AS_ERRORS ?= 1
 ENABLE_WALL ?= 1
 NUM_THREADS ?= $(shell getconf _NPROCESSORS_CONF 2>/dev/null || echo 1)
+CPU_TARGET ?= "avx"
 CMAKE_PREFIX_PATH ?= "/usr/local"
 
 PRESTO_ENABLE_PARQUET ?= "ON"
@@ -82,24 +83,24 @@ presto_protocol:		#: Build the presto_protocol serde library
 TypeSignature:		#: Build the Presto TypeSignature parser
 	cd presto_cpp/main/types; $(MAKE) TypeSignature
 
-format-fix: 			#: Fix formatting issues in the current branch
-	velox/scripts/check.py format branch --fix
+format-fix: 			#: Fix formatting issues in the master branch
+	velox/scripts/check.py format master --fix
 
-format-check: 			#: Check for formatting issues on the current branch
+format-check: 			#: Check for formatting issues on the master branch
 	clang-format --version
-	velox/scripts/check.py format branch
+	velox/scripts/check.py format master
 
-header-fix:				#: Fix license header issues in the current branch
-	velox/scripts/check.py header branch --fix
+header-fix:				#: Fix license header issues in the master branch
+	velox/scripts/check.py header master --fix
 
-header-check:			#: Check for license header issues on the current branch
-	velox/scripts/check.py header branch
+header-check:			#: Check for license header issues on the man branch
+	velox/scripts/check.py header master
 
-tidy-fix: cmake			#: Fix clang-tidy issues in the current branch
-	velox/scripts/check.py tidy branch --fix
+tidy-fix: cmake			#: Fix clang-tidy issues in the master branch
+	velox/scripts/check.py tidy master --fix
 
-tidy-check: cmake		#: Check clang-tidy issues in the current branch
-	velox/scripts/check.py tidy branch
+tidy-check: cmake		#: Check clang-tidy issues in the master branch
+	velox/scripts/check.py tidy master
 
 circleci-container:			#: Build the linux container for CircleCi
 	$(MAKE) linux-container CONTAINER_NAME=circleci
@@ -107,9 +108,9 @@ circleci-container:			#: Build the linux container for CircleCi
 linux-container:
 	rm -rf /tmp/docker && \
 	mkdir -p /tmp/docker && \
-	cp scripts/setup-$(CONTAINER_NAME).sh scripts/$(CONTAINER_NAME)-container.dockfile /tmp/docker && \
+	cp scripts/setup-$(CONTAINER_NAME).sh scripts/$(CONTAINER_NAME)-container.dockfile velox/scripts/setup-helper-functions.sh /tmp/docker && \
 	cd /tmp/docker && \
-	docker build --tag "prestocpp/prestocpp-$(CONTAINER_NAME):$(USER)-$(shell date +%Y%m%d)" -f $(CONTAINER_NAME)-container.dockfile .
+	docker build --build-arg cpu_target=$(CPU_TARGET) --tag "prestocpp/prestocpp-$(CPU_TARGET)-$(CONTAINER_NAME):$(USER)-$(shell date +%Y%m%d)" -f $(CONTAINER_NAME)-container.dockfile .
 
 help:					#: Show the help messages
 	@cat $(firstword $(MAKEFILE_LIST)) | \
