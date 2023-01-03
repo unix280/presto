@@ -1297,14 +1297,6 @@ workflows:
           requires:
             - start_test_suite
       - test_specific_module:
-          name: test_specific_module_presto_geospatial
-          context:
-            - docker_hub
-            - presto_maven
-          module: presto-geospatial
-          requires:
-            - start_test_suite
-      - test_specific_module:
           name: test_specific_module_presto_geospatial_toolkit
           context:
             - docker_hub
@@ -1490,7 +1482,6 @@ workflows:
             - test_specific_module_presto_base_jdbc
             - test_specific_module_presto_common
             - test_specific_module_presto_event_listener
-            - test_specific_module_presto_geospatial
             - test_specific_module_presto_geospatial_toolkit
             - test_specific_module_presto_hive_common
             - test_specific_module_presto_jdbc
