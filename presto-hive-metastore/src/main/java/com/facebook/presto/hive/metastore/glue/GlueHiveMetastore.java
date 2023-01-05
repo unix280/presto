@@ -981,7 +981,7 @@ public class GlueHiveMetastore
                                             .withCatalogId(catalogId)
                                             .withDatabaseName(table.getDatabaseName())
                                             .withTableName(table.getTableName())
-                                            .withPartitionsToGet(partitions))));
+                                            .withPartitionsToGet(partitions)), stats.getBatchGetPartitions().metricsAsyncHandler()));
                 }
                 pendingPartitions.clear();
 
