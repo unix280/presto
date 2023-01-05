@@ -228,7 +228,7 @@ public class GlueHiveMetastore
                 .build(CacheLoader.from(this::createAssumeRoleCredentialsProvider));
         this.enableColumnStatistics = glueConfig.isColumnStatisticsEnabled();
         if (this.enableColumnStatistics) {
-            this.columnStatisticsProvider = new DefaultGlueColumnStatisticsProvider(glueClient, catalogId, statisticsReadExecutor, statisticsWriteExecutor, glueConfig, glueSecurityMappingsSupplier, this.awsCredentialsProviderLoadingCache);
+            this.columnStatisticsProvider = new DefaultGlueColumnStatisticsProvider(glueClient, catalogId, statisticsReadExecutor, statisticsWriteExecutor, glueConfig, glueSecurityMappingsSupplier, this.awsCredentialsProviderLoadingCache, stats);
         }
         else {
             this.columnStatisticsProvider = new DisabledGlueColumnStatisticsProvider();
