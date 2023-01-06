@@ -218,6 +218,7 @@ public final class SystemSessionProperties
     public static final String OFFSET_CLAUSE_ENABLED = "offset_clause_enabled";
     public static final String VERBOSE_EXCEEDED_MEMORY_LIMIT_ERRORS_ENABLED = "verbose_exceeded_memory_limit_errors_enabled";
     public static final String MATERIALIZED_VIEW_DATA_CONSISTENCY_ENABLED = "materialized_view_data_consistency_enabled";
+    public static final String CONSIDER_QUERY_FILTERS_FOR_MATERIALIZED_VIEW_PARTITIONS = "consider-query-filters-for-materialized-view-partitions";
     public static final String QUERY_OPTIMIZATION_WITH_MATERIALIZED_VIEW_ENABLED = "query_optimization_with_materialized_view_enabled";
     public static final String AGGREGATION_IF_TO_FILTER_REWRITE_STRATEGY = "aggregation_if_to_filter_rewrite_strategy";
     public static final String RESOURCE_AWARE_SCHEDULING_STRATEGY = "resource_aware_scheduling_strategy";
@@ -231,7 +232,7 @@ public final class SystemSessionProperties
     public static final String PREFER_MERGE_JOIN = "prefer_merge_join";
     public static final String SEGMENTED_AGGREGATION_ENABLED = "segmented_aggregation_enabled";
     public static final String USE_HISTORY_BASED_PLAN_STATISTICS = "use_history_based_plan_statistics";
-    public static final String USE_EXTERNAL_PLAN_STATISTICS = "use_external_plan_statistics";
+    public static final String TRACK_HISTORY_BASED_PLAN_STATISTICS = "track_history_based_plan_statistics";
 
     //TODO: Prestissimo related session properties that are temporarily put here. They will be relocated in the future
     public static final String PRESTISSIMO_SIMPLIFIED_EXPRESSION_EVALUATION_ENABLED = "simplified_expression_evaluation_enabled";
@@ -1207,6 +1208,11 @@ public final class SystemSessionProperties
                         featuresConfig.isMaterializedViewDataConsistencyEnabled(),
                         false),
                 booleanProperty(
+                        CONSIDER_QUERY_FILTERS_FOR_MATERIALIZED_VIEW_PARTITIONS,
+                        "When enabled and counting materialized view partitions, filters partition domains not in base query",
+                        featuresConfig.isMaterializedViewPartitionFilteringEnabled(),
+                        false),
+                booleanProperty(
                         QUERY_OPTIMIZATION_WITH_MATERIALIZED_VIEW_ENABLED,
                         "Enable query optimization with materialized view",
                         featuresConfig.isQueryOptimizationWithMaterializedViewEnabled(),
@@ -1320,13 +1326,13 @@ public final class SystemSessionProperties
                         false),
                 booleanProperty(
                         USE_HISTORY_BASED_PLAN_STATISTICS,
-                        "Use history based plan statistics in query optimizer",
+                        "Use history based plan statistics service in query optimizer",
                         featuresConfig.isUseHistoryBasedPlanStatistics(),
                         false),
                 booleanProperty(
-                        USE_EXTERNAL_PLAN_STATISTICS,
-                        "Use plan statistics from external service in query optimizer",
-                        featuresConfig.isUseExternalPlanStatistics(),
+                        TRACK_HISTORY_BASED_PLAN_STATISTICS,
+                        "Track history based plan statistics service in query optimizer",
+                        featuresConfig.isTrackHistoryBasedPlanStatistics(),
                         false));
     }
 
@@ -2170,6 +2176,11 @@ public final class SystemSessionProperties
         return session.getSystemProperty(MATERIALIZED_VIEW_DATA_CONSISTENCY_ENABLED, Boolean.class);
     }
 
+    public static boolean isMaterializedViewPartitionFilteringEnabled(Session session)
+    {
+        return session.getSystemProperty(CONSIDER_QUERY_FILTERS_FOR_MATERIALIZED_VIEW_PARTITIONS, Boolean.class);
+    }
+
     public static boolean isQueryOptimizationWithMaterializedViewEnabled(Session session)
     {
         return session.getSystemProperty(QUERY_OPTIMIZATION_WITH_MATERIALIZED_VIEW_ENABLED, Boolean.class);
@@ -2235,8 +2246,8 @@ public final class SystemSessionProperties
         return session.getSystemProperty(USE_HISTORY_BASED_PLAN_STATISTICS, Boolean.class);
     }
 
-    public static boolean useExternalPlanStatisticsEnabled(Session session)
+    public static boolean trackHistoryBasedPlanStatisticsEnabled(Session session)
     {
-        return session.getSystemProperty(USE_EXTERNAL_PLAN_STATISTICS, Boolean.class);
+        return session.getSystemProperty(TRACK_HISTORY_BASED_PLAN_STATISTICS, Boolean.class);
     }
 }

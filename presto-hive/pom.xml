@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.275</version>
+        <version>0.276</version>
     </parent>
 
     <artifactId>presto-hive</artifactId>
@@ -932,6 +932,10 @@
                     <groupId>net.bytebuddy</groupId>
                     <artifactId>byte-buddy-agent</artifactId>
                 </exclusion>
+<!--                <exclusion>-->
+<!--                    <groupId>net.bytebuddy</groupId>-->
+<!--                    <artifactId>byte-buddy</artifactId>-->
+<!--                </exclusion>-->
             </exclusions>
         </dependency>
 
@@ -964,6 +968,16 @@
                         <ignoredClassPattern>shaded.parquet.it.unimi.dsi.fastutil.*</ignoredClassPattern>
                         <ignoredClassPattern>module-info</ignoredClassPattern>
                     </ignoredClassPatterns>
+                    <ignoredDependencies>
+                        <dependency>
+                            <groupId>net.bytebuddy</groupId>
+                            <artifactId>byte-buddy</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.alluxio</groupId>
+                            <artifactId>alluxio-shaded-client</artifactId>
+                        </dependency>
+                    </ignoredDependencies>
                 </configuration>
             </plugin>
 

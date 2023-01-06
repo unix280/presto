@@ -966,6 +966,7 @@ public abstract class AbstractTestQueries
                 "GROUP BY orderdate " +
                 "HAVING COUNT(DISTINCT clerk) > 1");
     }
+
     @Test
     public void testDistinctLimitWithQuickDistinctLimitEnabled()
     {

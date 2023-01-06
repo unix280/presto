@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.275</version>
+        <version>0.276</version>
     </parent>
 
     <artifactId>presto-kudu</artifactId>
@@ -65,12 +65,7 @@
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>joda-time</groupId>
-            <artifactId>joda-time</artifactId>
-        </dependency>
-
+        
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>configuration</artifactId>
