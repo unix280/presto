@@ -164,7 +164,7 @@ public class StoragePartitionLoader
             return COMPLETED_FUTURE;
         }
         Path path = new Path(location);
-        Configuration configuration = hdfsEnvironment.getConfiguration(hdfsContext, path);
+        Configuration configuration = hdfsEnvironment.getFileSystem(hdfsContext, path).getConf();
         InputFormat<?, ?> inputFormat = getInputFormat(configuration, inputFormatName, false);
         ExtendedFileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext.getIdentity().getUser(), path, configuration);
         boolean s3SelectPushdownEnabled = shouldEnablePushdownForTable(session, table, path.toString(), partition.getPartition());

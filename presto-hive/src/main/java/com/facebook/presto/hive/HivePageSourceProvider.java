@@ -51,6 +51,7 @@ import org.joda.time.DateTimeZone;
 
 import javax.inject.Inject;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +69,7 @@ import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.PARTITION_KEY
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
 import static com.facebook.presto.hive.HiveColumnHandle.isPushedDownSubfield;
+import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_UNKNOWN_ERROR;
 import static com.facebook.presto.hive.HivePageSourceProvider.ColumnMapping.toColumnHandles;
 import static com.facebook.presto.hive.HiveSessionProperties.isUseRecordPageSourceForCustomSplit;
@@ -143,14 +145,20 @@ public class HivePageSourceProvider
         HiveSplit hiveSplit = (HiveSplit) split;
         Path path = new Path(hiveSplit.getPath());
 
-        Configuration configuration = hdfsEnvironment.getConfiguration(
-                new HdfsContext(
-                        session,
-                        hiveSplit.getDatabase(),
-                        hiveSplit.getTable(),
-                        hiveLayout.getTablePath(),
-                        false),
-                path);
+        Configuration configuration;
+        try {
+            configuration = hdfsEnvironment.getFileSystem(
+                    new HdfsContext(
+                            session,
+                            hiveSplit.getDatabase(),
+                            hiveSplit.getTable(),
+                            hiveLayout.getTablePath(),
+                            false),
+                    path).getConf();
+        }
+        catch (IOException e) {
+            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Could not open file system for " + hiveSplit.getTable(), e);
+        }
 
         Optional<EncryptionInformation> encryptionInformation = hiveSplit.getEncryptionInformation();
         if (hiveLayout.isPushdownFilterEnabled()) {
