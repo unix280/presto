@@ -670,7 +670,7 @@ public class TestBackgroundHiveSplitLoader
         @Override
         public ExtendedFileSystem getFileSystem(String user, Path path, Configuration configuration)
         {
-            return new TestingHdfsFileSystem(files);
+            return new TestingHdfsFileSystem(files, configuration);
         }
     }
 
@@ -678,6 +678,13 @@ public class TestBackgroundHiveSplitLoader
             extends ExtendedFileSystem
     {
         private List<LocatedFileStatus> files;
+        private Configuration configuration;
+
+        public TestingHdfsFileSystem(List<LocatedFileStatus> files, Configuration configuration)
+        {
+            this.files = ImmutableList.copyOf(files);
+            this.configuration = configuration;
+        }
 
         public TestingHdfsFileSystem(List<LocatedFileStatus> files)
         {
@@ -779,6 +786,12 @@ public class TestBackgroundHiveSplitLoader
         public URI getUri()
         {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Configuration getConf()
+        {
+            return configuration;
         }
     }
 }
