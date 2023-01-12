@@ -1053,8 +1053,7 @@ public class CachingHiveMetastore
         if (refreshMillis.isPresent() && (!expiresAfterWriteMillis.isPresent() || expiresAfterWriteMillis.getAsLong() > refreshMillis.getAsLong())) {
             cacheBuilder = cacheBuilder.refreshAfterWrite(refreshMillis.getAsLong(), MILLISECONDS);
         }
-        cacheBuilder = cacheBuilder.maximumSize(maximumSize);
-        return cacheBuilder;
+        return cacheBuilder.maximumSize(maximumSize).recordStats();
     }
 
     @Override
