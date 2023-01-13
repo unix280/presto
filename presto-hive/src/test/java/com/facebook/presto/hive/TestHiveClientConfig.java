@@ -171,7 +171,7 @@ public class TestHiveClientConfig
                 .setHudiMetadataEnabled(false)
                 .setThriftProtocol(Protocol.BINARY)
                 .setThriftBufferSize(new DataSize(128, BYTE))
-                .setCopyOnFirstWriteConfigurationEnabled(true)
+                .setCopyOnFirstWriteConfigurationEnabled(false)
                 .setPartitionFilteringFromMetastoreEnabled(true));
     }
 
@@ -300,7 +300,7 @@ public class TestHiveClientConfig
                 .put("hive.hudi-metadata-enabled", "true")
                 .put("hive.internal-communication.thrift-transport-protocol", "COMPACT")
                 .put("hive.internal-communication.thrift-transport-buffer-size", "256B")
-                .put("hive.copy-on-first-write-configuration-enabled", "false")
+                .put("hive.copy-on-first-write-configuration-enabled", "true")
                 .put("hive.partition-filtering-from-metastore-enabled", "false")
                 .build();
 
@@ -426,7 +426,7 @@ public class TestHiveClientConfig
                 .setUseRecordPageSourceForCustomSplit(false)
                 .setThriftProtocol(Protocol.COMPACT)
                 .setThriftBufferSize(new DataSize(256, BYTE))
-                .setCopyOnFirstWriteConfigurationEnabled(false)
+                .setCopyOnFirstWriteConfigurationEnabled(true)
                 .setPartitionFilteringFromMetastoreEnabled(false);
 
         ConfigAssertions.assertFullMapping(properties, expected);
