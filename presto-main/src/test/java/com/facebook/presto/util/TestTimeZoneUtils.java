@@ -74,6 +74,22 @@ public class TestTimeZoneUtils
                 continue;
             }
 
+            if (zoneId.equals("Europe/Kyiv")) {
+                // TODO: remove Once this recently renamed Timezone is supported.
+                // Europe/Kiev was renamed to Europe/Kyiv.
+                // https://www.oracle.com/java/technologies/tzdata-versions.html
+                // Likely need to wait for Joda to supported this renamed timezone.
+                // https://www.joda.org/joda-time/timezones.html
+                continue;
+            }
+
+            if (zoneId.equals("America/Ciudad_Juarez")) {
+                // TODO: remove Once this new Timezone is supported.
+                // This is included in 2022g release of the tz code and data.
+                // https://mm.icann.org/pipermail/tz-announce/2022-November/000076.html
+                continue;
+            }
+
             DateTimeZone dateTimeZone = DateTimeZone.forID(zoneId);
             DateTimeZone indexedZone = getDateTimeZone(TimeZoneKey.getTimeZoneKey(zoneId));
 
