@@ -25,6 +25,7 @@ import com.facebook.presto.parquet.ParquetDataSourceId;
 import com.facebook.presto.parquet.PrimitiveField;
 import com.facebook.presto.parquet.RichColumnDescriptor;
 import com.facebook.presto.parquet.cache.MetadataReader;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import org.apache.hadoop.conf.Configuration;
@@ -53,6 +54,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.common.type.BigintType.BIGINT;
+import static com.facebook.presto.common.type.IntegerType.INTEGER;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.parquet.ParquetTypeUtils.getArrayElementColumn;
 import static com.facebook.presto.parquet.ParquetTypeUtils.getColumnIO;
@@ -81,12 +83,13 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(10000)
                 .withCodec("GZIP")
                 .withExtraMeta(extraMetadata)
                 .withPageSize(1000)
+                .withDictionaryEnabled()
                 .withFooterEncryption()
                 .build();
         decryptAndValidate(inputFile);
@@ -97,13 +100,14 @@ public class TestEncryption
             throws IOException
     {
         MessageType schema = createSchema();
-        String[] encryptColumns = {"id", "name", "gender"};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        String[] encryptColumns = {"id", "bal", "name", "gender"};
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(10000)
                 .withCodec("GZIP")
                 .withPageSize(1000)
                 .withFooterEncryption()
+                .withDictionaryEnabled()
                 .build();
         decryptAndValidate(inputFile);
     }
@@ -114,11 +118,12 @@ public class TestEncryption
     {
         MessageType schema = createSchema();
         String[] encryptColumns = {};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(10000)
                 .withCodec("GZIP")
                 .withPageSize(1000)
+                .withDictionaryEnabled()
                 .withFooterEncryption()
                 .build();
         decryptAndValidate(inputFile);
@@ -130,11 +135,12 @@ public class TestEncryption
     {
         MessageType schema = createSchema();
         String[] encryptColumns = {"name", "gender"};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(1)
                 .withCodec("GZIP")
                 .withPageSize(1000)
+                .withDictionaryEnabled()
                 .withFooterEncryption()
                 .build();
         decryptAndValidate(inputFile);
@@ -146,11 +152,12 @@ public class TestEncryption
     {
         MessageType schema = createSchema();
         String[] encryptColumns = {"name", "gender"};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(1000000)
                 .withCodec("GZIP")
                 .withPageSize(1000)
+                .withDictionaryEnabled()
                 .withFooterEncryption()
                 .build();
         decryptAndValidate(inputFile);
@@ -162,10 +169,11 @@ public class TestEncryption
     {
         MessageType schema = createSchema();
         String[] encryptColumns = {"name", "gender"};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(10000)
                 .withCodec("SNAPPY")
+                .withDictionaryEnabled()
                 .withPageSize(1000)
                 .build();
         decryptAndValidate(inputFile);
@@ -177,11 +185,12 @@ public class TestEncryption
     {
         MessageType schema = createSchema();
         String[] encryptColumns = {"name", "gender"};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(100000)
                 .withCodec("GZIP")
                 .withPageSize(100000)
+                .withDictionaryEnabled()
                 .withFooterEncryption()
                 .build();
         decryptAndValidate(inputFile);
@@ -193,11 +202,12 @@ public class TestEncryption
     {
         MessageType schema = createSchema();
         String[] encryptColumns = {"name", "gender"};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(100000)
                 .withCodec("GZIP")
                 .withPageSize(1000)
+                .withDictionaryEnabled()
                 .withEncrytionAlgorithm(ParquetCipher.AES_GCM_CTR_V1)
                 .build();
         decryptAndValidate(inputFile);
@@ -207,11 +217,12 @@ public class TestEncryption
     {
         return new MessageType("schema",
                 new PrimitiveType(OPTIONAL, INT64, "id"),
+                new PrimitiveType(OPTIONAL, INT32, "bal"),
                 new PrimitiveType(REQUIRED, BINARY, "name"),
                 new PrimitiveType(OPTIONAL, BINARY, "gender"));
     }
 
-    private void decryptAndValidate(EncryptionTestFile inputFile)
+    private void decryptAndValidate(TestFile inputFile)
             throws IOException
     {
         Path path = new Path(inputFile.getFileName());
@@ -237,7 +248,23 @@ public class TestEncryption
         return Optional.empty();
     }
 
-    private ParquetReader createParquetReader(ParquetMetadata parquetMetadata,
+    private static void validateFile(ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile)
+            throws IOException
+    {
+        int rowIndex = 0;
+        int batchSize = parquetReader.nextBatch();
+        while (batchSize > 0) {
+            validateColumn("id", BIGINT, rowIndex, parquetReader, messageColumn, inputFile);
+            validateColumn("bal", INTEGER, rowIndex, parquetReader, messageColumn, inputFile);
+            validateColumn("name", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
+            validateColumn("gender", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
+            rowIndex += batchSize;
+            batchSize = parquetReader.nextBatch();
+        }
+    }
+
+    @VisibleForTesting
+    static ParquetReader createParquetReader(ParquetMetadata parquetMetadata,
                                               MessageColumnIO messageColumn,
                                               ParquetDataSource dataSource,
                                               Optional<InternalFileDecryptor> fileDecryptor)
@@ -267,21 +294,8 @@ public class TestEncryption
                 fileDecryptor);
     }
 
-    private void validateFile(ParquetReader parquetReader, MessageColumnIO messageColumn, EncryptionTestFile inputFile)
-            throws IOException
-    {
-        int rowIndex = 0;
-        int batchSize = parquetReader.nextBatch();
-        while (batchSize > 0) {
-            validateColumn("id", BIGINT, rowIndex, parquetReader, messageColumn, inputFile);
-            validateColumn("name", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
-            validateColumn("gender", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
-            rowIndex += batchSize;
-            batchSize = parquetReader.nextBatch();
-        }
-    }
-
-    private void validateColumn(String name, Type type, int rowIndex, ParquetReader parquetReader, MessageColumnIO messageColumn, EncryptionTestFile inputFile)
+    @VisibleForTesting
+    static void validateColumn(String name, Type type, int rowIndex, ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile)
             throws IOException
     {
         Block block = parquetReader.readBlock(constructField(type, lookupColumnByName(messageColumn, name)).orElse(null));
@@ -298,7 +312,8 @@ public class TestEncryption
         }
     }
 
-    private Optional<Field> constructField(Type type, ColumnIO columnIO)
+    @VisibleForTesting
+    static Optional<Field> constructField(Type type, ColumnIO columnIO)
     {
         if (columnIO == null) {
             return Optional.empty();

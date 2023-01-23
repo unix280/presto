@@ -16,12 +16,16 @@ package com.facebook.presto.parquet.reader;
 import com.facebook.presto.common.NotSupportedException;
 import com.facebook.presto.parquet.ParquetDataSource;
 import com.facebook.presto.parquet.ParquetDataSourceId;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.internal.column.columnindex.ColumnIndex;
 import org.apache.parquet.internal.column.columnindex.OffsetIndex;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -34,6 +38,7 @@ public class MockParquetDataSource
     private final FSDataInputStream inputStream;
     private long readTimeNanos;
     private long readBytes;
+    private List<Integer> dataSourceBytesFetchedPerCall = new ArrayList<>();
 
     public MockParquetDataSource(
             ParquetDataSourceId id,
@@ -80,6 +85,7 @@ public class MockParquetDataSource
     public void readFully(long position, byte[] buffer, int bufferOffset, int bufferLength)
     {
         readBytes += bufferLength;
+        dataSourceBytesFetchedPerCall.add(bufferLength);
 
         long start = System.nanoTime();
         try {
@@ -105,5 +111,11 @@ public class MockParquetDataSource
             throws IOException
     {
         throw new NotSupportedException("Not supported");
+    }
+
+    @VisibleForTesting
+    public final List<Integer> getDataSourceBytesFetchedPerCall()
+    {
+        return Collections.unmodifiableList(dataSourceBytesFetchedPerCall);
     }
 }
