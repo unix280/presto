@@ -434,7 +434,7 @@ public class BigintGroupByHash
         public boolean process()
         {
             int positionCount = block.getPositionCount();
-            checkState(lastPosition < positionCount, "position count out of bound");
+            checkState(lastPosition <= positionCount, "position count out of bound");
 
             // needRehash() == false indicates we have reached capacity boundary and a rehash is needed.
             // We can only proceed if tryRehash() successfully did a rehash.
@@ -533,7 +533,7 @@ public class BigintGroupByHash
         public boolean process()
         {
             int positionCount = block.getPositionCount();
-            checkState(lastPosition < positionCount, "position count out of bound");
+            checkState(lastPosition <= positionCount, "position count out of bound");
             checkState(!finished);
 
             // needRehash() == false indicates we have reached capacity boundary and a rehash is needed.
