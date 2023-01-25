@@ -13,12 +13,14 @@
  */
 package com.facebook.presto.parquet.reader;
 
+import com.facebook.presto.memory.context.LocalMemoryContext;
 import com.facebook.presto.parquet.DataPage;
 import com.facebook.presto.parquet.DataPageV1;
 import com.facebook.presto.parquet.DataPageV2;
 import com.facebook.presto.parquet.DictionaryPage;
 import com.facebook.presto.parquet.ParquetCorruptionException;
 import com.facebook.presto.parquet.cache.MetadataReader;
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.slice.Slice;
 import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.EncodingStats;
@@ -35,7 +37,10 @@ import org.apache.parquet.format.Util;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnPath;
 import org.apache.parquet.internal.column.columnindex.OffsetIndex;
+import org.openjdk.jol.info.ClassLayout;
 
+import java.io.BufferedInputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -43,31 +48,48 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.parquet.ParquetTypeUtils.getParquetEncoding;
+import static io.airlift.slice.SizeOf.sizeOf;
 import static io.airlift.slice.Slices.wrappedBuffer;
+import static java.util.Objects.requireNonNull;
 
 public class ParquetColumnChunk
+        implements Closeable
 {
+    //TODO : Make this max buffer size read value configurable
+    //For S3 reads 8MB - 32MB fetch size is good default
+    @VisibleForTesting
+    public static final int MAX_BUFFER_SIZE_DATA_SOURCE_READ = 8 * 1024 * 1024;
+
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(ParquetColumnChunk.class).instanceSize();
+
     private final ColumnChunkDescriptor descriptor;
-    private final InputStream stream;
+    private final ColumnChunkBufferedInputStream stream;
     private final OffsetIndex offsetIndex;
+    private final LocalMemoryContext memoryContext;
 
     public ParquetColumnChunk(
+            int columnChunkSize,
             ColumnChunkDescriptor descriptor,
-            InputStream stream)
+            InputStream stream,
+            LocalMemoryContext memoryContext)
     {
-        this.stream = stream;
-        this.descriptor = descriptor;
+        this.descriptor = requireNonNull(descriptor);
+        this.stream = new ColumnChunkBufferedInputStream(requireNonNull(stream), Math.min(columnChunkSize, MAX_BUFFER_SIZE_DATA_SOURCE_READ));
+        this.memoryContext = requireNonNull(memoryContext, "ParquetColumnChunk memoryContext is null");
         this.offsetIndex = null;
     }
 
     public ParquetColumnChunk(
+            int columnChunkSize,
             ColumnChunkDescriptor descriptor,
             InputStream stream,
-            OffsetIndex offsetIndex)
+            OffsetIndex offsetIndex,
+            LocalMemoryContext memoryContext)
     {
-        this.stream = stream;
-        this.descriptor = descriptor;
-        this.offsetIndex = offsetIndex;
+        this.descriptor = requireNonNull(descriptor);
+        this.stream = new ColumnChunkBufferedInputStream(requireNonNull(stream), Math.min(columnChunkSize, MAX_BUFFER_SIZE_DATA_SOURCE_READ));
+        this.offsetIndex = requireNonNull(offsetIndex);
+        this.memoryContext = requireNonNull(memoryContext, "ParquetColumnChunk memoryContext is null");
     }
 
     public ColumnChunkDescriptor getDescriptor()
@@ -81,7 +103,10 @@ public class ParquetColumnChunk
         return Util.readPageHeader(stream, headerBlockDecryptor, pageHeaderAAD);
     }
 
-    public PageReader buildPageReader(Optional<InternalFileDecryptor> fileDecryptor, int rowGroupOrdinal, int columnOrdinal)
+    public PageReader buildPageReader(
+            Optional<InternalFileDecryptor> fileDecryptor,
+            int rowGroupOrdinal,
+            int columnOrdinal)
             throws IOException
     {
         byte[] dataPageHeaderAAD = null;
@@ -115,9 +140,25 @@ public class ParquetColumnChunk
         byte[] fileAAD = fileDecryptor.map(InternalFileDecryptor::getFileAAD).orElse(null);
         Optional<BlockCipher.Decryptor> dataDecryptor = getDataDecryptor(columnDecryptionSetup);
 
-        long totalValueCount = descriptor.getColumnChunkMetaData().getValueCount();
-        return new PageReader(descriptor.getColumnChunkMetaData().getCodec(), dataPageIterator, totalValueCount,
-                dictionaryPage, offsetIndex, dataDecryptor, fileAAD, rowGroupOrdinal, columnOrdinal);
+        long valueCountInColumnChunk = descriptor.getColumnChunkMetaData().getValueCount();
+        return new PageReader(
+                descriptor.getColumnChunkMetaData().getCodec(),
+                dataPageIterator,
+                valueCountInColumnChunk,
+                dictionaryPage,
+                offsetIndex,
+                dataDecryptor,
+                fileAAD,
+                rowGroupOrdinal,
+                columnOrdinal);
+    }
+
+    @Override
+    public void close()
+            throws IOException
+    {
+        stream.close();
+        memoryContext.close();
     }
 
     private Iterator<DataPage> getDataPageIterator(byte[] dataPageHeaderAAD, BlockCipher.Decryptor headerBlockDecryptor, DictionaryPage dictionaryPage)
@@ -145,12 +186,12 @@ public class ParquetColumnChunk
             {
                 DataPage readPage = null;
                 try {
-                    byte[] pageHeaderAadditionalAuthenticationData = dataPageHeaderAAD;
+                    byte[] pageHeaderAdditionalAuthenticationData = dataPageHeaderAAD;
                     if (headerBlockDecryptor != null) {
                         // Important: this verifies file integrity (makes sure dictionary page had not been removed)
                         AesCipher.quickUpdatePageAAD(dataPageHeaderAAD, pageOrdinal);
                     }
-                    PageHeader pageHeader = readPageHeader(headerBlockDecryptor, pageHeaderAadditionalAuthenticationData);
+                    PageHeader pageHeader = readPageHeader(headerBlockDecryptor, pageHeaderAdditionalAuthenticationData);
                     int uncompressedPageSize = pageHeader.getUncompressed_page_size();
                     int compressedPageSize = pageHeader.getCompressed_page_size();
                     long firstRowIndex;
@@ -178,6 +219,15 @@ public class ParquetColumnChunk
                             stream.skip(compressedPageSize);
                             break;
                     }
+
+                    memoryContext.setBytes(getRetainedSizeInBytes() +
+                            // The pageHeaderAdditionalAuthenticationData is used to decrypt the stream and create a ByteArrayInputStream to read the PageHeader in the Apache
+                            // Parquet library. The memory allocated in that library cannot be measured but pageHeaderAdditionalAuthenticationData can be. Although they are not
+                            // retained by this class, it still makes sense to count them because they are actual being used in the PageDataPage's lifetime.
+                            sizeOf(pageHeaderAdditionalAuthenticationData) +
+                            // The memory to hold the ParquetDataPage data is allocated in getSlice() with size compressedPageSize. This slice will be read, uncompressed and
+                            // decoded while the PageDataPage is alive, therefore it's better to also count it.
+                            readPage.getRetainedSizeInBytes());
                 }
                 catch (IOException e) {
                     throw new RuntimeException(e);
@@ -185,6 +235,11 @@ public class ParquetColumnChunk
                 return readPage;
             }
         };
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE + stream.getRetainedSizeInBytes();
     }
 
     private Optional<BlockCipher.Decryptor> getDataDecryptor(InternalColumnDecryptionSetup columnDecryptionSetup)
@@ -195,7 +250,8 @@ public class ParquetColumnChunk
         return Optional.of(columnDecryptionSetup.getDataDecryptor());
     }
 
-    private Slice getSlice(int size) throws IOException
+    private Slice getSlice(int size)
+            throws IOException
     {
         byte[] buffer = new byte[size];
         stream.read(buffer);
@@ -213,7 +269,8 @@ public class ParquetColumnChunk
                 getParquetEncoding(Encoding.valueOf(dictHeader.getEncoding().name())));
     }
 
-    private DataPageV1 readDataPageV1(PageHeader pageHeader,
+    private DataPageV1 readDataPageV1(
+            PageHeader pageHeader,
             int uncompressedPageSize,
             int compressedPageSize,
             long firstRowIndex)
@@ -233,7 +290,8 @@ public class ParquetColumnChunk
                 getParquetEncoding(Encoding.valueOf(dataHeaderV1.getEncoding().name())));
     }
 
-    private DataPageV2 readDataPageV2(PageHeader pageHeader,
+    private DataPageV2 readDataPageV2(
+            PageHeader pageHeader,
             int uncompressedPageSize,
             int compressedPageSize,
             long firstRowIndex)
@@ -272,5 +330,22 @@ public class ParquetColumnChunk
 
         Set<Encoding> encodings = columnChunkMetaData.getEncodings();
         return encodings.contains(Encoding.PLAIN_DICTIONARY) || encodings.contains(Encoding.RLE_DICTIONARY);
+    }
+
+    class ColumnChunkBufferedInputStream
+            extends BufferedInputStream
+    {
+        private int bufferSize;
+
+        ColumnChunkBufferedInputStream(InputStream inputStream, int bufferSize)
+        {
+            super(requireNonNull(inputStream), bufferSize);
+            this.bufferSize = bufferSize;
+        }
+
+        long getRetainedSizeInBytes()
+        {
+            return bufferSize;
+        }
     }
 }
