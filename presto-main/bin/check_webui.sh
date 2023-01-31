@@ -10,6 +10,10 @@ set -euo pipefail
 
 WEBUI_ROOT="$(pwd)/${BASH_SOURCE%/*}/../src/main/resources/webapp"
 
+# Allow working with legacy openssl for Node 17+
+# See https://github.com/webpack/webpack/issues/14532#issuecomment-947012063
+export NODE_OPTIONS=--openssl-legacy-provider
+
 # Fail if running the command to generate the `dist` folder again produces different results.
 # The lockfile is generated code also, and must go through the same process.
 
