@@ -38,6 +38,7 @@ pipeline {
                     steps {
                         sh 'apt update && apt install -y awscli git tree'
                         sh 'unset MAVEN_CONFIG && ./mvnw versions:set -DremoveSnapshot'
+                        sh 'git config --global --add safe.directory ${WORKSPACE}'
 
                         withCredentials([[
                                 $class:            'AmazonWebServicesCredentialsBinding',
