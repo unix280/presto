@@ -86,6 +86,7 @@ import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.FileAssert.fail;
@@ -226,21 +227,32 @@ public class TestBackgroundHiveSplitLoader
                         new Duration(5, TimeUnit.MINUTES),
                         1000,
                         ImmutableList.of("test_dbname.test_table")),
-                "test_dbname.test_table");
+                "test_dbname.test_table",
+                1000);
+        testCachingDirectoryLister(
+                new CachingDirectoryLister(
+                        new HadoopDirectoryLister(),
+                        new Duration(5, TimeUnit.MINUTES),
+                        0,
+                        ImmutableList.of("test_dbname.test_table")),
+                "test_dbname.test_table",
+                0);
         testCachingDirectoryLister(
                 new CachingDirectoryLister(
                         new HadoopDirectoryLister(),
                         new Duration(5, TimeUnit.MINUTES),
                         1000,
                         ImmutableList.of("*")),
-                "*");
+                "*",
+                1000);
         testCachingDirectoryLister(
                 new CachingDirectoryLister(
                         new HadoopDirectoryLister(),
                         new Duration(5, TimeUnit.MINUTES),
                         1000,
                         ImmutableList.of("*")),
-                "");
+                "",
+                1000);
         assertThrows(
                 IllegalArgumentException.class,
                 () -> testCachingDirectoryLister(
@@ -249,7 +261,8 @@ public class TestBackgroundHiveSplitLoader
                                 new Duration(5, TimeUnit.MINUTES),
                                 1000,
                                 ImmutableList.of("*", "test_dbname.test_table")),
-                        "*,test_dbname.test_table"));
+                        "*,test_dbname.test_table",
+                        1000));
     }
 
     @Test
@@ -351,7 +364,7 @@ public class TestBackgroundHiveSplitLoader
         assertEquals(drainSplits(hiveSplitSource).size(), expectedSplitCount);
     }
 
-    private void testCachingDirectoryLister(CachingDirectoryLister cachingDirectoryLister, String fileStatusCacheTables)
+    private void testCachingDirectoryLister(CachingDirectoryLister cachingDirectoryLister, String fileStatusCacheTables, long maxSize)
             throws Exception
     {
         assertEquals(cachingDirectoryLister.getRequestCount(), 0);
@@ -399,10 +412,15 @@ public class TestBackgroundHiveSplitLoader
             assertEquals(cachingDirectoryLister.getMissCount(), 0);
             assertEquals(cachingDirectoryLister.getRequestCount(), 0);
         }
+        else if (maxSize == 0) {
+            assertEquals(cachingDirectoryLister.getRequestCount(), totalCount);
+            assertNotEquals(cachingDirectoryLister.getEvictionCount(), 0);
+        }
         else {
             assertEquals(cachingDirectoryLister.getHitCount(), totalCount - 1);
             assertEquals(cachingDirectoryLister.getMissCount(), 1);
             assertEquals(cachingDirectoryLister.getRequestCount(), totalCount);
+            assertEquals(cachingDirectoryLister.getEvictionCount(), 0);
         }
     }
 
