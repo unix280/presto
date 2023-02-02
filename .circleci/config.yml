@@ -367,7 +367,7 @@ jobs:
 
       - run:
           name: Install test dependencies
-          command: ./mvnw install $MAVEN_FAST_INSTALL -pl '!presto-docs,!presto-server-rpm,!presto-spark-package,!presto-spark-launcher,!presto-spark-testing'
+          command: ./mvnw install $MAVEN_FAST_INSTALL -pl '!presto-docs,!presto-server-rpm,!presto-spark-package,!presto-spark-launcher,!presto-spark-testing,!presto-test-coverage'
 
       - run:
           name: Test basic environment
@@ -461,7 +461,7 @@ jobs:
 
       - run:
           name: Install test dependencies
-          command: ./mvnw install $MAVEN_FAST_INSTALL -pl '!presto-docs,!presto-server-rpm,!presto-spark-package,!presto-spark-launcher,!presto-spark-testing'
+          command: ./mvnw install $MAVEN_FAST_INSTALL -pl '!presto-docs,!presto-server-rpm,!presto-spark-package,!presto-spark-launcher,!presto-spark-testing,!presto-test-coverage'
 
       - run:
           name: Test mysql
