@@ -16,8 +16,7 @@ package org.apache.hadoop.fs;
 public class PrestoExtendedFileSystemCache
         extends PrestoFileSystemCache
 {
-    @Override
-    protected FileSystem createPrestoFileSystemWrapper(FileSystem original)
+    protected static FileSystem createPrestoFileSystemWrapper(FileSystem original)
     {
         return new HadoopExtendedFileSystem(original);
     }

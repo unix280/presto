@@ -176,7 +176,7 @@ public class StoragePartitionLoader
 
             // TODO: This should use an iterator like the HiveFileIterator
             ListenableFuture<?> lastResult = COMPLETED_FUTURE;
-            for (Path targetPath : getTargetPathsFromSymlink(fs, path)) {
+            for (Path targetPath : getTargetPathsFromSymlink(fs, path, partition.getPartition())) {
                 // The input should be in TextInputFormat.
                 TextInputFormat targetInputFormat = new TextInputFormat();
                 // the splits must be generated using the file system for the target path
@@ -475,17 +475,31 @@ public class StoragePartitionLoader
                 .collect(toImmutableList());
     }
 
-    private static List<Path> getTargetPathsFromSymlink(ExtendedFileSystem fileSystem, Path symlinkDir)
+    private List<Path> getTargetPathsFromSymlink(ExtendedFileSystem fileSystem, Path symlinkDir, Optional<Partition> partition)
     {
         try {
-            FileStatus[] symlinks = fileSystem.listStatus(symlinkDir, HIDDEN_FILES_PATH_FILTER);
             List<Path> targets = new ArrayList<>();
-
-            for (FileStatus symlink : symlinks) {
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(fileSystem.open(symlink.getPath()), StandardCharsets.UTF_8))) {
-                    CharStreams.readLines(reader).stream()
-                            .map(Path::new)
-                            .forEach(targets::add);
+            if (isUseListDirectoryCache(session)) {
+                // As per https://svn.apache.org/repos/infra/websites/production/hive/content/javadocs/r2.1.1/api/org/apache/hadoop/hive/ql/io/SymlinkTextInputFormat.html there is one symlink file in a directory
+                HiveDirectoryContext hiveDirectoryContext = new HiveDirectoryContext(IGNORED, isUseListDirectoryCache(session), buildDirectoryContextProperties(session));
+                List<HiveFileInfo> manifestFileInfos = new ArrayList<>();
+                Iterators.addAll(manifestFileInfos, directoryLister.list(fileSystem, table, symlinkDir, partition, namenodeStats, hiveDirectoryContext));
+                for (HiveFileInfo symlink : manifestFileInfos) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(fileSystem.open(symlink.getPath()), StandardCharsets.UTF_8))) {
+                        CharStreams.readLines(reader).stream()
+                                .map(Path::new)
+                                .forEach(targets::add);
+                    }
+                }
+            }
+            else {
+                FileStatus[] symlinks = fileSystem.listStatus(symlinkDir, HIDDEN_FILES_PATH_FILTER);
+                for (FileStatus symlink : symlinks) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(fileSystem.open(symlink.getPath()), StandardCharsets.UTF_8))) {
+                        CharStreams.readLines(reader).stream()
+                                .map(Path::new)
+                                .forEach(targets::add);
+                    }
                 }
             }
             return targets;

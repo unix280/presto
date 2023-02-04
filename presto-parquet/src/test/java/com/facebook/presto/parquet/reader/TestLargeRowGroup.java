@@ -51,10 +51,6 @@ import static org.testng.Assert.assertTrue;
 public class TestLargeRowGroup
 {
     private final Configuration conf = new Configuration(false);
-    private final Runtime runtime = Runtime.getRuntime();
-    private MockParquetDataSource dataSource;
-    private MessageColumnIO messageColumn;
-    private ParquetReader parquetReader;
 
     @Test
     public void testDataSourceIsReadInBoundedChunksForALargeColumnChunk()
@@ -68,8 +64,8 @@ public class TestLargeRowGroup
                 .withRowGroupSize(1024 * 1024 * 1024)
                 .build();
 
-        ParquetMetadata parquetMetadata = createTestParquetFile(inputFile);
-        List<BlockMetaData> rowGroupsMetadata = parquetMetadata.getBlocks();
+        TestParquetFileProperties parquetFile = createTestParquetFile(inputFile);
+        List<BlockMetaData> rowGroupsMetadata = parquetFile.getParquetMetadata().getBlocks();
         assertEquals(rowGroupsMetadata.size(), 1, "Test requires only 1 row group to be created");
 
         ColumnChunkMetaData col1ColChunkMetadata = rowGroupsMetadata.get(0).getColumns().get(0);
@@ -77,9 +73,9 @@ public class TestLargeRowGroup
         assertTrue(totalSize > MAX_BUFFER_SIZE_DATA_SOURCE_READ, "Test setup requires a single ColumnChunk more than MAX_BUFFER_SIZE_DATA_SOURCE_READ");
 
         //Read all columns in the file
-        validateFile(parquetReader, messageColumn, inputFile);
+        validateFile(parquetFile.getParquetReader(), parquetFile.getMessageColumnIO(), inputFile);
 
-        List<Integer> bytesFetchedPerCall = dataSource.getDataSourceBytesFetchedPerCall();
+        List<Integer> bytesFetchedPerCall = parquetFile.getDataSource().getDataSourceBytesFetchedPerCall();
         assertTrue(bytesFetchedPerCall.size() > 1, "Expected more than one call to dataSource.readFully");
 
         //Verify that we don't read more tha MAX_BUFFER_SIZE_DATA_SOURCE_READ in any read call from the dataSource
@@ -92,6 +88,7 @@ public class TestLargeRowGroup
     //We test that the total memory consumed to parse and read this column chunk is NOT a function of the number of data pages
     // in a ColumnChunk. Instead, we use a bounded amount of memory to read any ColumnChunk since we don't materialize the full
     // chunk in memory at any time
+
     @Test
     public void testMemoryUsedIsNotAFunctionOfDataPageCount()
             throws IOException
@@ -106,13 +103,14 @@ public class TestLargeRowGroup
         SizeOf sizeOf = SizeOf.newInstance();
         for (Integer testPageCount : Arrays.asList(1000, 5000, 10000, 20000)) {
             //Create an input file with 1 row group, 1 column and a pre-determined number of data pages
-            ParquetMetadata parquetMetadata = createTestParquetFile(schema, testPageCount);
-            long expectedRowCount = parquetMetadata.getBlocks().get(0).getRowCount();
+            TestParquetFileProperties parquetFile = createTestParquetFile(schema, testPageCount);
+            long expectedRowCount = parquetFile.getParquetMetadata().getBlocks().get(0).getRowCount();
 
             //Read the column completely
-            Field col1 = constructField(VARCHAR, lookupColumnByName(messageColumn, "col1")).orElse(null);
+            Field col1 = constructField(VARCHAR, lookupColumnByName(parquetFile.getMessageColumnIO(), "col1")).orElse(null);
             long maxSystemMemoryUsed = 0;
 
+            ParquetReader parquetReader = parquetFile.getParquetReader();
             long parquetReaderSizeBefore = sizeOf.deepSizeOf(parquetReader);
             long totalRowsRead = 0;
             while (totalRowsRead < expectedRowCount) {
@@ -133,8 +131,7 @@ public class TestLargeRowGroup
             parquetReader.close();
         }
     }
-
-    private ParquetMetadata createTestParquetFile(MessageType schema, int requestedPageCount)
+    private TestParquetFileProperties createTestParquetFile(MessageType schema, int requestedPageCount)
             throws IOException
     {
         int pageSize = 100;
@@ -146,31 +143,32 @@ public class TestLargeRowGroup
                 .withRowGroupSize(1024 * 1024 * 1024)
                 .build();
 
-        ParquetMetadata parquetMetadata = createTestParquetFile(inputFile);
-        List<BlockMetaData> rowGroupsMetadata = parquetMetadata.getBlocks();
+        TestParquetFileProperties parquetFile = createTestParquetFile(inputFile);
+        List<BlockMetaData> rowGroupsMetadata = parquetFile.getParquetMetadata().getBlocks();
         assertEquals(rowGroupsMetadata.size(), 1, "Test requires only 1 row group to be created");
 
         ColumnChunkMetaData col1ColChunkMetadata = rowGroupsMetadata.get(0).getColumns().get(0);
         int actualDataPageCount = col1ColChunkMetadata.getEncodingStats().getNumDataPagesEncodedAs(Encoding.PLAIN);
         assertEquals(actualDataPageCount, requestedPageCount);
 
-        return parquetMetadata;
+        return parquetFile;
     }
 
-    private ParquetMetadata createTestParquetFile(TestFile inputFile)
+    private TestParquetFileProperties createTestParquetFile(TestFile inputFile)
             throws IOException
     {
         Path path = new Path(inputFile.getFileName());
         FileSystem fileSystem = path.getFileSystem(conf);
         FSDataInputStream inputStream = fileSystem.open(path);
         long fileSize = fileSystem.getFileStatus(path).getLen();
-        dataSource = new MockParquetDataSource(new ParquetDataSourceId(path.toString()), fileSize, inputStream);
+        MockParquetDataSource dataSource = new MockParquetDataSource(new ParquetDataSourceId(path.toString()), fileSize, inputStream);
         ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, inputFile.getFileSize(), Optional.empty()).getParquetMetadata();
         FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
         MessageType fileSchema = fileMetaData.getSchema();
-        messageColumn = getColumnIO(fileSchema, fileSchema);
-        parquetReader = createParquetReader(parquetMetadata, messageColumn, dataSource, Optional.empty());
-        return parquetMetadata;
+        MessageColumnIO messageColumn = getColumnIO(fileSchema, fileSchema);
+        ParquetReader parquetReader = createParquetReader(parquetMetadata, messageColumn, dataSource, Optional.empty());
+
+        return new TestParquetFileProperties(messageColumn, parquetReader, dataSource, parquetMetadata);
     }
 
     private static void validateFile(ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile)
@@ -182,6 +180,41 @@ public class TestLargeRowGroup
             validateColumn("col1", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
             rowIndex += batchSize;
             batchSize = parquetReader.nextBatch();
+        }
+    }
+    private static class TestParquetFileProperties
+    {
+        private MessageColumnIO messageColumnIO;
+        private ParquetReader parquetReader;
+        private MockParquetDataSource dataSource;
+        private ParquetMetadata parquetMetadata;
+
+        public TestParquetFileProperties(MessageColumnIO messageColumnIO, ParquetReader parquetReader, MockParquetDataSource dataSource, ParquetMetadata parquetMetadata)
+        {
+            this.messageColumnIO = messageColumnIO;
+            this.parquetReader = parquetReader;
+            this.dataSource = dataSource;
+            this.parquetMetadata = parquetMetadata;
+        }
+
+        public MessageColumnIO getMessageColumnIO()
+        {
+            return messageColumnIO;
+        }
+
+        public ParquetReader getParquetReader()
+        {
+            return parquetReader;
+        }
+
+        public MockParquetDataSource getDataSource()
+        {
+            return dataSource;
+        }
+
+        public ParquetMetadata getParquetMetadata()
+        {
+            return parquetMetadata;
         }
     }
 }
