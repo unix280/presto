@@ -1,6 +1,7 @@
 {
   "settingsInheritedFrom": "whitesource-config/whitesource-config@master",
   "scanSettings": {
-             "baseBranches": ["Experimental_dev"]
+             "baseBranches": ["Experimental_dev","presto-release-0.279"]
          }
 }
+
