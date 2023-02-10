@@ -21,9 +21,9 @@
 #include "presto_cpp/main/common/Utils.h"
 #include "presto_cpp/main/types/PrestoToVeloxSplit.h"
 #include "velox/common/base/StatsReporter.h"
+#include "velox/common/file/FileSystems.h"
 #include "velox/common/time/Timer.h"
 #include "velox/exec/Exchange.h"
-#include "velox/serializers/PrestoSerializer.h"
 
 DEFINE_int32(
     old_task_ms,
@@ -38,6 +38,26 @@ using facebook::presto::protocol::TaskInfo;
 namespace facebook::presto {
 
 namespace {
+
+// If spilling is enabled and the given Task can spill, then this helper
+// generates the spilling directory path for the Task, creates that directory in
+// the file system and sets the path to it to the Task.
+static void maybeSetupTaskSpillDirectory(
+    const core::PlanFragment& planFragment,
+    exec::Task& execTask) {
+  const auto baseSpillPath = SystemConfig::instance()->spillerSpillPath();
+  if (!baseSpillPath.empty() &&
+      planFragment.canSpill(execTask.queryCtx()->queryConfig())) {
+    const auto taskSpillDirPath = TaskManager::buildTaskSpillDirectoryPath(
+        baseSpillPath, execTask.queryCtx()->queryId(), execTask.taskId());
+    execTask.setSpillDirectory(taskSpillDirPath);
+    // Create folder for the task spilling.
+    auto fileSystem =
+        velox::filesystems::getFileSystem(taskSpillDirPath, nullptr);
+    VELOX_CHECK_NOT_NULL(fileSystem, "File System is null!");
+    fileSystem->mkdir(taskSpillDirPath);
+  }
+}
 
 bool isFinalState(protocol::TaskState state) {
   switch (state) {
@@ -100,6 +120,14 @@ void TaskManager::acknowledgeResults(
 
 namespace {
 
+std::unique_ptr<Result> createTimeOutResult(long token) {
+  auto result = std::make_unique<Result>();
+  result->sequence = result->nextSequence = token;
+  result->data = folly::IOBuf::create(0);
+  result->complete = false;
+  return result;
+}
+
 void getData(
     PromiseHolderPtr<std::unique_ptr<Result>> promiseHolder,
     const TaskId& taskId,
@@ -112,7 +140,7 @@ void getData(
     return;
   }
 
-  bufferManager.getData(
+  auto bufferFound = bufferManager.getData(
       taskId,
       bufferId,
       maxSize.getValue(protocol::DataUnit::BYTE),
@@ -154,6 +182,13 @@ void getData(
 
         promiseHolder->promise.setValue(std::move(result));
       });
+
+  if (!bufferFound) {
+    // Buffer was erased for current TaskId.
+    VLOG(1) << "Task " << taskId << ", buffer " << bufferId << ", sequence "
+            << token << ", buffer not found.";
+    promiseHolder->promise.setValue(std::move(createTimeOutResult(token)));
+  }
 }
 } // namespace
 
@@ -169,11 +204,53 @@ std::unique_ptr<TaskInfo> TaskManager::createOrUpdateErrorTask(
     }
     prestoTask->info.needsPlan = false;
   }
-  // outside of prestoTask->mutex.
-  prestoTask->taskStarted = true;
 
   auto info = prestoTask->updateInfo();
   return std::make_unique<TaskInfo>(info);
+}
+
+/*static*/ std::string TaskManager::buildTaskSpillDirectoryPath(
+    const std::string& baseSpillPath,
+    const std::string& queryId,
+    const protocol::TaskId& taskId) {
+  // Generate 'YYYY-MM-DD' from the query ID, which starts with 'YYYYMMDD'.
+  // In case query id is malformed (should not be the case in production) we
+  // fall back to the predefined date.
+  const std::string dateString = (queryId.size() >= 8)
+      ? fmt::format(
+            "{}-{}-{}",
+            queryId.substr(0, 4),
+            queryId.substr(4, 2),
+            queryId.substr(6, 2))
+      : "1970-01-01";
+
+  std::stringstream ss;
+  ss << baseSpillPath << "/";
+  ss << dateString;
+  ss << "/";
+  // TODO(spershin): We will like need to use identity (from config?) in the
+  // long run. Use 'presto_native' for now.
+  ss << "presto_native/" << queryId << "/" << taskId << "/";
+  return ss.str();
+}
+
+void TaskManager::getDataForResultRequests(
+    const std::unordered_map<int64_t, std::shared_ptr<ResultRequest>>&
+        resultRequests) {
+  for (const auto& entry : resultRequests) {
+    auto resultRequest = entry.second.get();
+
+    VLOG(1) << "Processing pending result request for task "
+            << resultRequest->taskId << ", buffer " << resultRequest->bufferId
+            << ", sequence " << resultRequest->token;
+    getData(
+        resultRequest->promise.lock(),
+        resultRequest->taskId,
+        resultRequest->bufferId,
+        resultRequest->token,
+        resultRequest->maxSize,
+        *bufferManager_);
+  }
 }
 
 std::unique_ptr<TaskInfo> TaskManager::createOrUpdateTask(
@@ -213,6 +290,8 @@ std::unique_ptr<TaskInfo> TaskManager::createOrUpdateTask(
 
       execTask = std::make_shared<exec::Task>(
           taskId, planFragment, 0, std::move(queryCtx));
+      maybeSetupTaskSpillDirectory(planFragment, *execTask);
+
       prestoTask->task = execTask;
       prestoTask->info.needsPlan = false;
       startTask = true;
@@ -252,22 +331,10 @@ std::unique_ptr<TaskInfo> TaskManager::createOrUpdateTask(
     infoRequest = prestoTask->infoRequest;
   }
 
-  for (const auto& entry : resultRequests) {
-    auto resultRequest = entry.second.get();
+  getDataForResultRequests(resultRequests);
 
-    VLOG(1) << "Processing pending result request for task "
-            << resultRequest->taskId << ", buffer " << resultRequest->bufferId
-            << ", sequence " << resultRequest->token;
-
-    getData(
-        resultRequest->promise.lock(),
-        resultRequest->taskId,
-        resultRequest->bufferId,
-        resultRequest->token,
-        resultRequest->maxSize,
-        *bufferManager_);
-  }
-
+  // TODO Handle possible race condition. Refer:
+  // https://github.com/facebookincubator/velox/issues/3593
   if (outputBuffers.type == protocol::BufferType::BROADCAST) {
     execTask->updateBroadcastOutputBuffers(
         outputBuffers.buffers.size(), outputBuffers.noMoreBufferIds);
@@ -591,7 +658,6 @@ folly::Future<std::unique_ptr<Result>> TaskManager::getResults(
       std::max(1.0, maxWait.getValue(protocol::TimeUnit::MICROSECONDS));
   VLOG(1) << "TaskManager::getResults " << taskId << ", " << bufferId << ", "
           << token;
-  auto eventBase = folly::EventBaseManager::get()->getEventBase();
   auto [promise, future] =
       folly::makePromiseContract<std::unique_ptr<Result>>();
 
@@ -612,14 +678,9 @@ folly::Future<std::unique_ptr<Result>> TaskManager::getResults(
         promise.setValue(std::move(result));
       });
 
-  auto timeoutFn = [token]() {
-    auto result = std::make_unique<Result>();
-    result->sequence = result->nextSequence = token;
-    result->data = folly::IOBuf::create(0);
-    result->complete = false;
-    return result;
-  };
+  auto timeoutFn = [this, token]() { return createTimeOutResult(token); };
 
+  auto eventBase = folly::EventBaseManager::get()->getEventBase();
   try {
     auto prestoTask = findOrCreateTask(taskId);
 
@@ -628,7 +689,23 @@ folly::Future<std::unique_ptr<Result>> TaskManager::getResults(
       VELOX_USER_FAIL("Calling getResult() on a aborted task: {}", taskId);
     }
     if (prestoTask->error != nullptr) {
-      VELOX_USER_FAIL("Calling getResult() on a failed task: {}", taskId);
+      try {
+        std::rethrow_exception(prestoTask->error);
+      } catch (const VeloxException& e) {
+        VELOX_USER_FAIL(
+            "Calling getResult() on a failed PrestoTask: {}. PrestoTask failure reason: {}",
+            taskId,
+            e.what());
+      } catch (const std::exception& e) {
+        VELOX_USER_FAIL(
+            "Calling getResult() on a failed PrestoTask: {}. PrestoTask failure reason: {}",
+            taskId,
+            e.what());
+      } catch (...) {
+        VELOX_USER_FAIL(
+            "Calling getResult() on a failed PrestoTask: {}. PrestoTask failure reason: UNKNOWN",
+            taskId);
+      }
     }
 
     for (;;) {
@@ -662,6 +739,9 @@ folly::Future<std::unique_ptr<Result>> TaskManager::getResults(
       return std::move(future).via(eventBase).onTimeout(
           std::chrono::microseconds(maxWaitMicros), timeoutFn);
     }
+  } catch (const velox::VeloxException& e) {
+    promiseHolder->promise.setException(e);
+    return std::move(future).via(eventBase);
   } catch (const std::exception& e) {
     promiseHolder->promise.setException(e);
     return std::move(future).via(eventBase);
@@ -747,46 +827,45 @@ std::shared_ptr<PrestoTask> TaskManager::findOrCreateTaskLocked(
     TaskMap& taskMap,
     const TaskId& taskId) {
   auto it = taskMap.find(taskId);
-  if (it == taskMap.cend()) {
-    auto prestoTask = std::make_shared<PrestoTask>(taskId);
-    prestoTask->info.stats.createTime =
-        util::toISOTimestamp(velox::getCurrentTimeMs());
-    prestoTask->info.needsPlan = true;
-    prestoTask->info.metadataUpdates.connectorId = "unused";
-
-    struct uuid_split {
-      int64_t lo;
-      int64_t hi;
-    };
-    union uuid_parse {
-      boost::uuids::uuid uuid;
-      uuid_split split;
-    };
-
-    uuid_parse uuid;
-    uuid.uuid = boost::uuids::random_generator()();
-
-    prestoTask->info.taskStatus.taskInstanceIdLeastSignificantBits =
-        uuid.split.lo;
-    prestoTask->info.taskStatus.taskInstanceIdMostSignificantBits =
-        uuid.split.hi;
-
-    prestoTask->info.taskStatus.state = protocol::TaskState::RUNNING;
-    prestoTask->info.taskStatus.self =
-        fmt::format("{}/v1/task/{}", baseUri_, taskId);
-    prestoTask->info.taskStatus.outputBufferUtilization = 1;
-    prestoTask->updateHeartbeatLocked();
-    ++prestoTask->info.taskStatus.version;
-
-    taskMap[taskId] = prestoTask;
-    return prestoTask;
-  } else {
+  if (it != taskMap.end()) {
     auto prestoTask = it->second;
     std::lock_guard<std::mutex> l(prestoTask->mutex);
     prestoTask->updateHeartbeatLocked();
     ++prestoTask->info.taskStatus.version;
     return prestoTask;
   }
+
+  auto prestoTask = std::make_shared<PrestoTask>(taskId);
+  prestoTask->info.stats.createTime =
+      util::toISOTimestamp(velox::getCurrentTimeMs());
+  prestoTask->info.needsPlan = true;
+  prestoTask->info.metadataUpdates.connectorId = "unused";
+
+  struct UuidSplit {
+    int64_t lo;
+    int64_t hi;
+  };
+  union UuidParse {
+    boost::uuids::uuid uuid;
+    UuidSplit split;
+  };
+
+  UuidParse uuid;
+  uuid.uuid = boost::uuids::random_generator()();
+
+  prestoTask->info.taskStatus.taskInstanceIdLeastSignificantBits =
+      uuid.split.lo;
+  prestoTask->info.taskStatus.taskInstanceIdMostSignificantBits = uuid.split.hi;
+
+  prestoTask->info.taskStatus.state = protocol::TaskState::RUNNING;
+  prestoTask->info.taskStatus.self =
+      fmt::format("{}/v1/task/{}", baseUri_, taskId);
+  prestoTask->info.taskStatus.outputBufferUtilization = 1;
+  prestoTask->updateHeartbeatLocked();
+  ++prestoTask->info.taskStatus.version;
+
+  taskMap[taskId] = prestoTask;
+  return prestoTask;
 }
 
 std::string TaskManager::toString() const {

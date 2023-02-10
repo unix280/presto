@@ -28,6 +28,7 @@ import com.facebook.drift.codec.utils.DataSizeToBytesThriftCodec;
 import com.facebook.drift.codec.utils.DurationToMillisThriftCodec;
 import com.facebook.drift.codec.utils.JodaDateTimeToEpochMillisThriftCodec;
 import com.facebook.presto.client.NodeVersion;
+import com.facebook.presto.common.ErrorCode;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeManager;
 import com.facebook.presto.connector.ConnectorTypeSerdeManager;
@@ -55,7 +56,6 @@ import com.facebook.presto.server.ConnectorMetadataUpdateHandleJsonSerde;
 import com.facebook.presto.server.InternalCommunicationConfig;
 import com.facebook.presto.server.TaskUpdateRequest;
 import com.facebook.presto.spi.ConnectorId;
-import com.facebook.presto.spi.ErrorCode;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.Serialization;
@@ -134,7 +134,7 @@ public class TestHttpRemoteTask
     // This 30 sec per-test timeout should never be reached because the test should fail and do proper cleanup after 20 sec.
     private static final Duration POLL_TIMEOUT = new Duration(100, MILLISECONDS);
     private static final Duration IDLE_TIMEOUT = new Duration(3, SECONDS);
-    private static final Duration FAIL_TIMEOUT = new Duration(20, SECONDS);
+    private static final Duration FAIL_TIMEOUT = new Duration(40, SECONDS);
     private static final TaskManagerConfig TASK_MANAGER_CONFIG = new TaskManagerConfig()
             // Shorten status refresh wait and info update interval so that we can have a shorter test timeout
             .setStatusRefreshMaxWait(new Duration(IDLE_TIMEOUT.roundTo(MILLISECONDS) / 100, MILLISECONDS))
@@ -148,28 +148,28 @@ public class TestHttpRemoteTask
         return new Object[][] {{true}, {false}};
     }
 
-    @Test(timeOut = 30000, dataProvider = "thriftEncodingToggle")
+    @Test(timeOut = 50000, dataProvider = "thriftEncodingToggle")
     public void testRemoteTaskMismatch(boolean useThriftEncoding)
             throws Exception
     {
         runTest(FailureScenario.TASK_MISMATCH, useThriftEncoding);
     }
 
-    @Test(timeOut = 30000, dataProvider = "thriftEncodingToggle")
+    @Test(timeOut = 50000, dataProvider = "thriftEncodingToggle")
     public void testRejectedExecutionWhenVersionIsHigh(boolean useThriftEncoding)
             throws Exception
     {
         runTest(FailureScenario.TASK_MISMATCH_WHEN_VERSION_IS_HIGH, useThriftEncoding);
     }
 
-    @Test(timeOut = 30000, dataProvider = "thriftEncodingToggle")
+    @Test(timeOut = 40000, dataProvider = "thriftEncodingToggle")
     public void testRejectedExecution(boolean useThriftEncoding)
             throws Exception
     {
         runTest(FailureScenario.REJECTED_EXECUTION, useThriftEncoding);
     }
 
-    @Test(timeOut = 30000, dataProvider = "thriftEncodingToggle")
+    @Test(timeOut = 60000, dataProvider = "thriftEncodingToggle")
     public void testRegular(boolean useThriftEncoding)
             throws Exception
     {
@@ -201,7 +201,7 @@ public class TestHttpRemoteTask
         httpRemoteTaskFactory.stop();
     }
 
-    @Test(timeOut = 30000)
+    @Test(timeOut = 50000)
     public void testHTTPRemoteTaskSize()
             throws Exception
     {

@@ -18,19 +18,21 @@ import com.facebook.airlift.stats.CounterStat;
 import com.facebook.presto.common.CatalogSchemaName;
 import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.Subfield;
+import com.facebook.presto.common.transaction.TransactionId;
 import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.ConnectorAccessControl;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.spi.security.AccessControlContext;
+import com.facebook.presto.spi.security.AuthorizedIdentity;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.Privilege;
 import com.facebook.presto.spi.security.SystemAccessControl;
 import com.facebook.presto.spi.security.SystemAccessControlFactory;
-import com.facebook.presto.transaction.TransactionId;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -42,7 +44,9 @@ import javax.inject.Inject;
 
 import java.io.File;
 import java.security.Principal;
+import java.security.cert.X509Certificate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -162,6 +166,15 @@ public class AccessControlManager
         requireNonNull(userName, "userName is null");
 
         authenticationCheck(() -> systemAccessControl.get().checkCanSetUser(identity, context, principal, userName));
+    }
+
+    @Override
+    public AuthorizedIdentity selectAuthorizedIdentity(Identity identity, AccessControlContext context, String userName, List<X509Certificate> certificates)
+    {
+        requireNonNull(userName, "userName is null");
+        requireNonNull(certificates, "certificates is null");
+
+        return systemAccessControl.get().selectAuthorizedIdentity(identity, context, userName, certificates);
     }
 
     @Override

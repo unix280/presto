@@ -15,16 +15,17 @@ package com.facebook.presto.execution;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
+import com.facebook.presto.common.ErrorCode;
+import com.facebook.presto.common.resourceGroups.QueryType;
+import com.facebook.presto.common.transaction.TransactionId;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.cost.StatsAndCosts;
 import com.facebook.presto.execution.QueryExecution.QueryOutputInfo;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.memory.VersionedMemoryPoolId;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.server.BasicQueryInfo;
 import com.facebook.presto.server.BasicQueryStats;
-import com.facebook.presto.spi.ErrorCode;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SchemaTableName;
@@ -32,10 +33,10 @@ import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.connector.ConnectorCommitHandle;
 import com.facebook.presto.spi.function.SqlFunctionId;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
-import com.facebook.presto.spi.resourceGroups.QueryType;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.spi.security.SelectedRole;
-import com.facebook.presto.transaction.TransactionId;
+import com.facebook.presto.sql.planner.CanonicalPlanWithInfo;
 import com.facebook.presto.transaction.TransactionInfo;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.base.Ticker;
@@ -149,6 +150,7 @@ public class QueryStateMachine
     private final AtomicReference<ExecutionFailureInfo> failureCause = new AtomicReference<>();
 
     private final AtomicReference<StatsAndCosts> planStatsAndCosts = new AtomicReference<>();
+    private final AtomicReference<List<CanonicalPlanWithInfo>> planCanonicalInfo = new AtomicReference<>();
     private final AtomicReference<Set<Input>> inputs = new AtomicReference<>(ImmutableSet.of());
     private final AtomicReference<Optional<Output>> output = new AtomicReference<>(Optional.empty());
 
@@ -159,6 +161,7 @@ public class QueryStateMachine
     private final Set<SqlFunctionId> removedSessionFunctions = Sets.newConcurrentHashSet();
 
     private final WarningCollector warningCollector;
+    private final AtomicReference<List<String>> functionNames = new AtomicReference<>(ImmutableList.of());
 
     private QueryStateMachine(
             String query,
@@ -479,7 +482,10 @@ public class QueryStateMachine
                 runtimeOptimizedStages.isEmpty() ? Optional.empty() : Optional.of(runtimeOptimizedStages),
                 addedSessionFunctions,
                 removedSessionFunctions,
-                Optional.ofNullable(planStatsAndCosts.get()).orElseGet(StatsAndCosts::empty));
+                Optional.ofNullable(planStatsAndCosts.get()).orElseGet(StatsAndCosts::empty),
+                session.getOptimizerInformationCollector().getOptimizationInfo(),
+                functionNames.get(),
+                Optional.ofNullable(planCanonicalInfo.get()).orElseGet(ImmutableList::of));
     }
 
     private QueryStats getQueryStats(Optional<StageInfo> rootStage, List<StageInfo> allStages)
@@ -534,10 +540,22 @@ public class QueryStateMachine
         this.planStatsAndCosts.set(statsAndCosts);
     }
 
+    public void setPlanCanonicalInfo(List<CanonicalPlanWithInfo> planCanonicalInfo)
+    {
+        requireNonNull(planCanonicalInfo, "planCanonicalInfo is null");
+        this.planCanonicalInfo.set(planCanonicalInfo);
+    }
+
     public void setOutput(Optional<Output> output)
     {
         requireNonNull(output, "output is null");
         this.output.set(output);
+    }
+
+    public void setFunctionNames(List<String> functionNames)
+    {
+        requireNonNull(functionNames, "functionNames is null");
+        this.functionNames.set(ImmutableList.copyOf(functionNames));
     }
 
     private void addSerializedCommitOutputToOutput(ConnectorCommitHandle commitHandle)
@@ -995,6 +1013,10 @@ public class QueryStateMachine
         return queryInfo;
     }
 
+    /**
+     * Remove large objects from the query info object graph, e.g : plan, stats, stage summaries, failed attempts
+     * Used when pruning expired queries from the state machine
+     */
     public void pruneQueryInfo()
     {
         Optional<QueryInfo> finalInfo = finalQueryInfo.get();
@@ -1047,7 +1069,10 @@ public class QueryStateMachine
                 queryInfo.getRuntimeOptimizedStages(),
                 queryInfo.getAddedSessionFunctions(),
                 queryInfo.getRemovedSessionFunctions(),
-                StatsAndCosts.empty());
+                StatsAndCosts.empty(),
+                queryInfo.getOptimizerInformation(),
+                queryInfo.getFunctionNames(),
+                ImmutableList.of());
         finalQueryInfo.compareAndSet(finalInfo, Optional.of(prunedQueryInfo));
     }
 

@@ -14,6 +14,7 @@
 package com.facebook.presto.execution;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.common.CatalogSchemaName;
 import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.block.BlockEncodingSerde;
 import com.facebook.presto.common.block.TestingBlockEncodingSerde;
@@ -24,22 +25,24 @@ import com.facebook.presto.metadata.Catalog;
 import com.facebook.presto.metadata.CatalogManager;
 import com.facebook.presto.metadata.ColumnPropertyManager;
 import com.facebook.presto.metadata.FunctionAndTypeManager;
-import com.facebook.presto.metadata.TableMetadata;
 import com.facebook.presto.metadata.TablePropertyManager;
-import com.facebook.presto.metadata.ViewDefinition;
-import com.facebook.presto.security.AccessControl;
-import com.facebook.presto.security.AllowAllAccessControl;
 import com.facebook.presto.spi.ColumnHandle;
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
-import com.facebook.presto.spi.ConnectorMaterializedViewDefinition;
 import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableMetadata;
+import com.facebook.presto.spi.MaterializedViewDefinition;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableHandle;
+import com.facebook.presto.spi.TableMetadata;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
+import com.facebook.presto.spi.security.AccessControl;
+import com.facebook.presto.spi.security.AllowAllAccessControl;
+import com.facebook.presto.sql.analyzer.MetadataResolver;
+import com.facebook.presto.sql.analyzer.ViewDefinition;
 import com.facebook.presto.sql.parser.ParsingOptions;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.CreateMaterializedView;
@@ -206,7 +209,7 @@ public class TestCreateMaterializedViewTask
         }
 
         @Override
-        public void createMaterializedView(Session session, String catalogName, ConnectorTableMetadata viewMetadata, ConnectorMaterializedViewDefinition viewDefinition, boolean ignoreExisting)
+        public void createMaterializedView(Session session, String catalogName, ConnectorTableMetadata viewMetadata, MaterializedViewDefinition viewDefinition, boolean ignoreExisting)
         {
             if (!ignoreExisting) {
                 throw new PrestoException(ALREADY_EXISTS, "Materialized view already exists");
@@ -244,7 +247,55 @@ public class TestCreateMaterializedViewTask
         }
 
         @Override
-        public Optional<TableHandle> getTableHandle(Session session, QualifiedObjectName tableName)
+        public MetadataResolver getMetadataResolver(Session session)
+        {
+            return new MetadataResolver()
+            {
+                @Override
+                public boolean catalogExists(String catalogName)
+                {
+                    return false;
+                }
+
+                @Override
+                public boolean schemaExists(CatalogSchemaName schemaName)
+                {
+                    return false;
+                }
+
+                @Override
+                public Optional<TableHandle> getTableHandle(QualifiedObjectName tableName)
+                {
+                    return getOptionalTableHandle(session, tableName);
+                }
+
+                @Override
+                public List<ColumnMetadata> getColumns(TableHandle tableHandle)
+                {
+                    return emptyList();
+                }
+
+                @Override
+                public Map<String, ColumnHandle> getColumnHandles(TableHandle tableHandle)
+                {
+                    return emptyMap();
+                }
+
+                @Override
+                public Optional<ViewDefinition> getView(QualifiedObjectName viewName)
+                {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<MaterializedViewDefinition> getMaterializedView(QualifiedObjectName viewName)
+                {
+                    return Optional.empty();
+                }
+            };
+        }
+
+        private Optional<TableHandle> getOptionalTableHandle(Session session, QualifiedObjectName tableName)
         {
             if (tableName.getObjectName().equals(MATERIALIZED_VIEW_A)) {
                 return Optional.empty();
@@ -271,18 +322,6 @@ public class TestCreateMaterializedViewTask
             return new TableMetadata(
                     catalogHandle,
                     new ConnectorTableMetadata(new SchemaTableName(SCHEMA_NAME, TABLE_A), emptyList()));
-        }
-
-        @Override
-        public Optional<ViewDefinition> getView(Session session, QualifiedObjectName viewName)
-        {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<ConnectorMaterializedViewDefinition> getMaterializedView(Session session, QualifiedObjectName viewName)
-        {
-            return Optional.empty();
         }
 
         @Override

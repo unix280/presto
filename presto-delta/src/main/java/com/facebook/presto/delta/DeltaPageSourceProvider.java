@@ -46,7 +46,6 @@ import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.airlift.units.DataSize;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
@@ -82,6 +81,7 @@ import static com.facebook.presto.delta.DeltaErrorCode.DELTA_CANNOT_OPEN_SPLIT;
 import static com.facebook.presto.delta.DeltaErrorCode.DELTA_MISSING_DATA;
 import static com.facebook.presto.delta.DeltaErrorCode.DELTA_PARQUET_SCHEMA_MISMATCH;
 import static com.facebook.presto.delta.DeltaSessionProperties.getParquetMaxReadBlockSize;
+import static com.facebook.presto.delta.DeltaSessionProperties.getReadNullMaskedParquetEncryptedValue;
 import static com.facebook.presto.delta.DeltaSessionProperties.isParquetBatchReaderVerificationEnabled;
 import static com.facebook.presto.delta.DeltaSessionProperties.isParquetBatchReadsEnabled;
 import static com.facebook.presto.delta.DeltaTypeUtils.convertPartitionValue;
@@ -157,7 +157,7 @@ public class DeltaPageSourceProvider
 
         ConnectorPageSource dataPageSource = createParquetPageSource(
                 hdfsEnvironment,
-                session.getUser(),
+                session,
                 hdfsEnvironment.getConfiguration(hdfsContext, filePath),
                 filePath,
                 deltaSplit.getStart(),
@@ -165,13 +165,9 @@ public class DeltaPageSourceProvider
                 deltaSplit.getFileSize(),
                 regularColumnHandles,
                 deltaTableHandle.toSchemaTableName(),
-                getParquetMaxReadBlockSize(session),
-                isParquetBatchReadsEnabled(session),
-                isParquetBatchReaderVerificationEnabled(session),
                 typeManager,
                 deltaTableLayoutHandle.getPredicate(),
-                fileFormatDataSourceStats,
-                false);
+                fileFormatDataSourceStats);
 
         return new DeltaPageSource(
                 deltaColumnHandles,
@@ -201,7 +197,7 @@ public class DeltaPageSourceProvider
 
     private static ConnectorPageSource createParquetPageSource(
             HdfsEnvironment hdfsEnvironment,
-            String user,
+            ConnectorSession session,
             Configuration configuration,
             Path path,
             long start,
@@ -209,15 +205,14 @@ public class DeltaPageSourceProvider
             long fileSize,
             List<DeltaColumnHandle> columns,
             SchemaTableName tableName,
-            DataSize maxReadBlockSize,
-            boolean batchReaderEnabled,
-            boolean verificationEnabled,
             TypeManager typeManager,
             TupleDomain<DeltaColumnHandle> effectivePredicate,
-            FileFormatDataSourceStats stats,
-            boolean columnIndexFilterEnabled)
+            FileFormatDataSourceStats stats)
     {
         AggregatedMemoryContext systemMemoryContext = newSimpleAggregatedMemoryContext();
+
+        String user = session.getUser();
+        boolean readMaskedValue = getReadNullMaskedParquetEncryptedValue(session);
 
         ParquetDataSource dataSource = null;
         try {
@@ -226,7 +221,7 @@ public class DeltaPageSourceProvider
             final ParquetDataSource parquetDataSource = buildHdfsParquetDataSource(inputStream, path, stats);
             dataSource = parquetDataSource;
             Optional<InternalFileDecryptor> fileDecryptor = createDecryptor(configuration, path);
-            ParquetMetadata parquetMetadata = hdfsEnvironment.doAs(user, () -> MetadataReader.readFooter(parquetDataSource, fileSize, fileDecryptor).getParquetMetadata());
+            ParquetMetadata parquetMetadata = hdfsEnvironment.doAs(user, () -> MetadataReader.readFooter(parquetDataSource, fileSize, fileDecryptor, readMaskedValue).getParquetMetadata());
             FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
             MessageType fileSchema = fileMetaData.getSchema();
 
@@ -258,8 +253,8 @@ public class DeltaPageSourceProvider
             ImmutableList.Builder<BlockMetaData> blocks = ImmutableList.builder();
             List<ColumnIndexStore> blockIndexStores = new ArrayList<>();
             for (BlockMetaData block : footerBlocks.build()) {
-                Optional<ColumnIndexStore> columnIndexStore = getColumnIndexStore(parquetPredicate, finalDataSource, block, descriptorsByPath, columnIndexFilterEnabled);
-                if (predicateMatches(parquetPredicate, block, finalDataSource, descriptorsByPath, parquetTupleDomain, columnIndexStore, columnIndexFilterEnabled)) {
+                Optional<ColumnIndexStore> columnIndexStore = getColumnIndexStore(parquetPredicate, finalDataSource, block, descriptorsByPath, false);
+                if (predicateMatches(parquetPredicate, block, finalDataSource, descriptorsByPath, parquetTupleDomain, columnIndexStore, false, Optional.of(session.getWarningCollector()))) {
                     blocks.add(block);
                     blockIndexStores.add(columnIndexStore.orElse(null));
                 }
@@ -271,12 +266,12 @@ public class DeltaPageSourceProvider
                     Optional.empty(),
                     dataSource,
                     systemMemoryContext,
-                    maxReadBlockSize,
-                    batchReaderEnabled,
-                    verificationEnabled,
+                    getParquetMaxReadBlockSize(session),
+                    isParquetBatchReadsEnabled(session),
+                    isParquetBatchReaderVerificationEnabled(session),
                     parquetPredicate,
                     blockIndexStores,
-                    columnIndexFilterEnabled,
+                    false,
                     fileDecryptor);
 
             ImmutableList.Builder<String> namesBuilder = ImmutableList.builder();

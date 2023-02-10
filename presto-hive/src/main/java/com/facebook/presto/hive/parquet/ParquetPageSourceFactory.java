@@ -26,6 +26,7 @@ import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveBatchPageSourceFactory;
 import com.facebook.presto.hive.HiveColumnHandle;
 import com.facebook.presto.hive.HiveFileContext;
+import com.facebook.presto.hive.HiveFileSplit;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.metastore.Storage;
 import com.facebook.presto.memory.context.AggregatedMemoryContext;
@@ -45,7 +46,6 @@ import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import io.airlift.units.DataSize;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
@@ -53,8 +53,10 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.crypto.DecryptionPropertiesFactory;
 import org.apache.parquet.crypto.FileDecryptionProperties;
+import org.apache.parquet.crypto.HiddenColumnException;
 import org.apache.parquet.crypto.InternalFileDecryptor;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
+import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.internal.filter2.columnindex.ColumnIndexStore;
@@ -105,6 +107,7 @@ import static com.facebook.presto.hive.HiveErrorCode.HIVE_MISSING_DATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PARTITION_SCHEMA_MISMATCH;
 import static com.facebook.presto.hive.HiveSessionProperties.columnIndexFilterEnabled;
 import static com.facebook.presto.hive.HiveSessionProperties.getParquetMaxReadBlockSize;
+import static com.facebook.presto.hive.HiveSessionProperties.getReadNullMaskedParquetEncryptedValue;
 import static com.facebook.presto.hive.HiveSessionProperties.isParquetBatchReaderVerificationEnabled;
 import static com.facebook.presto.hive.HiveSessionProperties.isParquetBatchReadsEnabled;
 import static com.facebook.presto.hive.HiveSessionProperties.isUseParquetColumnNames;
@@ -117,7 +120,6 @@ import static com.facebook.presto.parquet.ParquetTypeUtils.getParquetTypeByName;
 import static com.facebook.presto.parquet.ParquetTypeUtils.getSubfieldType;
 import static com.facebook.presto.parquet.ParquetTypeUtils.lookupColumnByName;
 import static com.facebook.presto.parquet.ParquetTypeUtils.nestedColumnPath;
-import static com.facebook.presto.parquet.cache.MetadataReader.findFirstNonHiddenColumnId;
 import static com.facebook.presto.parquet.predicate.PredicateUtils.buildPredicate;
 import static com.facebook.presto.parquet.predicate.PredicateUtils.predicateMatches;
 import static com.facebook.presto.spi.StandardErrorCode.PERMISSION_DENIED;
@@ -127,6 +129,7 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category.PRIMITIVE;
 import static org.apache.parquet.crypto.DecryptionPropertiesFactory.loadFactory;
+import static org.apache.parquet.crypto.HiddenColumnChunkMetaData.isHiddenColumn;
 import static org.apache.parquet.io.ColumnIOConverter.constructField;
 import static org.apache.parquet.io.ColumnIOConverter.findNestedColumnIO;
 
@@ -172,75 +175,29 @@ public class ParquetPageSourceFactory
         this.parquetMetadataSource = requireNonNull(parquetMetadataSource, "parquetMetadataSource is null");
     }
 
-    @Override
-    public Optional<? extends ConnectorPageSource> createPageSource(
-            Configuration configuration,
-            ConnectorSession session,
-            Path path,
-            long start,
-            long length,
-            long fileSize,
-            Storage storage,
-            SchemaTableName tableName,
-            Map<String, String> tableParameters,
-            List<HiveColumnHandle> columns,
-            TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone,
-            HiveFileContext hiveFileContext,
-            Optional<EncryptionInformation> encryptionInformation)
-    {
-        if (!PARQUET_SERDE_CLASS_NAMES.contains(storage.getStorageFormat().getSerDe())) {
-            return Optional.empty();
-        }
-
-        return Optional.of(createParquetPageSource(
-                hdfsEnvironment,
-                session.getUser(),
-                configuration,
-                path,
-                start,
-                length,
-                fileSize,
-                columns,
-                tableName,
-                isUseParquetColumnNames(session),
-                getParquetMaxReadBlockSize(session),
-                isParquetBatchReadsEnabled(session),
-                isParquetBatchReaderVerificationEnabled(session),
-                typeManager,
-                functionResolution,
-                effectivePredicate,
-                stats,
-                hiveFileContext,
-                parquetMetadataSource,
-                columnIndexFilterEnabled(session)));
-    }
-
     public static ConnectorPageSource createParquetPageSource(
             HdfsEnvironment hdfsEnvironment,
-            String user,
+            ConnectorSession session,
             Configuration configuration,
-            Path path,
-            long start,
-            long length,
-            long fileSize,
+            HiveFileSplit fileSplit,
             List<HiveColumnHandle> columns,
             SchemaTableName tableName,
-            boolean useParquetColumnNames,
-            DataSize maxReadBlockSize,
-            boolean batchReaderEnabled,
-            boolean verificationEnabled,
             TypeManager typeManager,
             StandardFunctionResolution functionResolution,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             FileFormatDataSourceStats stats,
             HiveFileContext hiveFileContext,
-            ParquetMetadataSource parquetMetadataSource,
-            boolean columnIndexFilterEnabled)
+            ParquetMetadataSource parquetMetadataSource)
     {
         AggregatedMemoryContext systemMemoryContext = newSimpleAggregatedMemoryContext();
 
+        String user = session.getUser();
+        boolean useParquetColumnNames = isUseParquetColumnNames(session);
+        boolean columnIndexFilterEnabled = columnIndexFilterEnabled(session);
+        boolean readMaskedValue = getReadNullMaskedParquetEncryptedValue(session);
+
         ParquetDataSource dataSource = null;
+        Path path = new Path(fileSplit.getPath());
         try {
             FSDataInputStream inputStream = hdfsEnvironment.getFileSystem(user, path, configuration).openFile(path, hiveFileContext);
             // Lambda expression below requires final variable, so we define a new variable parquetDataSource.
@@ -249,10 +206,11 @@ public class ParquetPageSourceFactory
             Optional<InternalFileDecryptor> fileDecryptor = createDecryptor(configuration, path);
             ParquetMetadata parquetMetadata = hdfsEnvironment.doAs(user, () -> parquetMetadataSource.getParquetMetadata(
                     parquetDataSource,
-                    fileSize,
+                    fileSplit.getFileSize(),
                     hiveFileContext.isCacheable(),
                     hiveFileContext.getModificationTime(),
-                    fileDecryptor).getParquetMetadata());
+                    fileDecryptor,
+                    readMaskedValue).getParquetMetadata());
 
             if (!columns.isEmpty() && columns.stream().allMatch(hiveColumnHandle -> hiveColumnHandle.getColumnType() == AGGREGATED)) {
                 return new AggregatedParquetPageSource(columns, parquetMetadata, typeManager, functionResolution);
@@ -272,11 +230,12 @@ public class ParquetPageSourceFactory
             MessageType requestedSchema = message.orElse(new MessageType(fileSchema.getName(), ImmutableList.of()));
 
             ImmutableList.Builder<BlockMetaData> footerBlocks = ImmutableList.builder();
+
             for (BlockMetaData block : parquetMetadata.getBlocks()) {
                 Optional<Integer> firstIndex = findFirstNonHiddenColumnId(block);
                 if (firstIndex.isPresent()) {
                     long firstDataPage = block.getColumns().get(firstIndex.get()).getFirstDataPageOffset();
-                    if (firstDataPage >= start && firstDataPage < start + length) {
+                    if (firstDataPage >= fileSplit.getStart() && firstDataPage < fileSplit.getStart() + fileSplit.getLength()) {
                         footerBlocks.add(block);
                     }
                 }
@@ -292,7 +251,7 @@ public class ParquetPageSourceFactory
             ImmutableList.Builder<Long> blockStarts = ImmutableList.builder();
             for (BlockMetaData block : footerBlocks.build()) {
                 Optional<ColumnIndexStore> columnIndexStore = ColumnIndexFilterUtils.getColumnIndexStore(parquetPredicate, finalDataSource, block, descriptorsByPath, columnIndexFilterEnabled);
-                if (predicateMatches(parquetPredicate, block, finalDataSource, descriptorsByPath, parquetTupleDomain, columnIndexStore, columnIndexFilterEnabled)) {
+                if (predicateMatches(parquetPredicate, block, finalDataSource, descriptorsByPath, parquetTupleDomain, columnIndexStore, columnIndexFilterEnabled, Optional.of(session.getWarningCollector()))) {
                     blocks.add(block);
                     blockStarts.add(nextStart);
                     blockIndexStores.add(columnIndexStore.orElse(null));
@@ -314,9 +273,9 @@ public class ParquetPageSourceFactory
                     Optional.of(blockStarts.build()),
                     dataSource,
                     systemMemoryContext,
-                    maxReadBlockSize,
-                    batchReaderEnabled,
-                    verificationEnabled,
+                    getParquetMaxReadBlockSize(session),
+                    isParquetBatchReadsEnabled(session),
+                    isParquetBatchReaderVerificationEnabled(session),
                     parquetPredicate,
                     blockIndexStores,
                     columnIndexFilterEnabled,
@@ -384,9 +343,14 @@ public class ParquetPageSourceFactory
                     e instanceof FileNotFoundException) {
                 throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, e);
             }
-            String message = format("Error opening Hive split %s (offset=%s, length=%s): %s", path, start, length, e.getMessage());
+            String message = format("Error opening Hive split %s (offset=%s, length=%s): %s", path, fileSplit.getStart(), fileSplit.getLength(), e.getMessage());
             if (e.getClass().getSimpleName().equals("BlockMissingException")) {
                 throw new PrestoException(HIVE_MISSING_DATA, message, e);
+            }
+            if (e instanceof HiddenColumnException) {
+                message = format("User does not have access to encryption key for encrypted column = %s. If returning 'null' for encrypted " +
+                        "columns is acceptable to your query, please add 'set session hive.read_null_masked_parquet_encrypted_value_enabled=true' before your query", ((HiddenColumnException) e).getColumn());
+                throw new PrestoException(PERMISSION_DENIED, message, e);
             }
             throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, message, e);
         }
@@ -556,5 +520,50 @@ public class ParquetPageSourceFactory
         DecryptionPropertiesFactory cryptoFactory = loadFactory(configuration);
         FileDecryptionProperties fileDecryptionProperties = (cryptoFactory == null) ? null : cryptoFactory.getFileDecryptionProperties(configuration, path);
         return (fileDecryptionProperties == null) ? Optional.empty() : Optional.of(new InternalFileDecryptor(fileDecryptionProperties));
+    }
+
+    private static Optional<Integer> findFirstNonHiddenColumnId(BlockMetaData block)
+    {
+        List<ColumnChunkMetaData> columns = block.getColumns();
+        for (int i = 0; i < columns.size(); i++) {
+            if (!isHiddenColumn(columns.get(i))) {
+                return Optional.of(i);
+            }
+        }
+        // all columns are hidden (encrypted but not accessible to current user)
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<? extends ConnectorPageSource> createPageSource(
+            Configuration configuration,
+            ConnectorSession session,
+            HiveFileSplit fileSplit,
+            Storage storage,
+            SchemaTableName tableName,
+            Map<String, String> tableParameters,
+            List<HiveColumnHandle> columns,
+            TupleDomain<HiveColumnHandle> effectivePredicate,
+            DateTimeZone hiveStorageTimeZone,
+            HiveFileContext hiveFileContext,
+            Optional<EncryptionInformation> encryptionInformation)
+    {
+        if (!PARQUET_SERDE_CLASS_NAMES.contains(storage.getStorageFormat().getSerDe())) {
+            return Optional.empty();
+        }
+
+        return Optional.of(createParquetPageSource(
+                hdfsEnvironment,
+                session,
+                configuration,
+                fileSplit,
+                columns,
+                tableName,
+                typeManager,
+                functionResolution,
+                effectivePredicate,
+                stats,
+                hiveFileContext,
+                parquetMetadataSource));
     }
 }

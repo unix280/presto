@@ -32,6 +32,7 @@ import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveCoercer;
 import com.facebook.presto.hive.HiveColumnHandle;
 import com.facebook.presto.hive.HiveFileContext;
+import com.facebook.presto.hive.HiveFileSplit;
 import com.facebook.presto.hive.HiveOrcAggregatedMemoryContext;
 import com.facebook.presto.hive.HiveSelectivePageSourceFactory;
 import com.facebook.presto.hive.HiveType;
@@ -200,10 +201,7 @@ public class OrcSelectivePageSourceFactory
     public Optional<? extends ConnectorPageSource> createPageSource(
             Configuration configuration,
             ConnectorSession session,
-            Path path,
-            long start,
-            long length,
-            long fileSize,
+            HiveFileSplit fileSplit,
             Storage storage,
             List<HiveColumnHandle> columns,
             Map<Integer, String> prefilledValues,
@@ -215,14 +213,15 @@ public class OrcSelectivePageSourceFactory
             DateTimeZone hiveStorageTimeZone,
             HiveFileContext hiveFileContext,
             Optional<EncryptionInformation> encryptionInformation,
-            boolean appendRowNumberEnabled)
+            boolean appendRowNumberEnabled,
+            boolean footerStatsUnreliable)
     {
         if (!OrcSerde.class.getName().equals(storage.getStorageFormat().getSerDe())) {
             return Optional.empty();
         }
 
         // per HIVE-13040 and ORC-162, empty files are allowed
-        if (fileSize == 0) {
+        if (fileSplit.getFileSize() == 0) {
             return Optional.of(new FixedPageSource(ImmutableList.of()));
         }
 
@@ -231,10 +230,7 @@ public class OrcSelectivePageSourceFactory
                 ORC,
                 hdfsEnvironment,
                 configuration,
-                path,
-                start,
-                length,
-                fileSize,
+                fileSplit,
                 columns,
                 prefilledValues,
                 coercers,
@@ -256,7 +252,8 @@ public class OrcSelectivePageSourceFactory
                 tupleDomainFilterCache,
                 encryptionInformation,
                 NO_ENCRYPTION,
-                appendRowNumberEnabled));
+                appendRowNumberEnabled,
+                footerStatsUnreliable));
     }
 
     public static ConnectorPageSource createOrcPageSource(
@@ -264,10 +261,7 @@ public class OrcSelectivePageSourceFactory
             OrcEncoding orcEncoding,
             HdfsEnvironment hdfsEnvironment,
             Configuration configuration,
-            Path path,
-            long start,
-            long length,
-            long fileSize,
+            HiveFileSplit fileSplit,
             List<HiveColumnHandle> columns,
             Map<Integer, String> prefilledValues,
             Map<Integer, HiveCoercer> coercers,
@@ -289,7 +283,8 @@ public class OrcSelectivePageSourceFactory
             TupleDomainFilterCache tupleDomainFilterCache,
             Optional<EncryptionInformation> encryptionInformation,
             DwrfEncryptionProvider dwrfEncryptionProvider,
-            boolean appendRowNumberEnabled)
+            boolean appendRowNumberEnabled,
+            boolean footerStatsUnreliable)
     {
         checkArgument(domainCompactionThreshold >= 1, "domainCompactionThreshold must be at least 1");
 
@@ -308,11 +303,12 @@ public class OrcSelectivePageSourceFactory
         boolean lazyReadSmallRanges = getOrcLazyReadSmallRanges(session);
 
         OrcDataSource orcDataSource;
+        Path path = new Path(fileSplit.getPath());
         try {
             FSDataInputStream inputStream = hdfsEnvironment.getFileSystem(session.getUser(), path, configuration).openFile(path, hiveFileContext);
             orcDataSource = new HdfsOrcDataSource(
-                    new OrcDataSourceId(path.toString()),
-                    fileSize,
+                    new OrcDataSourceId(fileSplit.getPath()),
+                    fileSplit.getFileSize(),
                     maxMergeDistance,
                     maxBufferSize,
                     streamBufferSize,
@@ -325,7 +321,7 @@ public class OrcSelectivePageSourceFactory
                     e instanceof FileNotFoundException) {
                 throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, e);
             }
-            throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, splitError(e, path, start, length), e);
+            throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, splitError(e, path, fileSplit.getStart(), fileSplit.getLength()), e);
         }
 
         OrcAggregatedMemoryContext systemMemoryUsage = new HiveOrcAggregatedMemoryContext();
@@ -347,7 +343,7 @@ public class OrcSelectivePageSourceFactory
 
             List<HiveColumnHandle> physicalColumns = getPhysicalHiveColumnHandles(columns, useOrcColumnNames, reader.getTypes(), path);
 
-            if (!physicalColumns.isEmpty() && physicalColumns.stream().allMatch(hiveColumnHandle -> hiveColumnHandle.getColumnType() == AGGREGATED)) {
+            if (!footerStatsUnreliable && !physicalColumns.isEmpty() && physicalColumns.stream().allMatch(hiveColumnHandle -> hiveColumnHandle.getColumnType() == AGGREGATED)) {
                 return new AggregatedOrcPageSource(physicalColumns, reader.getFooter(), typeManager, functionResolution);
             }
 
@@ -408,8 +404,8 @@ public class OrcSelectivePageSourceFactory
                     typedPrefilledValues,
                     Maps.transformValues(mappedCoercers, Function.class::cast),
                     orcPredicate,
-                    start,
-                    length,
+                    fileSplit.getStart(),
+                    fileSplit.getLength(),
                     hiveStorageTimeZone,
                     systemMemoryUsage,
                     Optional.empty(),
@@ -435,7 +431,7 @@ public class OrcSelectivePageSourceFactory
             if (e instanceof PrestoException) {
                 throw (PrestoException) e;
             }
-            String message = splitError(e, path, start, length);
+            String message = splitError(e, path, fileSplit.getStart(), fileSplit.getLength());
             if (e.getClass().getSimpleName().equals("BlockMissingException")) {
                 throw new PrestoException(HIVE_MISSING_DATA, message, e);
             }

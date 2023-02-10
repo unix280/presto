@@ -19,11 +19,9 @@ import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.type.TypeSignature;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.SessionPropertyManager.SessionPropertyValue;
-import com.facebook.presto.metadata.ViewDefinition;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.ConnectorId;
-import com.facebook.presto.spi.ConnectorMaterializedViewDefinition;
 import com.facebook.presto.spi.ConnectorTableMetadata;
+import com.facebook.presto.spi.MaterializedViewDefinition;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.StandardErrorCode;
@@ -33,12 +31,15 @@ import com.facebook.presto.spi.function.FunctionKind;
 import com.facebook.presto.spi.function.Signature;
 import com.facebook.presto.spi.function.SqlFunction;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.PrincipalType;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.sql.QueryUtil;
+import com.facebook.presto.sql.analyzer.MetadataResolver;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
 import com.facebook.presto.sql.analyzer.SemanticException;
+import com.facebook.presto.sql.analyzer.ViewDefinition;
 import com.facebook.presto.sql.parser.ParsingException;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.AllColumns;
@@ -115,7 +116,6 @@ import static com.facebook.presto.spi.StandardErrorCode.GENERIC_USER_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_COLUMN_PROPERTY;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static com.facebook.presto.sql.ExpressionUtils.combineConjuncts;
-import static com.facebook.presto.sql.ParsingUtil.createParsingOptions;
 import static com.facebook.presto.sql.QueryUtil.aliased;
 import static com.facebook.presto.sql.QueryUtil.aliasedName;
 import static com.facebook.presto.sql.QueryUtil.aliasedNullToEmpty;
@@ -148,6 +148,7 @@ import static com.facebook.presto.sql.tree.RoutineCharacteristics.NullCallClause
 import static com.facebook.presto.sql.tree.ShowCreate.Type.MATERIALIZED_VIEW;
 import static com.facebook.presto.sql.tree.ShowCreate.Type.TABLE;
 import static com.facebook.presto.sql.tree.ShowCreate.Type.VIEW;
+import static com.facebook.presto.util.AnalyzerUtil.createParsingOptions;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.String.format;
@@ -182,6 +183,7 @@ final class ShowQueriesRewrite
         private final SqlParser sqlParser;
         final List<Expression> parameters;
         private final AccessControl accessControl;
+        private final MetadataResolver metadataResolver;
         private Optional<QueryExplainer> queryExplainer;
         private final WarningCollector warningCollector;
 
@@ -194,6 +196,7 @@ final class ShowQueriesRewrite
             this.accessControl = requireNonNull(accessControl, "accessControl is null");
             this.queryExplainer = requireNonNull(queryExplainer, "queryExplainer is null");
             this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+            this.metadataResolver = metadata.getMetadataResolver(session);
         }
 
         @Override
@@ -215,11 +218,11 @@ final class ShowQueriesRewrite
 
             accessControl.checkCanShowTablesMetadata(session.getRequiredTransactionId(), session.getIdentity(), session.getAccessControlContext(), schema);
 
-            if (!metadata.catalogExists(session, schema.getCatalogName())) {
+            if (!metadataResolver.catalogExists(schema.getCatalogName())) {
                 throw new SemanticException(MISSING_CATALOG, showTables, "Catalog '%s' does not exist", schema.getCatalogName());
             }
 
-            if (!metadata.schemaExists(session, schema)) {
+            if (!metadataResolver.schemaExists(schema)) {
                 throw new SemanticException(MISSING_SCHEMA, showTables, "Schema '%s' does not exist", schema.getSchemaName());
             }
 
@@ -251,8 +254,8 @@ final class ShowQueriesRewrite
             if (tableName.isPresent()) {
                 QualifiedObjectName qualifiedTableName = createQualifiedObjectName(session, showGrants, tableName.get());
 
-                if (!metadata.getView(session, qualifiedTableName).isPresent() &&
-                        !metadata.getTableHandle(session, qualifiedTableName).isPresent()) {
+                if (!metadataResolver.getView(qualifiedTableName).isPresent() &&
+                        !metadataResolver.getTableHandle(qualifiedTableName).isPresent()) {
                     throw new SemanticException(MISSING_TABLE, showGrants, "Table '%s' does not exist", tableName);
                 }
 
@@ -391,8 +394,8 @@ final class ShowQueriesRewrite
         {
             QualifiedObjectName tableName = createQualifiedObjectName(session, showColumns, showColumns.getTable());
 
-            if (!metadata.getView(session, tableName).isPresent() &&
-                    !metadata.getTableHandle(session, tableName).isPresent()) {
+            if (!metadataResolver.getView(tableName).isPresent() &&
+                    !metadataResolver.getTableHandle(tableName).isPresent()) {
                 throw new SemanticException(MISSING_TABLE, showColumns, "Table '%s' does not exist", tableName);
             }
 
@@ -448,15 +451,15 @@ final class ShowQueriesRewrite
         protected Node visitShowCreate(ShowCreate node, Void context)
         {
             QualifiedObjectName objectName = createQualifiedObjectName(session, node, node.getName());
-            Optional<ViewDefinition> viewDefinition = metadata.getView(session, objectName);
-            Optional<ConnectorMaterializedViewDefinition> materializedViewDefinition = metadata.getMaterializedView(session, objectName);
+            Optional<ViewDefinition> viewDefinition = metadataResolver.getView(objectName);
+            Optional<MaterializedViewDefinition> materializedViewDefinition = metadataResolver.getMaterializedView(objectName);
 
             if (node.getType() == VIEW) {
                 if (!viewDefinition.isPresent()) {
                     if (materializedViewDefinition.isPresent()) {
                         throw new SemanticException(NOT_SUPPORTED, node, "Relation '%s' is a materialized view, not a view", objectName);
                     }
-                    if (metadata.getTableHandle(session, objectName).isPresent()) {
+                    if (metadataResolver.getTableHandle(objectName).isPresent()) {
                         throw new SemanticException(NOT_SUPPORTED, node, "Relation '%s' is a table, not a view", objectName);
                     }
                     throw new SemanticException(MISSING_TABLE, node, "View '%s' does not exist", objectName);
@@ -468,7 +471,7 @@ final class ShowQueriesRewrite
             }
 
             if (node.getType() == MATERIALIZED_VIEW) {
-                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, objectName);
+                Optional<TableHandle> tableHandle = metadataResolver.getTableHandle(objectName);
 
                 if (!materializedViewDefinition.isPresent()) {
                     if (viewDefinition.isPresent()) {
@@ -505,7 +508,7 @@ final class ShowQueriesRewrite
                     throw new SemanticException(NOT_SUPPORTED, node, "Relation '%s' is a materialized view, not a table", objectName);
                 }
 
-                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, objectName);
+                Optional<TableHandle> tableHandle = metadataResolver.getTableHandle(objectName);
                 if (!tableHandle.isPresent()) {
                     throw new SemanticException(MISSING_TABLE, node, "Table '%s' does not exist", objectName);
                 }

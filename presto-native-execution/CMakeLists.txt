@@ -40,6 +40,7 @@ endif()
 
 # Add all Presto options below
 option(PRESTO_ENABLE_S3 "Build S3 connector" OFF)
+option(PRESTO_ENABLE_HDFS "Build HDFS connector" OFF)
 option(PRESTO_ENABLE_PARQUET "Enable Parquet support" OFF)
 option(PRESTO_ENABLE_TESTING "Enable tests" ON)
 
@@ -49,6 +50,13 @@ if(PRESTO_ENABLE_S3)
       ON
       CACHE BOOL "Build S3 connector")
   add_definitions(-DPRESTO_ENABLE_S3)
+endif()
+
+if(PRESTO_ENABLE_HDFS)
+  set(VELOX_ENABLE_HDFS
+      ON
+      CACHE BOOL "Build HDFS Connector")
+  add_definitions(-DPRESTO_ENABLE_HDFS)
 endif()
 
 if(PRESTO_ENABLE_PARQUET)
@@ -148,6 +156,10 @@ find_library(WANGLE wangle)
 
 find_library(RE2 re2)
 
+find_package(wangle CONFIG)
+find_package(FBThrift)
+include_directories(SYSTEM ${FBTHRIFT_INCLUDE_DIR})
+
 set(PROXYGEN_LIBRARIES ${PROXYGEN_HTTP_SERVER} ${PROXYGEN} ${WANGLE} ${FIZZ})
 find_path(PROXYGEN_DIR NAMES include/proxygen)
 set(PROXYGEN_INCLUDE_DIR "${PROXYGEN_DIR}/include/proxygen")
@@ -157,6 +169,7 @@ include_directories(.)
 include_directories(velox)
 include_directories(velox/velox/external/xxhash)
 include_directories(${VELOX_ROOT})
+include_directories(${CMAKE_BINARY_DIR})
 
 add_subdirectory(velox)
 

@@ -69,8 +69,11 @@ import com.facebook.presto.sql.planner.plan.IndexJoinNode;
 import com.facebook.presto.sql.planner.plan.IndexSourceNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LateralJoinNode;
+import com.facebook.presto.sql.planner.plan.NativeExecutionNode;
 import com.facebook.presto.sql.planner.plan.OffsetNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
+import com.facebook.presto.sql.planner.plan.PlanFragmentId;
+import com.facebook.presto.sql.planner.plan.RemoteSourceNode;
 import com.facebook.presto.sql.planner.plan.RowNumberNode;
 import com.facebook.presto.sql.planner.plan.SampleNode;
 import com.facebook.presto.sql.planner.plan.SemiJoinNode;
@@ -116,6 +119,7 @@ import static com.facebook.presto.sql.planner.SystemPartitioningHandle.FIXED_HAS
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static com.facebook.presto.sql.planner.optimizations.ApplyNodeUtil.verifySubquerySupported;
 import static com.facebook.presto.sql.planner.optimizations.SetOperationNodeUtils.fromListMultimap;
+import static com.facebook.presto.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static com.facebook.presto.sql.relational.Expressions.call;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 import static com.facebook.presto.sql.relational.Expressions.constantNull;
@@ -332,15 +336,20 @@ public class PlanBuilder
         return aggregationBuilder.build();
     }
 
+    public RemoteSourceNode remoteSource(List<PlanFragmentId> sourceFragmentIds)
+    {
+        return new RemoteSourceNode(Optional.empty(), idAllocator.getNextId(), sourceFragmentIds, ImmutableList.of(), false, Optional.empty(), REPARTITION);
+    }
+
     public CallExpression binaryOperation(OperatorType operatorType, RowExpression left, RowExpression right)
     {
-        FunctionHandle functionHandle = new FunctionResolution(metadata.getFunctionAndTypeManager()).arithmeticFunction(operatorType, left.getType(), right.getType());
+        FunctionHandle functionHandle = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()).arithmeticFunction(operatorType, left.getType(), right.getType());
         return call(operatorType.getOperator(), functionHandle, left.getType(), left, right);
     }
 
     public CallExpression comparison(OperatorType operatorType, RowExpression left, RowExpression right)
     {
-        FunctionHandle functionHandle = new FunctionResolution(metadata.getFunctionAndTypeManager()).comparisonFunction(operatorType, left.getType(), right.getType());
+        FunctionHandle functionHandle = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()).comparisonFunction(operatorType, left.getType(), right.getType());
         return call(operatorType.getOperator(), functionHandle, left.getType(), left, right);
     }
 
@@ -493,8 +502,13 @@ public class PlanBuilder
 
     public ApplyNode apply(Assignments subqueryAssignments, List<VariableReferenceExpression> correlation, PlanNode input, PlanNode subquery)
     {
+        return apply(subqueryAssignments, correlation, input, subquery, false);
+    }
+
+    public ApplyNode apply(Assignments subqueryAssignments, List<VariableReferenceExpression> correlation, PlanNode input, PlanNode subquery, boolean mayParticipateInAntiJoin)
+    {
         verifySubquerySupported(subqueryAssignments);
-        return new ApplyNode(subquery.getSourceLocation(), idAllocator.getNextId(), input, subquery, subqueryAssignments, correlation, "");
+        return new ApplyNode(subquery.getSourceLocation(), idAllocator.getNextId(), input, subquery, subqueryAssignments, correlation, "", mayParticipateInAntiJoin);
     }
 
     public AssignUniqueId assignUniqueId(VariableReferenceExpression variable, PlanNode source)
@@ -956,6 +970,14 @@ public class PlanBuilder
                 ordinalityVariable);
     }
 
+    public NativeExecutionNode nativeExecution(PlanNode subPlan)
+    {
+        return new NativeExecutionNode(
+                Optional.empty(),
+                idAllocator.getNextId(),
+                subPlan);
+    }
+
     public static Expression expression(String sql)
     {
         return ExpressionUtils.rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(sql));
@@ -983,7 +1005,7 @@ public class PlanBuilder
                 expression,
                 expressionTypes,
                 ImmutableMap.of(),
-                metadata.getFunctionAndTypeManager(),
+                metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
                 session);
     }
 
@@ -1002,7 +1024,7 @@ public class PlanBuilder
                 expression,
                 expressionTypes,
                 ImmutableMap.of(),
-                metadata.getFunctionAndTypeManager(),
+                metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
                 session);
     }
 

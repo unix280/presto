@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.spi.eventlistener;
 
+import com.facebook.presto.common.resourceGroups.QueryType;
 import com.facebook.presto.spi.PrestoWarning;
-import com.facebook.presto.spi.resourceGroups.QueryType;
 import com.facebook.presto.spi.statistics.PlanStatisticsWithSourceInfo;
 
 import java.time.Instant;
@@ -42,6 +42,8 @@ public class QueryCompletedEvent
     private final Instant executionStartTime;
     private final Instant endTime;
     private final Optional<String> expandedQuery;
+    private final List<PlanOptimizerInformation> optimizerInformation;
+    private final List<String> functionNames;
 
     public QueryCompletedEvent(
             QueryMetadata metadata,
@@ -59,7 +61,9 @@ public class QueryCompletedEvent
             List<OperatorStatistics> operatorStatistics,
             List<PlanStatisticsWithSourceInfo> planStatisticsRead,
             List<PlanStatisticsWithSourceInfo> planStatisticsWritten,
-            Optional<String> expandedQuery)
+            Optional<String> expandedQuery,
+            List<PlanOptimizerInformation> optimizerInformation,
+            List<String> functionNames)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.statistics = requireNonNull(statistics, "statistics is null");
@@ -77,6 +81,8 @@ public class QueryCompletedEvent
         this.planStatisticsRead = requireNonNull(planStatisticsRead, "planStatisticsRead is null");
         this.planStatisticsWritten = requireNonNull(planStatisticsWritten, "planStatisticsWritten is null");
         this.expandedQuery = requireNonNull(expandedQuery, "expandedQuery is null");
+        this.optimizerInformation = requireNonNull(optimizerInformation, "optimizerInformation is null");
+        this.functionNames = requireNonNull(functionNames, "functionNames is null");
     }
 
     public QueryMetadata getMetadata()
@@ -157,5 +163,15 @@ public class QueryCompletedEvent
     public Optional<String> getExpandedQuery()
     {
         return expandedQuery;
+    }
+
+    public List<PlanOptimizerInformation> getOptimizerInformation()
+    {
+        return optimizerInformation;
+    }
+
+    public List<String> getFunctionNames()
+    {
+        return functionNames;
     }
 }

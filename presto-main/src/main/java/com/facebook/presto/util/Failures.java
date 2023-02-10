@@ -15,10 +15,10 @@ package com.facebook.presto.util;
 
 import com.facebook.presto.ExceededMemoryLimitException;
 import com.facebook.presto.client.ErrorLocation;
+import com.facebook.presto.common.ErrorCode;
 import com.facebook.presto.execution.ExecutionFailureInfo;
 import com.facebook.presto.execution.Failure;
 import com.facebook.presto.spi.ErrorCause;
-import com.facebook.presto.spi.ErrorCode;
 import com.facebook.presto.spi.ErrorCodeSupplier;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.PrestoException;
@@ -152,8 +152,8 @@ public final class Failures
         }
         else if (throwable instanceof SemanticException) {
             SemanticException e = (SemanticException) throwable;
-            if (e.getNode().getLocation().isPresent()) {
-                NodeLocation nodeLocation = e.getNode().getLocation().get();
+            if (e.getLocation().isPresent()) {
+                NodeLocation nodeLocation = e.getLocation().get();
                 return new ErrorLocation(nodeLocation.getLineNumber(), nodeLocation.getColumnNumber());
             }
         }

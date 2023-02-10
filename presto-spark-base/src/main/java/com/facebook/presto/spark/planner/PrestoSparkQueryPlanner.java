@@ -14,26 +14,30 @@
 package com.facebook.presto.spark.planner;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.common.resourceGroups.QueryType;
 import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.HistoryBasedPlanStatisticsManager;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.execution.Input;
 import com.facebook.presto.execution.Output;
-import com.facebook.presto.execution.QueryPreparer.PreparedQuery;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spark.PhysicalResourceSettings;
 import com.facebook.presto.spark.PrestoSparkPhysicalResourceCalculator;
+import com.facebook.presto.spark.PrestoSparkSourceStatsCollector;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
-import com.facebook.presto.spi.resourceGroups.QueryType;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Analyzer;
+import com.facebook.presto.sql.analyzer.BuiltInQueryPreparer.BuiltInPreparedQuery;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
 import com.facebook.presto.sql.parser.SqlParser;
+import com.facebook.presto.sql.planner.CanonicalPlanWithInfo;
 import com.facebook.presto.sql.planner.InputExtractor;
 import com.facebook.presto.sql.planner.LogicalPlanner;
 import com.facebook.presto.sql.planner.OutputExtractor;
 import com.facebook.presto.sql.planner.Plan;
+import com.facebook.presto.sql.planner.PlanCanonicalInfoProvider;
 import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.sanity.PlanChecker;
@@ -46,9 +50,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import static com.facebook.presto.sql.ParameterUtils.parameterExtractor;
+import static com.facebook.presto.sql.analyzer.utils.ParameterUtils.parameterExtractor;
+import static com.facebook.presto.sql.analyzer.utils.StatementUtils.getQueryType;
 import static com.facebook.presto.sql.planner.LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED;
-import static com.facebook.presto.util.StatementUtils.getQueryType;
+import static com.facebook.presto.sql.planner.PlanNodeCanonicalInfo.getCanonicalInfo;
 import static java.util.Objects.requireNonNull;
 
 public class PrestoSparkQueryPlanner
@@ -61,6 +66,7 @@ public class PrestoSparkQueryPlanner
     private final CostCalculator costCalculator;
     private final AccessControl accessControl;
     private final PlanChecker planChecker;
+    private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
 
     @Inject
     public PrestoSparkQueryPlanner(
@@ -71,7 +77,8 @@ public class PrestoSparkQueryPlanner
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
             AccessControl accessControl,
-            PlanChecker planChecker)
+            PlanChecker planChecker,
+            HistoryBasedPlanStatisticsManager historyBasedPlanStatisticsManager)
     {
         this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
         this.optimizers = requireNonNull(optimizers, "optimizers is null");
@@ -81,9 +88,10 @@ public class PrestoSparkQueryPlanner
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.planChecker = requireNonNull(planChecker, "planChecker is null");
+        this.planCanonicalInfoProvider = requireNonNull(historyBasedPlanStatisticsManager, "historyBasedPlanStatisticsManager is null").getPlanCanonicalInfoProvider();
     }
 
-    public PlanAndMore createQueryPlan(Session session, PreparedQuery preparedQuery, WarningCollector warningCollector)
+    public PlanAndMore createQueryPlan(Session session, BuiltInPreparedQuery preparedQuery, WarningCollector warningCollector)
     {
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
 
@@ -115,7 +123,8 @@ public class PrestoSparkQueryPlanner
         Optional<Output> output = new OutputExtractor().extractOutput(plan.getRoot());
         Optional<QueryType> queryType = getQueryType(preparedQuery.getStatement().getClass());
         List<String> columnNames = ((OutputNode) plan.getRoot()).getColumnNames();
-        PhysicalResourceSettings physicalResourceSettings = new PrestoSparkPhysicalResourceCalculator().calculate(plan.getRoot(), metadata, session);
+        PhysicalResourceSettings physicalResourceSettings = new PrestoSparkPhysicalResourceCalculator()
+                .calculate(plan.getRoot(), new PrestoSparkSourceStatsCollector(metadata, session), session);
         return new PlanAndMore(
                 plan,
                 Optional.ofNullable(analysis.getUpdateType()),
@@ -123,7 +132,8 @@ public class PrestoSparkQueryPlanner
                 ImmutableSet.copyOf(inputs),
                 output,
                 queryType,
-                physicalResourceSettings);
+                physicalResourceSettings,
+                getCanonicalInfo(session, plan.getRoot(), planCanonicalInfoProvider));
     }
 
     public static class PlanAndMore
@@ -135,6 +145,7 @@ public class PrestoSparkQueryPlanner
         private final Optional<Output> output;
         private final Optional<QueryType> queryType;
         private final PhysicalResourceSettings physicalResourceSettings;
+        private final List<CanonicalPlanWithInfo> planCanonicalInfo;
 
         public PlanAndMore(
                 Plan plan,
@@ -143,7 +154,8 @@ public class PrestoSparkQueryPlanner
                 Set<Input> inputs,
                 Optional<Output> output,
                 Optional<QueryType> queryType,
-                PhysicalResourceSettings physicalResourceSettings)
+                PhysicalResourceSettings physicalResourceSettings,
+                List<CanonicalPlanWithInfo> planCanonicalInfo)
         {
             this.plan = requireNonNull(plan, "plan is null");
             this.updateType = requireNonNull(updateType, "updateType is null");
@@ -152,6 +164,7 @@ public class PrestoSparkQueryPlanner
             this.output = requireNonNull(output, "output is null");
             this.queryType = requireNonNull(queryType, "queryType is null");
             this.physicalResourceSettings = requireNonNull(physicalResourceSettings, "physicalResourceSetting is null.");
+            this.planCanonicalInfo = requireNonNull(planCanonicalInfo, "planCanonicalInfo is null");
         }
 
         public Plan getPlan()
@@ -187,6 +200,11 @@ public class PrestoSparkQueryPlanner
         public PhysicalResourceSettings getPhysicalResourceSettings()
         {
             return physicalResourceSettings;
+        }
+
+        public List<CanonicalPlanWithInfo> getPlanCanonicalInfo()
+        {
+            return planCanonicalInfo;
         }
     }
 }

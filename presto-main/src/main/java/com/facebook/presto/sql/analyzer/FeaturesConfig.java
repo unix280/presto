@@ -118,6 +118,7 @@ public class FeaturesConfig
     private boolean distributedSort = true;
     private boolean optimizeJoinsWithEmptySources;
     private boolean logFormattedQueryEnabled;
+    private boolean logInvokedFunctionNamesEnabled;
 
     private boolean dictionaryAggregation;
 
@@ -130,6 +131,7 @@ public class FeaturesConfig
     private boolean spillEnabled;
     private boolean joinSpillingEnabled = true;
     private boolean aggregationSpillEnabled = true;
+    private boolean topNSpillEnabled = true;
     private boolean distinctAggregationSpillEnabled = true;
     private boolean dedupBasedDistinctAggregationSpillEnabled;
     private boolean distinctAggregationLargeBlockSpillEnabled;
@@ -138,6 +140,7 @@ public class FeaturesConfig
     private boolean windowSpillEnabled = true;
     private boolean orderBySpillEnabled = true;
     private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, MEGABYTE);
+    private DataSize topNOperatorUnspillMemoryLimit = new DataSize(4, MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
     private int spillerThreads = 4;
     private double spillMaxUsedSpaceThreshold = 0.9;
@@ -159,6 +162,7 @@ public class FeaturesConfig
     private double partialAggregationByteReductionThreshold = 0.5;
     private boolean optimizeTopNRowNumber = true;
     private boolean pushLimitThroughOuterJoin = true;
+    private boolean optimizeConstantGroupingKeys = true;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private Duration queryAnalyzerTimeout = new Duration(3, MINUTES);
@@ -219,9 +223,8 @@ public class FeaturesConfig
     private boolean queryOptimizationWithMaterializedViewEnabled;
 
     private AggregationIfToFilterRewriteStrategy aggregationIfToFilterRewriteStrategy = AggregationIfToFilterRewriteStrategy.DISABLED;
+    private String analyzerType = "BUILTIN";
     private boolean verboseRuntimeStatsEnabled;
-    private boolean hashBasedDistinctLimitEnabled;
-    private int hashBasedDistinctLimitThreshold = 10000;
 
     private boolean streamingForPartialAggregationEnabled;
     private boolean preferMergeJoin;
@@ -234,6 +237,13 @@ public class FeaturesConfig
 
     private boolean pushRemoteExchangeThroughGroupId;
     private boolean isOptimizeMultipleApproxPercentileOnSameFieldEnabled = true;
+    private boolean nativeExecutionEnabled;
+    private String nativeExecutionExecutablePath = "./presto_server";
+    private boolean randomizeOuterJoinNullKey;
+    private boolean isOptimizeConditionalAggregationEnabled;
+    private boolean isRemoveRedundantDistinctAggregationEnabled = true;
+    private boolean inPredicatesAsInnerJoinsEnabled;
+    private double pushAggregationBelowJoinByteReductionThreshold = 1;
 
     public enum PartitioningPrecisionStrategy
     {
@@ -1054,6 +1064,19 @@ public class FeaturesConfig
         return aggregationSpillEnabled;
     }
 
+    @Config("experimental.topn-spill-enabled")
+    @ConfigDescription("Spill TopN if spill is enabled")
+    public FeaturesConfig setTopNSpillEnabled(boolean topNSpillEnabled)
+    {
+        this.topNSpillEnabled = topNSpillEnabled;
+        return this;
+    }
+
+    public boolean isTopNSpillEnabled()
+    {
+        return topNSpillEnabled;
+    }
+
     @Config("experimental.distinct-aggregation-spill-enabled")
     @ConfigDescription("Spill distinct aggregations if aggregation spill is enabled")
     public FeaturesConfig setDistinctAggregationSpillEnabled(boolean distinctAggregationSpillEnabled)
@@ -1253,6 +1276,18 @@ public class FeaturesConfig
     public boolean isDefaultFilterFactorEnabled()
     {
         return defaultFilterFactorEnabled;
+    }
+
+    public DataSize getTopNOperatorUnspillMemoryLimit()
+    {
+        return topNOperatorUnspillMemoryLimit;
+    }
+
+    @Config("experimental.topn-operator-unspill-memory-limit")
+    public FeaturesConfig setTopNOperatorUnspillMemoryLimit(DataSize aggregationOperatorUnspillMemoryLimit)
+    {
+        this.topNOperatorUnspillMemoryLimit = aggregationOperatorUnspillMemoryLimit;
+        return this;
     }
 
     public DataSize getAggregationOperatorUnspillMemoryLimit()
@@ -1623,6 +1658,18 @@ public class FeaturesConfig
         return pushLimitThroughOuterJoin;
     }
 
+    @Config("optimizer.optimize-constant-grouping-keys")
+    public FeaturesConfig setOptimizeConstantGroupingKeys(boolean optimizeConstantGroupingKeys)
+    {
+        this.optimizeConstantGroupingKeys = optimizeConstantGroupingKeys;
+        return this;
+    }
+
+    public boolean isOptimizeConstantGroupingKeys()
+    {
+        return optimizeConstantGroupingKeys;
+    }
+
     @Config("max-concurrent-materializations")
     @ConfigDescription("The maximum number of materializing plan sections that can run concurrently")
     public FeaturesConfig setMaxConcurrentMaterializations(int maxConcurrentMaterializations)
@@ -1897,6 +1944,19 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isLogInvokedFunctionNamesEnabled()
+    {
+        return logInvokedFunctionNamesEnabled;
+    }
+
+    @Config("log-invoked-function-names-enabled")
+    @ConfigDescription("Log the names of the functions invoked by the query when enabled.")
+    public FeaturesConfig setLogInvokedFunctionNamesEnabled(boolean logInvokedFunctionNamesEnabled)
+    {
+        this.logInvokedFunctionNamesEnabled = logInvokedFunctionNamesEnabled;
+        return this;
+    }
+
     public boolean isSpoolingOutputBufferEnabled()
     {
         return spoolingOutputBufferEnabled;
@@ -2062,30 +2122,17 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isHashBasedDistinctLimitEnabled()
+    public String getAnalyzerType()
     {
-        return hashBasedDistinctLimitEnabled;
+        return analyzerType;
     }
 
-    @Config("hash-based-distinct-limit-enabled")
-    @ConfigDescription("Enable fast hash-based distinct limit")
-    public FeaturesConfig setHashBasedDistinctLimitEnabled(boolean hashBasedDistinctLimitEnabled)
+    @Config("analyzer-type")
+    @ConfigDescription("Set the analyzer type for parsing and analyzing.")
+    public FeaturesConfig setAnalyzerType(String analyzerType)
     {
-        this.hashBasedDistinctLimitEnabled = hashBasedDistinctLimitEnabled;
+        this.analyzerType = analyzerType;
         return this;
-    }
-
-    @Config("hash-based-distinct-limit-threshold")
-    @ConfigDescription("Threshold for fast hash-based distinct limit")
-    public FeaturesConfig setHashBasedDistinctLimitThreshold(int hashBasedDistinctLimitThreshold)
-    {
-        this.hashBasedDistinctLimitThreshold = hashBasedDistinctLimitThreshold;
-        return this;
-    }
-
-    public int getHashBasedDistinctLimitThreshold()
-    {
-        return hashBasedDistinctLimitThreshold;
     }
 
     public boolean isStreamingForPartialAggregationEnabled()
@@ -2188,6 +2235,97 @@ public class FeaturesConfig
     public FeaturesConfig setOptimizeMultipleApproxPercentileOnSameFieldEnabled(boolean isOptimizeMultipleApproxPercentileOnSameFieldEnabled)
     {
         this.isOptimizeMultipleApproxPercentileOnSameFieldEnabled = isOptimizeMultipleApproxPercentileOnSameFieldEnabled;
+        return this;
+    }
+
+    @Config("native-execution-enabled")
+    @ConfigDescription("Enable execution on native engine")
+    public FeaturesConfig setNativeExecutionEnabled(boolean nativeExecutionEnabled)
+    {
+        this.nativeExecutionEnabled = nativeExecutionEnabled;
+        return this;
+    }
+
+    public boolean isNativeExecutionEnabled()
+    {
+        return this.nativeExecutionEnabled;
+    }
+
+    @Config("native-execution-executable-path")
+    @ConfigDescription("Native execution executable file path")
+    public FeaturesConfig setNativeExecutionExecutablePath(String nativeExecutionExecutablePath)
+    {
+        this.nativeExecutionExecutablePath = nativeExecutionExecutablePath;
+        return this;
+    }
+
+    public String getNativeExecutionExecutablePath()
+    {
+        return this.nativeExecutionExecutablePath;
+    }
+
+    public boolean isRandomizeOuterJoinNullKeyEnabled()
+    {
+        return randomizeOuterJoinNullKey;
+    }
+
+    @Config("optimizer.randomize-outer-join-null-key")
+    @ConfigDescription("Randomize null join key for outer join")
+    public FeaturesConfig setRandomizeOuterJoinNullKeyEnabled(boolean randomizeOuterJoinNullKey)
+    {
+        this.randomizeOuterJoinNullKey = randomizeOuterJoinNullKey;
+        return this;
+    }
+
+    public boolean isOptimizeConditionalAggregationEnabled()
+    {
+        return isOptimizeConditionalAggregationEnabled;
+    }
+
+    @Config("optimizer.optimize-conditional-aggregation-enabled")
+    @ConfigDescription("Enable rewriting IF(condition, AGG(x)) to AGG(x) with condition included in mask")
+    public FeaturesConfig setOptimizeConditionalAggregationEnabled(boolean isOptimizeConditionalAggregationEnabled)
+    {
+        this.isOptimizeConditionalAggregationEnabled = isOptimizeConditionalAggregationEnabled;
+        return this;
+    }
+
+    public boolean isRemoveRedundantDistinctAggregationEnabled()
+    {
+        return isRemoveRedundantDistinctAggregationEnabled;
+    }
+
+    @Config("optimizer.remove-redundant-distinct-aggregation-enabled")
+    @ConfigDescription("Enable removing distinct aggregation node if input is already distinct")
+    public FeaturesConfig setRemoveRedundantDistinctAggregationEnabled(boolean isRemoveRedundantDistinctAggregationEnabled)
+    {
+        this.isRemoveRedundantDistinctAggregationEnabled = isRemoveRedundantDistinctAggregationEnabled;
+        return this;
+    }
+
+    public boolean isInPredicatesAsInnerJoinsEnabled()
+    {
+        return inPredicatesAsInnerJoinsEnabled;
+    }
+
+    @Config("optimizer.in-predicates-as-inner-joins-enabled")
+    @ConfigDescription("Enable rewrite of In predicates to INNER joins")
+    public FeaturesConfig setInPredicatesAsInnerJoinsEnabled(boolean inPredicatesAsInnerJoinsEnabled)
+    {
+        this.inPredicatesAsInnerJoinsEnabled = inPredicatesAsInnerJoinsEnabled;
+        return this;
+    }
+
+    public double getPushAggregationBelowJoinByteReductionThreshold()
+    {
+        return pushAggregationBelowJoinByteReductionThreshold;
+    }
+
+    @Config("optimizer.push-aggregation-below-join-byte-reduction-threshold")
+    @ConfigDescription("Byte reduction ratio threshold at which to disable pushdown of aggregation below inner join")
+    public FeaturesConfig setPushAggregationBelowJoinByteReductionThreshold(double pushAggregationBelowJoinByteReductionThreshold)
+    {
+        this.pushAggregationBelowJoinByteReductionThreshold = pushAggregationBelowJoinByteReductionThreshold;
         return this;
     }
 }

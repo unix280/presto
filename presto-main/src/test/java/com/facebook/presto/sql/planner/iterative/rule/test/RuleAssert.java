@@ -24,13 +24,13 @@ import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.StatsProvider;
 import com.facebook.presto.matching.Match;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.plan.LogicalProperties;
 import com.facebook.presto.spi.plan.LogicalPropertiesProvider;
 import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Plan;
 import com.facebook.presto.sql.planner.PlanVariableAllocator;
@@ -43,7 +43,9 @@ import com.facebook.presto.sql.planner.iterative.Memo;
 import com.facebook.presto.sql.planner.iterative.PlanNodeMatcher;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.iterative.properties.LogicalPropertiesImpl;
+import com.facebook.presto.sql.planner.iterative.properties.LogicalPropertiesProviderImpl;
 import com.facebook.presto.sql.planner.iterative.rule.TranslateExpressions;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.collect.ImmutableSet;
 
@@ -145,7 +147,7 @@ public class RuleAssert
             fail(String.format(
                     "Expected %s to not fire for:\n%s",
                     rule.getClass().getName(),
-                    inTransaction(session -> textLogicalPlan(plan, ruleApplication.types, metadata.getFunctionAndTypeManager(), StatsAndCosts.empty(), session, 2))));
+                    inTransaction(session -> textLogicalPlan(plan, ruleApplication.types, StatsAndCosts.empty(), metadata.getFunctionAndTypeManager(), session, 2))));
         }
     }
 
@@ -241,7 +243,7 @@ public class RuleAssert
     {
         StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, session, types);
         CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, session);
-        return inTransaction(session -> textLogicalPlan(translateExpressions(plan, types), types, metadata.getFunctionAndTypeManager(), StatsAndCosts.create(plan, statsProvider, costProvider), session, 2, false));
+        return inTransaction(session -> textLogicalPlan(translateExpressions(plan, types), types, StatsAndCosts.create(plan, statsProvider, costProvider), metadata.getFunctionAndTypeManager(), session, 2, false));
     }
 
     private <T> T inTransaction(Function<Session, T> transactionSessionConsumer)
@@ -265,6 +267,7 @@ public class RuleAssert
     {
         StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, Optional.of(memo), lookup, session, variableAllocator.getTypes());
         CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(memo), session);
+        LogicalPropertiesProvider logicalPropertiesProvider = new LogicalPropertiesProviderImpl(new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()));
 
         return new Rule.Context()
         {
@@ -311,6 +314,12 @@ public class RuleAssert
             public WarningCollector getWarningCollector()
             {
                 return WarningCollector.NOOP;
+            }
+
+            @Override
+            public Optional<LogicalPropertiesProvider> getLogicalPropertiesProvider()
+            {
+                return Optional.of(logicalPropertiesProvider);
             }
         };
     }

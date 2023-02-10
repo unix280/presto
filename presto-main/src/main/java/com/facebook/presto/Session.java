@@ -15,9 +15,9 @@ package com.facebook.presto;
 
 import com.facebook.presto.common.RuntimeStats;
 import com.facebook.presto.common.function.SqlFunctionProperties;
+import com.facebook.presto.common.transaction.TransactionId;
 import com.facebook.presto.common.type.TimeZoneKey;
 import com.facebook.presto.metadata.SessionPropertyManager;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
@@ -25,14 +25,14 @@ import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.function.SqlFunctionId;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.spi.security.AccessControlContext;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.spi.session.ResourceEstimates;
 import com.facebook.presto.spi.session.SessionPropertyConfigurationManager.SystemSessionPropertyConfiguration;
 import com.facebook.presto.spi.tracing.Tracer;
-import com.facebook.presto.sql.tree.Execute;
-import com.facebook.presto.transaction.TransactionId;
+import com.facebook.presto.sql.planner.optimizations.OptimizerInformationCollector;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -93,6 +93,7 @@ public final class Session
     private final WarningCollector warningCollector;
 
     private final RuntimeStats runtimeStats = new RuntimeStats();
+    private final OptimizerInformationCollector optimizerInformationCollector = new OptimizerInformationCollector();
 
     public Session(
             QueryId queryId,
@@ -282,11 +283,6 @@ public final class Session
         return preparedStatements;
     }
 
-    public String getPreparedStatementFromExecute(Execute execute)
-    {
-        return getPreparedStatement(execute.getName().getValue());
-    }
-
     public String getPreparedStatement(String name)
     {
         String sql = preparedStatements.get(name);
@@ -317,6 +313,11 @@ public final class Session
     public WarningCollector getWarningCollector()
     {
         return warningCollector;
+    }
+
+    public OptimizerInformationCollector getOptimizerInformationCollector()
+    {
+        return optimizerInformationCollector;
     }
 
     public Session beginTransactionId(TransactionId transactionId, TransactionManager transactionManager, AccessControl accessControl)
@@ -390,7 +391,9 @@ public final class Session
                         identity.getPrincipal(),
                         roles.build(),
                         identity.getExtraCredentials(),
-                        identity.getExtraAuthenticators()),
+                        identity.getExtraAuthenticators(),
+                        identity.getSelectedUser(),
+                        identity.getReasonForSelect()),
                 source,
                 catalog,
                 schema,

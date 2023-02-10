@@ -672,7 +672,7 @@ public class TestHashJoinOperator
         return OperatorAssertion.toMaterializedResult(joinOperator.getOperatorContext().getSession(), types, actualPages);
     }
 
-    @Test(timeOut = 30_000)
+    @Test(timeOut = 40_000)
     public void testBuildGracefulSpill()
             throws Exception
     {
@@ -1209,7 +1209,7 @@ public class TestHashJoinOperator
         buildLookupSource(buildSideSetup);
     }
 
-    @Test(expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded per-node user memory limit of.* \\[Spilled:.*")
+    @Test(expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded per-node user memory limit of.* \\[Estimated Spilled:.*")
     public void testSpillMemoryLimit()
     {
         Session session = testSessionBuilder().setSystemProperty(QUERY_MAX_MEMORY_PER_NODE, "1000B").build();

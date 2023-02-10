@@ -76,6 +76,12 @@ class SystemConfig : public ConfigBase {
   static constexpr std::string_view kPrestoVersion{"presto.version"};
   static constexpr std::string_view kHttpServerHttpPort{
       "http-server.http.port"};
+  // This option allows a port closed in TIME_WAIT state to be reused
+  // immediately upon worker startup. This property is mainly used by batch
+  // processing. For interactive query, the worker uses a dynamic port upon
+  // startup.
+  static constexpr std::string_view kHttpServerReusePort{
+      "http-server.reuse-port"};
   static constexpr std::string_view kDiscoveryUri{"discovery.uri"};
   static constexpr std::string_view kMaxDriversPerTask{
       "task.max-drivers-per-task"};
@@ -84,33 +90,52 @@ class SystemConfig : public ConfigBase {
   static constexpr std::string_view kHttpExecThreads{"http_exec_threads"};
   static constexpr std::string_view kNumIoThreads{"num-io-threads"};
   static constexpr std::string_view kNumSpillThreads{"num-spill-threads"};
+  static constexpr std::string_view kSpillerSpillPath =
+      "experimental.spiller-spill-path";
   static constexpr std::string_view kShutdownOnsetSec{"shutdown-onset-sec"};
   static constexpr std::string_view kSystemMemoryGb{"system-memory-gb"};
   static constexpr std::string_view kAsyncCacheSsdGb{"async-cache-ssd-gb"};
   static constexpr std::string_view kAsyncCacheSsdPath{"async-cache-ssd-path"};
   static constexpr std::string_view kEnableSerializedPageChecksum{
       "enable-serialized-page-checksum"};
-
+  static constexpr std::string_view kUseMmapArena{"use-mmap-arena"};
+  static constexpr std::string_view kMmapArenaCapacityRatio{
+      "mmap-arena-capacity-ratio"};
+  static constexpr std::string_view kUseMmapAllocator{"use-mmap-allocator"};
   static constexpr std::string_view kEnableVeloxTaskLogging{
       "enable_velox_task_logging"};
+  static constexpr std::string_view kEnableVeloxExprSetLogging{
+      "enable_velox_expression_logging"};
+  static constexpr std::string_view kLocalShuffleMaxPartitionBytes{
+      "shuffle.local.max-partition-bytes"};
+  static constexpr std::string_view kShuffleName{"shuffle.name"};
   // Most server nodes today (May 2022) have at least 16 cores.
   // Setting the default maximum drivers per task to this value will
   // provide a better off-shelf experience.
   static constexpr int32_t kMaxDriversPerTaskDefault = 16;
+  static constexpr bool kHttpServerReusePortDefault = false;
   static constexpr int32_t kConcurrentLifespansPerTaskDefault = 1;
   static constexpr int32_t kHttpExecThreadsDefault = 8;
   static constexpr int32_t kNumIoThreadsDefault = 30;
   static constexpr int32_t kShutdownOnsetSecDefault = 10;
   static constexpr int32_t kSystemMemoryGbDefault = 40;
-  static constexpr int32_t kAsyncCacheSsdGbDefault = 0;
+  static constexpr int32_t kMmapArenaCapacityRatioDefault = 10;
+  static constexpr uint64_t kLocalShuffleMaxPartitionBytesDefault = 1 << 15;
+  static constexpr uint64_t kAsyncCacheSsdGbDefault = 0;
   static constexpr std::string_view kAsyncCacheSsdPathDefault{
       "/mnt/flash/async_cache."};
+  static constexpr std::string_view kShuffleNameDefault{""};
   static constexpr bool kEnableSerializedPageChecksumDefault = true;
-  static constexpr bool kEnableVeloxTaskLoggingDefault = true;
+  static constexpr bool kEnableVeloxTaskLoggingDefault = false;
+  static constexpr bool kEnableVeloxExprSetLoggingDefault = false;
+  static constexpr bool kUseMmapArenaDefault = false;
+  static constexpr bool kUseMmapAllocatorDefault{true};
 
   static SystemConfig* instance();
 
   int httpServerHttpPort() const;
+
+  bool httpServerReusePort() const;
 
   std::string prestoVersion() const;
 
@@ -126,17 +151,31 @@ class SystemConfig : public ConfigBase {
 
   int32_t numSpillThreads() const;
 
+  std::string spillerSpillPath() const;
+
   int32_t shutdownOnsetSec() const;
 
   int32_t systemMemoryGb() const;
 
-  int32_t asyncCacheSsdGb() const;
+  uint64_t asyncCacheSsdGb() const;
+
+  uint64_t localShuffleMaxPartitionBytes() const;
 
   std::string asyncCacheSsdPath() const;
+
+  std::string shuffleName() const;
 
   bool enableSerializedPageChecksum() const;
 
   bool enableVeloxTaskLogging() const;
+
+  bool enableVeloxExprSetLogging() const;
+
+  bool useMmapArena() const;
+
+  int32_t mmapArenaCapacityRatio() const;
+
+  bool useMmapAllocator() const;
 };
 
 /// Provides access to node properties defined in node.properties file.

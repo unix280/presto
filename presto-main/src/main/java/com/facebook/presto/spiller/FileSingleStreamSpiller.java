@@ -74,7 +74,7 @@ public class FileSingleStreamSpiller
 
     private boolean writable = true;
     private boolean committed;
-    private long spilledPagesInMemorySize;
+    private volatile long spilledPagesInMemorySize;
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
 
     public FileSingleStreamSpiller(
@@ -185,6 +185,7 @@ public class FileSingleStreamSpiller
             InputStream input = closer.register(targetFile.newInputStream());
             Iterator<Page> deserializedPages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
             Iterator<Page> compactPages = transform(deserializedPages, Page::compact);
+            spillerStats.addToTotalSpilledBytesRead(getSpilledPagesInMemorySize());
             return closeWhenExhausted(compactPages, input);
         }
         catch (IOException e) {

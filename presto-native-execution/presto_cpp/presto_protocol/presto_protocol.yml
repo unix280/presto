@@ -50,17 +50,20 @@ AbstractClasses:
       comparable: true
       subclasses:
         - { name: HiveColumnHandle,         key: hive }
+        - { name: TpchColumnHandle,         key: tpch }
 
     ConnectorPartitioningHandle:
       super: JsonEncodedSubclass
       subclasses:
         - { name: SystemPartitioningHandle, key: $remote }
         - { name: HivePartitioningHandle,   key: hive}
+        - { name: TpchPartitioningHandle,   key: tpch}
 
     ConnectorTableHandle:
       super: JsonEncodedSubclass
       subclasses:
         - { name: HiveTableHandle,          key: hive }
+        - { name: TpchTableHandle,          key: tpch }
 
     ConnectorOutputTableHandle:
       super: JsonEncodedSubclass
@@ -82,6 +85,7 @@ AbstractClasses:
       super: JsonEncodedSubclass
       subclasses:
         - { name: HiveTableLayoutHandle,    key: hive }
+        - { name: TpchTableLayoutHandle,    key: tpch }
 
     ConnectorMetadataUpdateHandle:
       super: JsonEncodedSubclass
@@ -92,6 +96,7 @@ AbstractClasses:
       super: JsonEncodedSubclass
       subclasses:
         - { name: HiveSplit,            key: hive }
+        - { name: TpchSplit,            key: tpch }
         - { name: RemoteSplit,          key: $remote }
         - { name: EmptySplit,           key: $empty }
 
@@ -150,6 +155,7 @@ AbstractClasses:
         - { name: BuiltInFunctionHandle,      key: $static }
 
 JavaClasses:
+  - presto-spi/src/main/java/com/facebook/presto/spi/ErrorCause.java
   - presto-spi/src/main/java/com/facebook/presto/spi/plan/AggregationNode.java
   - presto-common/src/main/java/com/facebook/presto/common/predicate/AllOrNoneValueSet.java
   - presto-common/src/main/java/com/facebook/presto/common/RuntimeMetric.java
@@ -181,7 +187,8 @@ JavaClasses:
   - presto-hive/src/main/java/com/facebook/presto/hive/DwrfEncryptionMetadata.java
   - presto-hive/src/main/java/com/facebook/presto/hive/EncryptionInformation.java
   - presto-common/src/main/java/com/facebook/presto/common/predicate/EquatableValueSet.java
-  - presto-spi/src/main/java/com/facebook/presto/spi/ErrorCode.java
+  - presto-common/src/main/java/com/facebook/presto/common/ErrorCode.java
+  - presto-common/src/main/java/com/facebook/presto/common/ErrorType.java
   - presto-client/src/main/java/com/facebook/presto/client/ErrorLocation.java
   - presto-client/src/main/java/com/facebook/presto/client/NodeVersion.java
   - presto-client/src/main/java/com/facebook/presto/client/ServerInfo.java
@@ -192,7 +199,6 @@ JavaClasses:
   - presto-main/src/main/java/com/facebook/presto/sql/planner/plan/TableWriterNode.java
   - presto-main/src/main/java/com/facebook/presto/sql/planner/plan/UnnestNode.java
   - presto-main/src/main/java/com/facebook/presto/sql/planner/plan/WindowNode.java
-  - presto-spi/src/main/java/com/facebook/presto/spi/ErrorType.java
   - presto-main/src/main/java/com/facebook/presto/execution/ExecutionFailureInfo.java
   - presto-main/src/main/java/com/facebook/presto/execution/Location.java
   - presto-main/src/main/java/com/facebook/presto/metadata/RemoteTransactionHandle.java
@@ -209,14 +215,20 @@ JavaClasses:
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveCompressionCodec.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveBucketing.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveColumnHandle.java
+  - presto-hive/src/main/java/com/facebook/presto/hive/HiveFileSplit.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveInsertTableHandle.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveOutputTableHandle.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HivePartitionKey.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HivePartitioningHandle.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveSplit.java
-  - presto-hive/src/main/java/com/facebook/presto/hive/HiveTableHandle.java
+  - presto-hive-metastore/src/main/java/com/facebook/presto/hive/HiveTableHandle.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveTableLayoutHandle.java
   - presto-hive/src/main/java/com/facebook/presto/hive/HiveTransactionHandle.java
+  - presto-tpch/src/main/java/com/facebook/presto/tpch/TpchSplit.java
+  - presto-tpch/src/main/java/com/facebook/presto/tpch/TpchTableHandle.java
+  - presto-tpch/src/main/java/com/facebook/presto/tpch/TpchTableLayoutHandle.java
+  - presto-tpch/src/main/java/com/facebook/presto/tpch/TpchColumnHandle.java
+  - presto-tpch/src/main/java/com/facebook/presto/tpch/TpchPartitioningHandle.java
   - presto-spi/src/main/java/com/facebook/presto/spi/plan/LimitNode.java
   - presto-spi/src/main/java/com/facebook/presto/spi/function/LongVariableConstraint.java
   - presto-common/src/main/java/com/facebook/presto/common/predicate/Marker.java
@@ -293,3 +305,4 @@ JavaClasses:
   - presto-main/src/main/java/com/facebook/presto/sql/planner/plan/SortNode.java
   - presto-main/src/main/java/com/facebook/presto/sql/planner/plan/AssignUniqueId.java
   - presto-spi/src/main/java/com/facebook/presto/spi/SourceLocation.java
+  - presto-spark-base/src/main/java/com/facebook/presto/spark/execution/BatchTaskUpdateRequest.java

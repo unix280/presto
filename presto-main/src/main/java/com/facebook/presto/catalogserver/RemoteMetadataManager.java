@@ -21,9 +21,12 @@ import com.facebook.presto.metadata.CatalogMetadata;
 import com.facebook.presto.metadata.DelegatingMetadataManager;
 import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.metadata.QualifiedTablePrefix;
-import com.facebook.presto.metadata.ViewDefinition;
-import com.facebook.presto.spi.ConnectorMaterializedViewDefinition;
+import com.facebook.presto.spi.ColumnHandle;
+import com.facebook.presto.spi.ColumnMetadata;
+import com.facebook.presto.spi.MaterializedViewDefinition;
 import com.facebook.presto.spi.TableHandle;
+import com.facebook.presto.sql.analyzer.MetadataResolver;
+import com.facebook.presto.sql.analyzer.ViewDefinition;
 import com.facebook.presto.transaction.TransactionManager;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -62,24 +65,6 @@ public class RemoteMetadataManager
     }
 
     @Override
-    public boolean schemaExists(Session session, CatalogSchemaName schema)
-    {
-        return catalogServerClient.get().schemaExists(
-                transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
-                session.toSessionRepresentation(),
-                schema);
-    }
-
-    @Override
-    public boolean catalogExists(Session session, String catalogName)
-    {
-        return catalogServerClient.get().catalogExists(
-                transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
-                session.toSessionRepresentation(),
-                catalogName);
-    }
-
-    @Override
     public List<String> listSchemaNames(Session session, String catalogName)
     {
         String schemaNamesJson = catalogServerClient.get().listSchemaNames(
@@ -91,8 +76,7 @@ public class RemoteMetadataManager
                 : readValue(schemaNamesJson, new TypeReference<List<String>>() {});
     }
 
-    @Override
-    public Optional<TableHandle> getTableHandle(Session session, QualifiedObjectName table)
+    private Optional<TableHandle> getOptionalTableHandle(Session session, QualifiedObjectName table)
     {
         String tableHandleJson = catalogServerClient.get().getTableHandle(
                 transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
@@ -150,30 +134,6 @@ public class RemoteMetadataManager
     }
 
     @Override
-    public Optional<ViewDefinition> getView(Session session, QualifiedObjectName viewName)
-    {
-        String viewDefinitionJson = catalogServerClient.get().getView(
-                transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
-                session.toSessionRepresentation(),
-                viewName);
-        return viewDefinitionJson.isEmpty()
-                ? Optional.empty()
-                : Optional.of(readValue(viewDefinitionJson, new TypeReference<ViewDefinition>() {}));
-    }
-
-    @Override
-    public Optional<ConnectorMaterializedViewDefinition> getMaterializedView(Session session, QualifiedObjectName viewName)
-    {
-        String connectorMaterializedViewDefinitionJson = catalogServerClient.get().getMaterializedView(
-                transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
-                session.toSessionRepresentation(),
-                viewName);
-        return connectorMaterializedViewDefinitionJson.isEmpty()
-                ? Optional.empty()
-                : Optional.of(readValue(connectorMaterializedViewDefinitionJson, new TypeReference<ConnectorMaterializedViewDefinition>() {}));
-    }
-
-    @Override
     public List<QualifiedObjectName> getReferencedMaterializedViews(Session session, QualifiedObjectName tableName)
     {
         String referencedMaterializedViewsListJson = catalogServerClient.get().getReferencedMaterializedViews(
@@ -183,6 +143,79 @@ public class RemoteMetadataManager
         return referencedMaterializedViewsListJson.isEmpty()
                 ? ImmutableList.of()
                 : readValue(referencedMaterializedViewsListJson, new TypeReference<List<QualifiedObjectName>>() {});
+    }
+
+    @Override
+    public MetadataResolver getMetadataResolver(Session session)
+    {
+        return new MetadataResolver()
+        {
+            @Override
+            public boolean catalogExists(String catalogName)
+            {
+                return catalogServerClient.get().catalogExists(
+                        transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
+                        session.toSessionRepresentation(),
+                        catalogName);
+            }
+
+            @Override
+            public boolean schemaExists(CatalogSchemaName schema)
+            {
+                return catalogServerClient.get().schemaExists(
+                        transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
+                        session.toSessionRepresentation(),
+                        schema);
+            }
+
+            @Override
+            public boolean tableExists(QualifiedObjectName tableName)
+            {
+                return getTableHandle(tableName).isPresent();
+            }
+
+            @Override
+            public Optional<TableHandle> getTableHandle(QualifiedObjectName tableName)
+            {
+                return getOptionalTableHandle(session, tableName);
+            }
+
+            @Override
+            public List<ColumnMetadata> getColumns(TableHandle tableHandle)
+            {
+                return getTableMetadata(session, tableHandle).getColumns();
+            }
+
+            @Override
+            public Map<String, ColumnHandle> getColumnHandles(TableHandle tableHandle)
+            {
+                return RemoteMetadataManager.this.getColumnHandles(session, tableHandle);
+            }
+
+            @Override
+            public Optional<ViewDefinition> getView(QualifiedObjectName viewName)
+            {
+                String viewDefinitionJson = catalogServerClient.get().getView(
+                        transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
+                        session.toSessionRepresentation(),
+                        viewName);
+                return viewDefinitionJson.isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(readValue(viewDefinitionJson, new TypeReference<ViewDefinition>() {}));
+            }
+
+            @Override
+            public Optional<MaterializedViewDefinition> getMaterializedView(QualifiedObjectName viewName)
+            {
+                String materializedViewDefinitionJson = catalogServerClient.get().getMaterializedView(
+                        transactionManager.getTransactionInfo(session.getRequiredTransactionId()),
+                        session.toSessionRepresentation(),
+                        viewName);
+                return materializedViewDefinitionJson.isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(readValue(materializedViewDefinitionJson, new TypeReference<MaterializedViewDefinition>() {}));
+            }
+        };
     }
 
     private <T> T readValue(String content, TypeReference<T> valueTypeRef)

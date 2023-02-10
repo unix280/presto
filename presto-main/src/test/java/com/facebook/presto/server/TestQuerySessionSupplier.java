@@ -14,15 +14,15 @@
 package com.facebook.presto.server;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.common.WarningHandlingLevel;
 import com.facebook.presto.common.type.TimeZoneNotSupportedException;
 import com.facebook.presto.execution.warnings.WarningCollectorFactory;
-import com.facebook.presto.execution.warnings.WarningHandlingLevel;
 import com.facebook.presto.metadata.SessionPropertyManager;
-import com.facebook.presto.security.AllowAllAccessControl;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.function.SqlFunctionId;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
+import com.facebook.presto.spi.security.AllowAllAccessControl;
 import com.facebook.presto.sql.SqlEnvironmentConfig;
 import com.facebook.presto.sql.parser.SqlParserOptions;
 import com.google.common.collect.ImmutableListMultimap;
@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 import javax.servlet.http.HttpServletRequest;
 
 import java.util.Locale;
+import java.util.Optional;
 
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
 import static com.facebook.presto.SystemSessionProperties.HASH_PARTITION_COUNT;
@@ -79,7 +80,8 @@ public class TestQuerySessionSupplier
                     .put(PRESTO_PREPARED_STATEMENT, "query1=select * from foo,query2=select * from bar")
                     .put(PRESTO_SESSION_FUNCTION, format("%s=%s", urlEncode(SERIALIZED_SQL_FUNCTION_ID_ADD), urlEncode(SERIALIZED_SQL_FUNCTION_ADD)))
                     .build(),
-            "testRemote");
+            "testRemote",
+            ImmutableMap.of());
 
     @Test
     public void testCreateSession()
@@ -98,7 +100,7 @@ public class TestQuerySessionSupplier
                 return WarningCollector.NOOP;
             }
         };
-        Session session = sessionSupplier.createSession(new QueryId("test_query_id"), context, warningCollectorFactory);
+        Session session = sessionSupplier.createSession(new QueryId("test_query_id"), context, warningCollectorFactory, Optional.empty());
 
         assertEquals(session.getQueryId(), new QueryId("test_query_id"));
         assertEquals(session.getUser(), "testUser");
@@ -129,7 +131,8 @@ public class TestQuerySessionSupplier
                 ImmutableListMultimap.<String, String>builder()
                         .put(PRESTO_USER, "testUser")
                         .build(),
-                "remoteAddress");
+                "remoteAddress",
+                ImmutableMap.of());
         HttpRequestSessionContext context1 = new HttpRequestSessionContext(request1, new SqlParserOptions());
         assertEquals(context1.getClientTags(), ImmutableSet.of());
 
@@ -138,7 +141,8 @@ public class TestQuerySessionSupplier
                         .put(PRESTO_USER, "testUser")
                         .put(PRESTO_CLIENT_TAGS, "")
                         .build(),
-                "remoteAddress");
+                "remoteAddress",
+                ImmutableMap.of());
         HttpRequestSessionContext context2 = new HttpRequestSessionContext(request2, new SqlParserOptions());
         assertEquals(context2.getClientTags(), ImmutableSet.of());
     }
@@ -151,7 +155,8 @@ public class TestQuerySessionSupplier
                         .put(PRESTO_USER, "testUser")
                         .put(PRESTO_TIME_ZONE, "unknown_timezone")
                         .build(),
-                "testRemote");
+                "testRemote",
+                ImmutableMap.of());
         HttpRequestSessionContext context = new HttpRequestSessionContext(request, new SqlParserOptions());
         QuerySessionSupplier sessionSupplier = new QuerySessionSupplier(
                 createTestTransactionManager(),
@@ -166,6 +171,6 @@ public class TestQuerySessionSupplier
                 return WarningCollector.NOOP;
             }
         };
-        sessionSupplier.createSession(new QueryId("test_query_id"), context, warningCollectorFactory);
+        sessionSupplier.createSession(new QueryId("test_query_id"), context, warningCollectorFactory, Optional.empty());
     }
 }

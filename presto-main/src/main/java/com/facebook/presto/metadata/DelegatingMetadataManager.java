@@ -24,13 +24,13 @@ import com.facebook.presto.execution.QueryManager;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
-import com.facebook.presto.spi.ConnectorMaterializedViewDefinition;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.Constraint;
-import com.facebook.presto.spi.MaterializedViewStatus;
+import com.facebook.presto.spi.MaterializedViewDefinition;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SystemTable;
 import com.facebook.presto.spi.TableHandle;
+import com.facebook.presto.spi.TableMetadata;
 import com.facebook.presto.spi.connector.ConnectorCapabilities;
 import com.facebook.presto.spi.connector.ConnectorOutputMetadata;
 import com.facebook.presto.spi.function.SqlFunction;
@@ -41,6 +41,7 @@ import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ComputedStatistics;
 import com.facebook.presto.spi.statistics.TableStatistics;
 import com.facebook.presto.spi.statistics.TableStatisticsMetadata;
+import com.facebook.presto.sql.analyzer.ViewDefinition;
 import com.facebook.presto.sql.planner.PartitioningHandle;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.Slice;
@@ -86,27 +87,9 @@ public abstract class DelegatingMetadataManager
     }
 
     @Override
-    public boolean schemaExists(Session session, CatalogSchemaName schema)
-    {
-        return delegate.schemaExists(session, schema);
-    }
-
-    @Override
-    public boolean catalogExists(Session session, String catalogName)
-    {
-        return delegate.catalogExists(session, catalogName);
-    }
-
-    @Override
     public List<String> listSchemaNames(Session session, String catalogName)
     {
         return delegate.listSchemaNames(session, catalogName);
-    }
-
-    @Override
-    public Optional<TableHandle> getTableHandle(Session session, QualifiedObjectName tableName)
-    {
-        return delegate.getTableHandle(session, tableName);
     }
 
     @Override
@@ -424,12 +407,6 @@ public abstract class DelegatingMetadataManager
     }
 
     @Override
-    public Optional<ViewDefinition> getView(Session session, QualifiedObjectName viewName)
-    {
-        return delegate.getView(session, viewName);
-    }
-
-    @Override
     public void createView(Session session, String catalogName, ConnectorTableMetadata viewMetadata, String viewData, boolean replace)
     {
         delegate.createView(session, catalogName, viewMetadata, viewData, replace);
@@ -442,17 +419,11 @@ public abstract class DelegatingMetadataManager
     }
 
     @Override
-    public Optional<ConnectorMaterializedViewDefinition> getMaterializedView(Session session, QualifiedObjectName viewName)
-    {
-        return delegate.getMaterializedView(session, viewName);
-    }
-
-    @Override
     public void createMaterializedView(
             Session session,
             String catalogName,
             ConnectorTableMetadata viewMetadata,
-            ConnectorMaterializedViewDefinition viewDefinition,
+            MaterializedViewDefinition viewDefinition,
             boolean ignoreExisting)
     {
         delegate.createMaterializedView(session, catalogName, viewMetadata, viewDefinition, ignoreExisting);
@@ -462,12 +433,6 @@ public abstract class DelegatingMetadataManager
     public void dropMaterializedView(Session session, QualifiedObjectName viewName)
     {
         delegate.dropMaterializedView(session, viewName);
-    }
-
-    @Override
-    public MaterializedViewStatus getMaterializedViewStatus(Session session, QualifiedObjectName materializedViewName, TupleDomain<String> baseQueryDomain)
-    {
-        return delegate.getMaterializedViewStatus(session, materializedViewName, baseQueryDomain);
     }
 
     @Override

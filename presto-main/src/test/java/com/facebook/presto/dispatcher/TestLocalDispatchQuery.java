@@ -15,6 +15,7 @@ package com.facebook.presto.dispatcher;
 
 import com.facebook.airlift.node.NodeInfo;
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.HistoryBasedOptimizationConfig;
 import com.facebook.presto.cost.HistoryBasedPlanStatisticsManager;
 import com.facebook.presto.event.QueryMonitor;
 import com.facebook.presto.event.QueryMonitorConfig;
@@ -370,7 +371,7 @@ public class TestLocalDispatchQuery
 
         query.startWaitingForResources();
 
-        Thread.sleep(300); // Sleep long enough to ensure resource exhaustion error
+        Thread.sleep(2000); // Sleep long enough to ensure resource exhaustion error
 
         assertEquals(query.getBasicQueryInfo().getState(), FAILED);
         assertEquals(query.getBasicQueryInfo().getErrorCode(), GENERIC_INSUFFICIENT_RESOURCES.toErrorCode());
@@ -453,7 +454,7 @@ public class TestLocalDispatchQuery
                 new SessionPropertyManager(),
                 metadata,
                 new QueryMonitorConfig(),
-                new HistoryBasedPlanStatisticsManager(new ObjectMapper(), new SessionPropertyManager()));
+                new HistoryBasedPlanStatisticsManager(new ObjectMapper(), new SessionPropertyManager(), metadata, new HistoryBasedOptimizationConfig()));
     }
 
     private EventListenerManager createEventListenerManager(CountingEventListener countingEventListener)

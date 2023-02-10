@@ -29,8 +29,8 @@ add_library(
   TaskManager.cpp
   TaskResource.cpp)
 
-add_dependencies(presto_server_lib presto_protocol presto_types
-                 presto_thrift-cpp2 presto_thrift_extra)
+add_dependencies(presto_server_lib presto_operators presto_protocol
+                 presto_types presto_thrift-cpp2 presto_thrift_extra)
 
 target_include_directories(presto_server_lib PRIVATE ${presto_thrift_INCLUDES})
 target_link_libraries(
@@ -40,10 +40,9 @@ target_link_libraries(
   $<TARGET_OBJECTS:presto_protocol>
   presto_adapters
   presto_common
-  presto_thrift-cpp2
-  presto_thrift_extra
   presto_exception
   presto_http
+  presto_operators
   velox_core
   velox_vector
   velox_exec
@@ -55,13 +54,24 @@ target_link_libraries(
   velox_dwio_common_exception
   velox_functions_lib
   velox_hive_partition_function
-  ${THRIFT_LIBRARY}
+  velox_window
+  velox_dwio_dwrf_reader
   ${RE2}
   ${FOLLY_WITH_DEPENDENCIES}
   ${ANTLR4_RUNTIME}
   ${GLOG}
   ${GFLAGS_LIBRARIES}
   pthread)
+
+if(PRESTO_ENABLE_PARQUET)
+  target_link_libraries(presto_server_lib velox_dwio_parquet_reader)
+endif()
+
+# Enabling Parquet causes build errors with missing symbols on MacOS. This is
+# likely due to a conflict between Thrift and FBThrift libraries. The build
+# issue is fixed by linking Thrift dependencies first followed by FBThrift.
+target_link_libraries(presto_server_lib presto_thrift-cpp2 presto_thrift_extra
+                      ${THRIFT_LIBRARY})
 
 add_executable(presto_server PrestoMain.cpp)
 
@@ -71,12 +81,8 @@ target_link_libraries(
   velox_functions_prestosql
   velox_aggregates
   velox_hive_connector
-  velox_presto_serializer
-  velox_dwio_dwrf_reader)
-
-if(PRESTO_ENABLE_PARQUET)
-  target_link_libraries(presto_server velox_dwio_parquet_reader)
-endif()
+  velox_tpch_connector
+  velox_presto_serializer)
 
 if(PRESTO_ENABLE_TESTING)
   add_subdirectory(tests)

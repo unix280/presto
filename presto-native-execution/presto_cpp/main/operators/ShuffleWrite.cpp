@@ -1,6 +1,4 @@
 /*
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,7 +18,6 @@ using namespace facebook::velox;
 
 namespace facebook::presto::operators {
 namespace {
-
 class ShuffleWriteOperator : public Operator {
  public:
   ShuffleWriteOperator(
@@ -32,8 +29,18 @@ class ShuffleWriteOperator : public Operator {
             planNode->outputType(),
             operatorId,
             planNode->id(),
-            "ShuffleWrite"),
-        shuffle_{planNode->shuffle()} {}
+            "ShuffleWrite") {
+    const auto& shuffleName = planNode->shuffleName();
+    auto shuffleFactory = ShuffleInterfaceFactory::factory(shuffleName);
+    VELOX_CHECK(
+        shuffleFactory != nullptr,
+        fmt::format(
+            "Failed to create shuffle write interface: Shuffle factory "
+            "with name '{}' is not registered.",
+            shuffleName));
+    shuffle_ = shuffleFactory->createWriter(
+        planNode->serializedShuffleWriteInfo(), operatorCtx_->pool());
+  }
 
   bool needsInput() const override {
     return !noMoreInput_;
@@ -45,7 +52,6 @@ class ShuffleWriteOperator : public Operator {
     for (auto i = 0; i < input->size(); ++i) {
       auto partition = partitions->valueAt(i);
       auto data = serializedRows->valueAt(i);
-
       shuffle_->collect(partition, std::string_view(data.data(), data.size()));
     }
   }
@@ -68,7 +74,7 @@ class ShuffleWriteOperator : public Operator {
   }
 
  private:
-  ShuffleInterface* shuffle_;
+  std::shared_ptr<ShuffleWriter> shuffle_;
 };
 } // namespace
 

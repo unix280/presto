@@ -32,9 +32,6 @@ import com.facebook.presto.metadata.CatalogManager;
 import com.facebook.presto.metadata.InMemoryNodeManager;
 import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.metadata.ViewDefinition;
-import com.facebook.presto.security.AccessControl;
-import com.facebook.presto.security.AllowAllAccessControl;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorTableMetadata;
@@ -48,6 +45,8 @@ import com.facebook.presto.spi.function.FunctionImplementationType;
 import com.facebook.presto.spi.function.Parameter;
 import com.facebook.presto.spi.function.RoutineCharacteristics;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
+import com.facebook.presto.spi.security.AccessControl;
+import com.facebook.presto.spi.security.AllowAllAccessControl;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import com.facebook.presto.sql.parser.SqlParser;
@@ -257,7 +256,13 @@ public class AbstractAnalyzerTest
                         new ColumnMetadata("b", RowType.from(ImmutableList.of(
                                 new RowType.Field(Optional.of("w"), BIGINT),
                                 new RowType.Field(Optional.of("x"),
-                                        new ArrayType(new ArrayType(RowType.from(ImmutableList.of(new RowType.Field(Optional.of("y"), BIGINT))))))))))),
+                                        new ArrayType(new ArrayType(RowType.from(ImmutableList.of(new RowType.Field(Optional.of("y"), BIGINT))))))))),
+                        new ColumnMetadata("c", RowType.from(ImmutableList.of(
+                                new RowType.Field(
+                                        Optional.of("x"),
+                                        new ArrayType(RowType.from(ImmutableList.of(
+                                                new RowType.Field(Optional.of("x"), BIGINT),
+                                                new RowType.Field(Optional.of("y"), BIGINT)))))))))),
                 false));
 
         // table with columns containing special characters
@@ -420,7 +425,7 @@ public class AbstractAnalyzerTest
 
             if (location.isPresent()) {
                 NodeLocation expected = location.get();
-                NodeLocation actual = e.getNode().getLocation().get();
+                NodeLocation actual = e.getLocation().get();
 
                 if (expected.getLineNumber() != actual.getLineNumber() || expected.getColumnNumber() != actual.getColumnNumber()) {
                     fail(format(

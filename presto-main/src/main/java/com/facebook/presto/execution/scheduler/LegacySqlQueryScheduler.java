@@ -17,6 +17,7 @@ import com.facebook.airlift.concurrent.SetThreadName;
 import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.stats.TimeStat;
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.StatsAndCosts;
 import com.facebook.presto.execution.BasicStageExecutionStats;
 import com.facebook.presto.execution.LocationFactory;
 import com.facebook.presto.execution.PartialResultQueryManager;
@@ -90,7 +91,7 @@ import static com.facebook.presto.execution.buffer.OutputBuffers.createDiscardin
 import static com.facebook.presto.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static com.facebook.presto.execution.scheduler.StreamingPlanSection.extractStreamingSections;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
-import static com.facebook.presto.sql.planner.PlanFragmenter.ROOT_FRAGMENT_ID;
+import static com.facebook.presto.sql.planner.PlanFragmenterUtils.ROOT_FRAGMENT_ID;
 import static com.facebook.presto.sql.planner.SchedulingOrderVisitor.scheduleOrder;
 import static com.facebook.presto.sql.planner.planPrinter.PlanPrinter.jsonFragmentPlan;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -609,6 +610,7 @@ public class LegacySqlQueryScheduler
             newRoot = optimizer.optimize(newRoot, session, variableAllocator.getTypes(), variableAllocator, idAllocator, warningCollector);
         }
         if (newRoot != fragment.getRoot()) {
+            StatsAndCosts estimatedStatsAndCosts = fragment.getStatsAndCosts();
             return Optional.of(
                     // The partitioningScheme should stay the same
                     // even if the root's outputVariable layout is changed.
@@ -621,8 +623,8 @@ public class LegacySqlQueryScheduler
                             fragment.getPartitioningScheme(),
                             fragment.getStageExecutionDescriptor(),
                             fragment.isOutputTableWriterFragment(),
-                            fragment.getStatsAndCosts(),
-                            Optional.of(jsonFragmentPlan(newRoot, fragment.getVariables(), functionAndTypeManager, session))));
+                            estimatedStatsAndCosts,
+                            Optional.of(jsonFragmentPlan(newRoot, fragment.getVariables(), estimatedStatsAndCosts, functionAndTypeManager, session))));
         }
         return Optional.empty();
     }

@@ -62,8 +62,8 @@ TEST_F(TestValues, valuesRowVector) {
 
   testJsonRoundtrip(j, p);
 
-  auto scopedPool = memory::getDefaultScopedMemoryPool();
-  VeloxQueryPlanConverter converter(scopedPool.get());
+  auto pool = memory::getDefaultMemoryPool();
+  VeloxInteractiveQueryPlanConverter converter(pool.get());
   auto values = std::dynamic_pointer_cast<const core::ValuesNode>(
       converter.toVeloxQueryPlan(
           std::dynamic_pointer_cast<protocol::PlanNode>(p),
@@ -101,8 +101,8 @@ TEST_F(TestValues, valuesPlan) {
 
   testJsonRoundtrip(j, p);
 
-  auto scopedPool = memory::getDefaultScopedMemoryPool();
-  VeloxQueryPlanConverter converter(scopedPool.get());
+  auto pool = memory::getDefaultMemoryPool();
+  VeloxInteractiveQueryPlanConverter converter(pool.get());
   auto values = converter.toVeloxQueryPlan(
       std::dynamic_pointer_cast<protocol::OutputNode>(p->root)->source,
       nullptr,
@@ -110,8 +110,9 @@ TEST_F(TestValues, valuesPlan) {
 
   ASSERT_EQ(values->name(), "Filter");
   ASSERT_EQ(values->sources()[0]->name(), "LocalPartition");
-  ASSERT_EQ(values->sources()[0]->sources()[0]->name(), "Values");
+  ASSERT_EQ(values->sources()[0]->sources()[0]->name(), "Project");
+  ASSERT_EQ(values->sources()[0]->sources()[0]->sources()[0]->name(), "Values");
 
   ASSERT_EQ(values->id(), "4");
-  ASSERT_EQ(values->sources()[0]->sources()[0]->id(), "0");
+  ASSERT_EQ(values->sources()[0]->sources()[0]->sources()[0]->id(), "0");
 }

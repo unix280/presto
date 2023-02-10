@@ -22,6 +22,7 @@ import com.facebook.presto.common.function.SqlFunctionProperties;
 import com.facebook.presto.common.type.RowType;
 import com.facebook.presto.common.type.TimeZoneKey;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.execution.ScheduledSplit;
 import com.facebook.presto.metadata.FunctionAndTypeManager;
 import com.facebook.presto.metadata.FunctionListBuilder;
 import com.facebook.presto.metadata.Metadata;
@@ -135,13 +136,13 @@ import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMEN
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.facebook.presto.sql.ExpressionUtils.rewriteIdentifiersToSymbolReferences;
-import static com.facebook.presto.sql.ParsingUtil.createParsingOptions;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.analyzeExpressions;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.getExpressionTypes;
 import static com.facebook.presto.sql.planner.iterative.rule.CanonicalizeExpressionRewriter.canonicalizeExpression;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 import static com.facebook.presto.sql.relational.SqlToRowExpressionTranslator.translate;
 import static com.facebook.presto.testing.TestingTaskContext.createTaskContext;
+import static com.facebook.presto.util.AnalyzerUtil.createParsingOptions;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static java.lang.String.format;
@@ -661,7 +662,7 @@ public final class FunctionAssertions
     private Object selectSingleValue(SourceOperatorFactory operatorFactory, Type type, Split split, Session session)
     {
         SourceOperator operator = operatorFactory.createOperator(createDriverContext(session));
-        operator.addSplit(split);
+        operator.addSplit(new ScheduledSplit(0, operator.getSourceId(), split));
         operator.noMoreSplits();
         return selectSingleValue(operator, type);
     }
@@ -827,7 +828,7 @@ public final class FunctionAssertions
     private static boolean executeFilter(SourceOperatorFactory operatorFactory, Split split, Session session)
     {
         SourceOperator operator = operatorFactory.createOperator(createDriverContext(session));
-        operator.addSplit(split);
+        operator.addSplit(new ScheduledSplit(0, operator.getSourceId(), split));
         operator.noMoreSplits();
         return executeFilter(operator);
     }
@@ -997,7 +998,7 @@ public final class FunctionAssertions
 
     private RowExpression toRowExpression(Expression projection, Map<NodeRef<Expression>, Type> expressionTypes, Map<VariableReferenceExpression, Integer> layout)
     {
-        return translate(projection, expressionTypes, layout, metadata.getFunctionAndTypeManager(), session);
+        return translate(projection, expressionTypes, layout, metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(), session);
     }
 
     private static Page getAtMostOnePage(Operator operator, Page sourcePage)

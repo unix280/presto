@@ -1,4 +1,4 @@
-# Presto [![Build Status](https://travis.ibm.com/OpenDataLakehouse/presto.svg?token=R1qay1NH2eHvpyNYYpJn&branch=master)](https://travis.ibm.com/OpenDataLakehouse/presto)
+# Presto [![Build Status](https://travis-ci.com/prestodb/presto.svg?branch=master)](https://travis-ci.com/prestodb/presto)
 
 Presto is a distributed SQL query engine for big data.
 
@@ -22,6 +22,16 @@ On the first build, Maven will download all the dependencies from the internet a
 Presto has a comprehensive set of unit tests that can take several minutes to run. You can disable the tests when building:
 
     ./mvnw clean install -DskipTests
+
+
+## Presto native and Velox
+
+[Presto native](https://github.com/prestodb/presto/tree/master/presto-native-execution) is a C++ rewrite of Presto worker. [Presto native](https://github.com/prestodb/presto/tree/master/presto-native-execution) uses [Velox](https://github.com/facebookincubator/velox) as its primary engine to run presto workloads.
+
+[Velox](https://github.com/facebookincubator/velox) is a C++ database library which provides reusable, extensible, and high-performance data processing components.
+
+Check out [building instructions](https://github.com/prestodb/presto/tree/master/presto-native-execution#building) to get started. 
+
 
 ## Running Presto in your IDE
 

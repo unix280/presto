@@ -84,8 +84,7 @@ public class HiveExternalWorkerQueryRunner
                         ImmutableMap.of(
                                 "parse-decimal-literals-as-double", "true",
                                 "regex-library", "RE2J",
-                                "offset-clause-enabled", "true",
-                                "deprecated.legacy-date-timestamp-to-varchar-coercion", "true"),
+                                "offset-clause-enabled", "true"),
                         "sql-standard",
                         ImmutableMap.of(
                                 "hive.storage-format", "DWRF",
@@ -182,6 +181,10 @@ public class HiveExternalWorkerQueryRunner
                                 format("connector.name=hive%n" +
                                         "cache.enabled=true%n" +
                                         "cache.max-cache-size=32").getBytes());
+
+                        // Add a tpch catalog.
+                        Files.write(catalogDirectoryPath.resolve("tpchstandard.properties"),
+                                format("connector.name=tpch%n").getBytes());
 
                         // Disable stack trace capturing as some queries (using TRY) generate a lot of exceptions.
                         return new ProcessBuilder(prestoServerPath, "--logtostderr=1", "--v=1")

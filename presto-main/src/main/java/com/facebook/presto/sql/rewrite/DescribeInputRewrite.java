@@ -16,8 +16,8 @@ package com.facebook.presto.sql.rewrite;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Analyzer;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
@@ -41,8 +41,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.common.type.UnknownType.UNKNOWN;
-import static com.facebook.presto.execution.ParameterExtractor.getParameters;
-import static com.facebook.presto.sql.ParsingUtil.createParsingOptions;
 import static com.facebook.presto.sql.QueryUtil.aliased;
 import static com.facebook.presto.sql.QueryUtil.ascending;
 import static com.facebook.presto.sql.QueryUtil.identifier;
@@ -51,6 +49,8 @@ import static com.facebook.presto.sql.QueryUtil.row;
 import static com.facebook.presto.sql.QueryUtil.selectList;
 import static com.facebook.presto.sql.QueryUtil.simpleQuery;
 import static com.facebook.presto.sql.QueryUtil.values;
+import static com.facebook.presto.sql.analyzer.utils.ParameterExtractor.getParameters;
+import static com.facebook.presto.util.AnalyzerUtil.createParsingOptions;
 import static java.util.Objects.requireNonNull;
 
 final class DescribeInputRewrite

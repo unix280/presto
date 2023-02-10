@@ -16,15 +16,15 @@ package com.facebook.presto.execution;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorId;
-import com.facebook.presto.spi.ConnectorMaterializedViewDefinition;
 import com.facebook.presto.spi.ConnectorTableMetadata;
+import com.facebook.presto.spi.MaterializedViewDefinition;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Analyzer;
 import com.facebook.presto.sql.analyzer.MaterializedViewColumnMappingExtractor;
@@ -48,10 +48,10 @@ import static com.facebook.presto.metadata.MetadataUtil.toSchemaTableName;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static com.facebook.presto.sql.NodeUtils.mapFromProperties;
-import static com.facebook.presto.sql.ParameterUtils.parameterExtractor;
 import static com.facebook.presto.sql.SqlFormatterUtil.getFormattedSql;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.MATERIALIZED_VIEW_ALREADY_EXISTS;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
+import static com.facebook.presto.sql.analyzer.utils.ParameterUtils.parameterExtractor;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.util.Objects.requireNonNull;
@@ -78,7 +78,7 @@ public class CreateMaterializedViewTask
     {
         QualifiedObjectName viewName = createQualifiedObjectName(session, statement, statement.getName());
 
-        Optional<TableHandle> viewHandle = metadata.getTableHandle(session, viewName);
+        Optional<TableHandle> viewHandle = metadata.getMetadataResolver(session).getTableHandle(viewName);
         if (viewHandle.isPresent()) {
             if (!statement.isNotExists()) {
                 throw new SemanticException(MATERIALIZED_VIEW_ALREADY_EXISTS, statement, "Materialized view '%s' already exists", viewName);
@@ -133,7 +133,7 @@ public class CreateMaterializedViewTask
                 .collect(toImmutableList());
 
         MaterializedViewColumnMappingExtractor extractor = new MaterializedViewColumnMappingExtractor(analysis, session);
-        ConnectorMaterializedViewDefinition viewDefinition = new ConnectorMaterializedViewDefinition(
+        MaterializedViewDefinition viewDefinition = new MaterializedViewDefinition(
                 sql,
                 viewName.getSchemaName(),
                 viewName.getObjectName(),

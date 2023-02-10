@@ -15,7 +15,7 @@ package com.facebook.presto.sql.analyzer;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.common.QualifiedObjectName;
-import com.facebook.presto.spi.ConnectorMaterializedViewDefinition;
+import com.facebook.presto.spi.MaterializedViewDefinition;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
@@ -30,9 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.facebook.presto.sql.ParsingUtil.createParsingOptions;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
+import static com.facebook.presto.util.AnalyzerUtil.createParsingOptions;
 import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
 
@@ -1573,9 +1573,9 @@ public class TestMaterializedViewQueryOptimizer
                 });
     }
 
-    private ConnectorMaterializedViewDefinition createStubConnectorMaterializedViewDefinition(String viewName, String viewSql, String schema, List<SchemaTableName> baseTables)
+    private MaterializedViewDefinition createStubConnectorMaterializedViewDefinition(String viewName, String viewSql, String schema, List<SchemaTableName> baseTables)
     {
-        return new ConnectorMaterializedViewDefinition(
+        return new MaterializedViewDefinition(
                 viewSql,
                 schema,
                 viewName,

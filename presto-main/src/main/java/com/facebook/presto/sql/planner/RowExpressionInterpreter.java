@@ -152,7 +152,7 @@ public class RowExpressionInterpreter
         this.optimizationLevel = optimizationLevel;
         this.functionInvoker = new InterpretedFunctionInvoker(metadata.getFunctionAndTypeManager());
         this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata.getFunctionAndTypeManager());
-        this.resolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
+        this.resolution = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
         this.functionAndTypeManager = metadata.getFunctionAndTypeManager();
 
         this.visitor = new Visitor();
@@ -268,8 +268,8 @@ public class RowExpressionInterpreter
 
             Object value;
             FunctionImplementationType implementationType = functionMetadata.getImplementationType();
-            if (implementationType.isExternal()) {
-                // do not interpret remote functions on coordinator
+            if (!implementationType.canBeEvaluatedInCoordinator()) {
+                // do not interpret remote functions or cpp UDF on coordinator
                 return call(node.getDisplayName(), functionHandle, node.getType(), toRowExpressions(argumentValues, node.getArguments()));
             }
             else if (implementationType.equals(JAVA)) {
@@ -281,7 +281,7 @@ public class RowExpressionInterpreter
                 RowExpression function = getSqlFunctionRowExpression(
                         functionMetadata,
                         functionImplementation,
-                        metadata,
+                        metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
                         session.getSqlFunctionProperties(),
                         session.getSessionFunctions(),
                         node.getArguments());
@@ -860,7 +860,7 @@ public class RowExpressionInterpreter
 
         private SpecialCallResult tryHandleLike(CallExpression callExpression, List<Object> argumentValues, List<Type> argumentTypes, Object context)
         {
-            FunctionResolution resolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
+            FunctionResolution resolution = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
             checkArgument(resolution.isLikeFunction(callExpression.getFunctionHandle()));
             checkArgument(callExpression.getArguments().size() == 2);
             RowExpression likePatternExpression = callExpression.getArguments().get(1);

@@ -1,6 +1,4 @@
 /*
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -14,7 +12,6 @@
  * limitations under the License.
  */
 #include "presto_cpp/main/operators/PartitionAndSerialize.h"
-#include "velox/connectors/hive/HivePartitionFunction.h"
 #include "velox/row/UnsafeRowDynamicSerializer.h"
 
 using namespace facebook::velox::exec;
@@ -45,6 +42,9 @@ void PartitionAndSerializeNode::addDetails(std::stringstream& stream) const {
 
 namespace {
 
+/// The output of this operator has 2 columns:
+/// (1) partition number (INTEGER);
+/// (2) serialized row (VARBINARY)
 class PartitionAndSerializeOperator : public Operator {
  public:
   PartitionAndSerializeOperator(
@@ -56,20 +56,12 @@ class PartitionAndSerializeOperator : public Operator {
             planNode->outputType(),
             operatorId,
             planNode->id(),
-            "PartitionAndSerialize") {
-    auto inputType = planNode->sources()[0]->outputType();
-    auto keyChannels = toChannels(inputType, planNode->keys());
-
-    // Initialize the hive partition function.
-    auto numPartitions = planNode->numPartitions();
-    std::vector<int> bucketToPartition(numPartitions);
-    std::iota(bucketToPartition.begin(), bucketToPartition.end(), 0);
-    partitionFunction_ =
-        std::make_unique<connector::hive::HivePartitionFunction>(
-            planNode->numPartitions(),
-            std::move(bucketToPartition),
-            keyChannels);
-  }
+            "PartitionAndSerialize"),
+        numPartitions_(planNode->numPartitions()),
+        partitionFunction_(
+            numPartitions_ == 1 ? nullptr
+                                : planNode->partitionFunctionFactory()(
+                                      planNode->numPartitions())) {}
 
   bool needsInput() const override {
     return !input_;
@@ -84,7 +76,7 @@ class PartitionAndSerializeOperator : public Operator {
       return nullptr;
     }
 
-    auto numInput = input_->size();
+    const auto numInput = input_->size();
 
     // TODO Reuse output vector.
     auto output = std::dynamic_pointer_cast<RowVector>(
@@ -110,18 +102,21 @@ class PartitionAndSerializeOperator : public Operator {
  private:
   void computePartitions(FlatVector<int32_t>& partitionsVector) {
     auto numInput = input_->size();
-
-    partitions_.resize(numInput);
-    partitionFunction_->partition(*input_, partitions_);
+    if (numPartitions_ == 1) {
+      std::fill(partitions_.begin(), partitions_.end(), 0);
+    } else {
+      partitions_.resize(numInput);
+      partitionFunction_->partition(*input_, partitions_);
+    }
 
     // TODO Avoid copy.
     partitionsVector.resize(numInput);
     auto rawPartitions = partitionsVector.mutableRawValues();
-    std::memcpy(rawPartitions, partitions_.data(), sizeof(int32_t) * numInput);
+    ::memcpy(rawPartitions, partitions_.data(), sizeof(int32_t) * numInput);
   }
 
   void serializeRows(FlatVector<StringView>& dataVector) {
-    auto numInput = input_->size();
+    const auto numInput = input_->size();
 
     dataVector.resize(numInput);
 
@@ -130,7 +125,7 @@ class PartitionAndSerializeOperator : public Operator {
 
     size_t totalSize = 0;
     for (auto i = 0; i < numInput; ++i) {
-      size_t rowSize = velox::row::UnsafeRowDynamicSerializer::getSizeRow(
+      const size_t rowSize = velox::row::UnsafeRowDynamicSerializer::getSizeRow(
           input_->type(), input_.get(), i);
       rowSizes_[i] = rowSize;
       totalSize += rowSize;
@@ -154,7 +149,8 @@ class PartitionAndSerializeOperator : public Operator {
     }
   }
 
-  std::unique_ptr<connector::hive::HivePartitionFunction> partitionFunction_;
+  const uint32_t numPartitions_;
+  std::unique_ptr<core::PartitionFunction> partitionFunction_;
   std::vector<uint32_t> partitions_;
   std::vector<size_t> rowSizes_;
 };

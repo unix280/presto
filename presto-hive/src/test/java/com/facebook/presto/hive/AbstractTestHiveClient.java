@@ -66,6 +66,7 @@ import com.facebook.presto.hive.orc.OrcSelectivePageSource;
 import com.facebook.presto.hive.pagefile.PageFilePageSource;
 import com.facebook.presto.hive.parquet.ParquetPageSource;
 import com.facebook.presto.hive.rcfile.RcFilePageSource;
+import com.facebook.presto.hive.rule.HiveFilterPushdown;
 import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -105,9 +106,12 @@ import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.constraints.PrimaryKeyConstraint;
 import com.facebook.presto.spi.constraints.TableConstraint;
 import com.facebook.presto.spi.constraints.UniqueConstraint;
+import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.function.SqlFunctionId;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
+import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.relation.RowExpression;
+import com.facebook.presto.spi.relation.RowExpressionService;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
@@ -221,6 +225,7 @@ import static com.facebook.presto.hive.HiveMetadata.convertToPredicate;
 import static com.facebook.presto.hive.HiveQueryRunner.METASTORE_CONTEXT;
 import static com.facebook.presto.hive.HiveSessionProperties.OFFLINE_DATA_DEBUG_MODE_ENABLED;
 import static com.facebook.presto.hive.HiveSessionProperties.SORTED_WRITE_TO_TEMP_PATH_ENABLED;
+import static com.facebook.presto.hive.HiveStorageFormat.ALPHA;
 import static com.facebook.presto.hive.HiveStorageFormat.AVRO;
 import static com.facebook.presto.hive.HiveStorageFormat.CSV;
 import static com.facebook.presto.hive.HiveStorageFormat.DWRF;
@@ -278,7 +283,6 @@ import static com.facebook.presto.hive.metastore.MetastoreUtil.toPartitionValues
 import static com.facebook.presto.hive.metastore.NoopMetastoreCacheStats.NOOP_METASTORE_CACHE_STATS;
 import static com.facebook.presto.hive.metastore.PrestoTableType.MANAGED_TABLE;
 import static com.facebook.presto.hive.metastore.StorageFormat.fromHiveStorageFormat;
-import static com.facebook.presto.hive.rule.HiveFilterPushdown.pushdownFilter;
 import static com.facebook.presto.spi.SplitContext.NON_CACHEABLE;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.TRANSACTION_CONFLICT;
@@ -377,6 +381,8 @@ public abstract class AbstractTestHiveClient
             .addAll(CREATE_TABLE_COLUMNS)
             .add(new ColumnMetadata("ds", createUnboundedVarcharType()))
             .build();
+
+    protected static final Predicate<String> PARTITION_COLUMN_FILTER = columnName -> columnName.equals("ds") || columnName.startsWith("part_");
 
     protected static final MaterializedResult CREATE_TABLE_PARTITIONED_DATA = new MaterializedResult(
             CREATE_TABLE_DATA.getMaterializedRows().stream()
@@ -568,10 +574,7 @@ public abstract class AbstractTestHiveClient
             row -> row.getField(0) != null && (short) row.getField(0) + 1 > 0,
             row -> row.getField(0) != null && (short) row.getField(0) + 1 < 0);
 
-    protected Set<HiveStorageFormat> createTableFormats = difference(
-            ImmutableSet.copyOf(HiveStorageFormat.values()),
-            // exclude formats that change table schema with serde
-            ImmutableSet.of(AVRO, CSV));
+    protected Set<HiveStorageFormat> createTableFormats = getSupportedCreateTableHiveStorageFormats();
 
     private static final JoinCompiler JOIN_COMPILER = new JoinCompiler(MetadataManager.createTestMetadataManager(), new FeaturesConfig());
 
@@ -733,7 +736,7 @@ public abstract class AbstractTestHiveClient
     Map<SchemaTableName, List<TableConstraint<String>>> tableConstraintsMap;
 
     protected String invalidClientId;
-    protected ConnectorTableHandle invalidTableHandle;
+    protected HiveTableHandle invalidTableHandle;
 
     protected HiveColumnHandle dsColumn;
     protected HiveColumnHandle fileFormatColumn;
@@ -811,24 +814,26 @@ public abstract class AbstractTestHiveClient
 
         invalidClientId = "hive";
         invalidTableHandle = new HiveTableHandle(database, INVALID_TABLE);
-        invalidTableLayoutHandle = new HiveTableLayoutHandle(
-                invalidTable,
-                "path",
-                ImmutableList.of(),
-                ImmutableList.of(),
-                ImmutableMap.of(),
-                ImmutableList.of(new HivePartition(invalidTable, "unknown", ImmutableMap.of())),
-                TupleDomain.all(),
-                TRUE_CONSTANT,
-                ImmutableMap.of(),
-                TupleDomain.all(),
-                Optional.empty(),
-                Optional.empty(),
-                false,
-                "layout",
-                Optional.empty(),
-                false,
-                false);
+        invalidTableLayoutHandle = new HiveTableLayoutHandle.Builder()
+                .setSchemaTableName(invalidTable)
+                .setTablePath("path")
+                .setPartitionColumns(ImmutableList.of())
+                .setDataColumns(ImmutableList.of())
+                .setTableParameters(ImmutableMap.of())
+                .setDomainPredicate(TupleDomain.all())
+                .setRemainingPredicate(TRUE_CONSTANT)
+                .setPredicateColumns(ImmutableMap.of())
+                .setPartitionColumnPredicate(TupleDomain.all())
+                .setPartitions(ImmutableList.of(new HivePartition(invalidTable, "unknown", ImmutableMap.of())))
+                .setBucketHandle(Optional.empty())
+                .setBucketFilter(Optional.empty())
+                .setPushdownFilterEnabled(false)
+                .setLayoutString("layout")
+                .setRequestedColumns(Optional.empty())
+                .setPartialAggregationsPushedDown(false)
+                .setAppendRowNumberEnabled(false)
+                .setHiveTableHandle(invalidTableHandle)
+                .build();
 
         int partitionColumnIndex = MAX_PARTITION_KEY_COLUMN_INDEX;
         dsColumn = new HiveColumnHandle("ds", HIVE_STRING, parseTypeSignature(StandardTypes.VARCHAR), partitionColumnIndex--, PARTITION_KEY, Optional.empty(), Optional.empty());
@@ -872,33 +877,33 @@ public abstract class AbstractTestHiveClient
         tupleDomain = TupleDomain.fromFixedValues(ImmutableMap.of(dsColumn, NullableValue.of(createUnboundedVarcharType(), utf8Slice("2012-12-29"))));
         TupleDomain<Subfield> domainPredicate = tupleDomain.transform(HiveColumnHandle.class::cast)
                 .transform(column -> new Subfield(column.getName(), ImmutableList.of()));
+        List<Column> dataColumns = ImmutableList.of(
+                new Column("t_string", HIVE_STRING, Optional.empty(), Optional.empty()),
+                new Column("t_tinyint", HIVE_BYTE, Optional.empty(), Optional.empty()),
+                new Column("t_smallint", HIVE_SHORT, Optional.empty(), Optional.empty()),
+                new Column("t_int", HIVE_INT, Optional.empty(), Optional.empty()),
+                new Column("t_bigint", HIVE_LONG, Optional.empty(), Optional.empty()),
+                new Column("t_float", HIVE_FLOAT, Optional.empty(), Optional.empty()),
+                new Column("t_double", HIVE_DOUBLE, Optional.empty(), Optional.empty()),
+                new Column("t_boolean", HIVE_BOOLEAN, Optional.empty(), Optional.empty()));
         tableLayout = new ConnectorTableLayout(
-                new HiveTableLayoutHandle(
-                        tablePartitionFormat,
-                        "path",
-                        partitionColumns,
-                        ImmutableList.of(
-                                new Column("t_string", HIVE_STRING, Optional.empty(), Optional.empty()),
-                                new Column("t_tinyint", HIVE_BYTE, Optional.empty(), Optional.empty()),
-                                new Column("t_smallint", HIVE_SHORT, Optional.empty(), Optional.empty()),
-                                new Column("t_int", HIVE_INT, Optional.empty(), Optional.empty()),
-                                new Column("t_bigint", HIVE_LONG, Optional.empty(), Optional.empty()),
-                                new Column("t_float", HIVE_FLOAT, Optional.empty(), Optional.empty()),
-                                new Column("t_double", HIVE_DOUBLE, Optional.empty(), Optional.empty()),
-                                new Column("t_boolean", HIVE_BOOLEAN, Optional.empty(), Optional.empty())),
-                        ImmutableMap.of(),
-                        partitions,
-                        domainPredicate,
-                        TRUE_CONSTANT,
-                        ImmutableMap.of(dsColumn.getName(), dsColumn),
-                        tupleDomain,
-                        Optional.empty(),
-                        Optional.empty(),
-                        false,
-                        "layout",
-                        Optional.empty(),
-                        false,
-                        false),
+                new HiveTableLayoutHandle.Builder()
+                        .setSchemaTableName(tablePartitionFormat).setTablePath("path")
+                        .setPartitionColumns(partitionColumns)
+                        .setDataColumns(dataColumns)
+                        .setTableParameters(ImmutableMap.of())
+                        .setDomainPredicate(domainPredicate)
+                        .setRemainingPredicate(TRUE_CONSTANT)
+                        .setPredicateColumns(ImmutableMap.of(dsColumn.getName(), dsColumn))
+                        .setPartitionColumnPredicate(tupleDomain)
+                        .setPartitions(partitions).setBucketHandle(Optional.empty())
+                        .setBucketFilter(Optional.empty())
+                        .setPushdownFilterEnabled(false)
+                        .setLayoutString("layout")
+                        .setRequestedColumns(Optional.empty())
+                        .setPartialAggregationsPushedDown(false)
+                        .setAppendRowNumberEnabled(false)
+                        .build(),
                 Optional.empty(),
                 withColumnDomains(ImmutableMap.of(
                         dsColumn, Domain.create(ValueSet.ofRanges(Range.equal(createUnboundedVarcharType(), utf8Slice("2012-12-29"))), false),
@@ -925,26 +930,28 @@ public abstract class AbstractTestHiveClient
                                 dummyColumn, Domain.create(ValueSet.ofRanges(Range.equal(INTEGER, 4L)), false)))))),
                 ImmutableList.of());
         List<HivePartition> unpartitionedPartitions = ImmutableList.of(new HivePartition(tableUnpartitioned));
-        unpartitionedTableLayout = new ConnectorTableLayout(new HiveTableLayoutHandle(
-                tableUnpartitioned,
-                "path",
-                ImmutableList.of(),
-                ImmutableList.of(
-                        new Column("t_string", HIVE_STRING, Optional.empty(), Optional.empty()),
-                        new Column("t_tinyint", HIVE_BYTE, Optional.empty(), Optional.empty())),
-                ImmutableMap.of(),
-                unpartitionedPartitions,
-                TupleDomain.all(),
-                TRUE_CONSTANT,
-                ImmutableMap.of(),
-                TupleDomain.all(),
-                Optional.empty(),
-                Optional.empty(),
-                false,
-                "layout",
-                Optional.empty(),
-                false,
-                false));
+        unpartitionedTableLayout = new ConnectorTableLayout(
+                new HiveTableLayoutHandle.Builder()
+                        .setSchemaTableName(tableUnpartitioned)
+                        .setTablePath("path")
+                        .setPartitionColumns(ImmutableList.of())
+                        .setDataColumns(ImmutableList.of(
+                            new Column("t_string", HIVE_STRING, Optional.empty(), Optional.empty()),
+                            new Column("t_tinyint", HIVE_BYTE, Optional.empty(), Optional.empty())))
+                        .setTableParameters(ImmutableMap.of())
+                        .setDomainPredicate(TupleDomain.all())
+                        .setRemainingPredicate(TRUE_CONSTANT)
+                        .setPredicateColumns(ImmutableMap.of())
+                        .setPartitionColumnPredicate(TupleDomain.all())
+                        .setPartitions(unpartitionedPartitions)
+                        .setBucketHandle(Optional.empty())
+                        .setBucketFilter(Optional.empty())
+                        .setPushdownFilterEnabled(false)
+                        .setLayoutString("layout")
+                        .setRequestedColumns(Optional.empty())
+                        .setPartialAggregationsPushedDown(false)
+                        .setAppendRowNumberEnabled(false)
+                        .build());
         timeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(ZoneId.of(timeZoneId)));
     }
 
@@ -2125,24 +2132,9 @@ public abstract class AbstractTestHiveClient
             HiveTableLayoutHandle layoutHandle = (HiveTableLayoutHandle) getTableLayout(session, transaction.getMetadata(), hiveTableHandle, Constraint.alwaysTrue(), transaction).getHandle();
             HiveBucketHandle bucketHandle = layoutHandle.getBucketHandle().get();
 
-            HiveTableLayoutHandle modifiedReadBucketCountLayoutHandle = new HiveTableLayoutHandle(
-                    layoutHandle.getSchemaTableName(),
-                    layoutHandle.getTablePath(),
-                    layoutHandle.getPartitionColumns(),
-                    layoutHandle.getDataColumns(),
-                    layoutHandle.getTableParameters(),
-                    layoutHandle.getPartitions().get(),
-                    layoutHandle.getDomainPredicate(),
-                    layoutHandle.getRemainingPredicate(),
-                    layoutHandle.getPredicateColumns(),
-                    layoutHandle.getPartitionColumnPredicate(),
-                    Optional.of(new HiveBucketHandle(bucketHandle.getColumns(), bucketHandle.getTableBucketCount(), 2)),
-                    layoutHandle.getBucketFilter(),
-                    false,
-                    "layout",
-                    Optional.empty(),
-                    false,
-                    false);
+            HiveTableLayoutHandle modifiedReadBucketCountLayoutHandle = layoutHandle.builder()
+                    .setBucketHandle(Optional.of(new HiveBucketHandle(bucketHandle.getColumns(), bucketHandle.getTableBucketCount(), 2)))
+                    .build();
 
             List<ConnectorSplit> splits = getAllSplits(session, transaction, modifiedReadBucketCountLayoutHandle);
             assertEquals(splits.size(), 16);
@@ -2289,6 +2281,22 @@ public abstract class AbstractTestHiveClient
         }
     }
 
+    private static HiveFilterPushdown.ConnectorPushdownFilterResult pushdownFilter(
+            ConnectorSession session,
+            ConnectorMetadata metadata,
+            SemiTransactionalHiveMetastore metastore,
+            RowExpressionService rowExpressionService,
+            StandardFunctionResolution functionResolution,
+            HivePartitionManager partitionManager,
+            FunctionMetadataManager functionMetadataManager,
+            ConnectorTableHandle tableHandle,
+            RowExpression filter,
+            Optional<ConnectorTableLayoutHandle> currentLayoutHandle)
+    {
+        HiveFilterPushdown filterPushdown = new HiveFilterPushdown(new HiveTransactionManager(), rowExpressionService, functionResolution, partitionManager, functionMetadataManager);
+        return filterPushdown.pushdownFilter(session, metadata, metastore, tableHandle, filter, currentLayoutHandle);
+    }
+
     private static void assertBucketTableEvolutionResult(MaterializedResult result, List<ColumnHandle> columnHandles, Set<Integer> bucketIds, int rowCount)
     {
         // Assert that only elements in the specified bucket shows up, and each element shows up 3 times.
@@ -2331,7 +2339,7 @@ public abstract class AbstractTestHiveClient
         // verify all paths are unique
         Set<String> paths = new HashSet<>();
         for (ConnectorSplit split : splits) {
-            assertTrue(paths.add(((HiveSplit) split).getPath()));
+            assertTrue(paths.add(((HiveSplit) split).getFileSplit().getPath()));
         }
     }
 
@@ -2417,11 +2425,11 @@ public abstract class AbstractTestHiveClient
 
                         long newCompletedBytes = pageSource.getCompletedBytes();
                         assertTrue(newCompletedBytes >= completedBytes);
-                        assertTrue(newCompletedBytes <= hiveSplit.getLength());
+                        assertTrue(newCompletedBytes <= hiveSplit.getFileSplit().getLength());
                         completedBytes = newCompletedBytes;
                     }
 
-                    assertTrue(completedBytes <= hiveSplit.getLength());
+                    assertTrue(completedBytes <= hiveSplit.getFileSplit().getLength());
                     assertEquals(rowNumber, 100);
                 }
             }
@@ -4043,10 +4051,16 @@ public abstract class AbstractTestHiveClient
             throws Exception
     {
         List<String> partitionedBy = createTableColumns.stream()
-                .filter(column -> column.getName().equals("ds"))
                 .map(ColumnMetadata::getName)
+                .filter(PARTITION_COLUMN_FILTER)
                 .collect(toList());
 
+        doCreateEmptyTable(tableName, storageFormat, createTableColumns, partitionedBy);
+    }
+
+    protected void doCreateEmptyTable(SchemaTableName tableName, HiveStorageFormat storageFormat, List<ColumnMetadata> createTableColumns, List<String> partitionedBy)
+            throws Exception
+    {
         String queryId;
         try (Transaction transaction = newTransaction()) {
             ConnectorSession session = newSession();
@@ -5051,11 +5065,11 @@ public abstract class AbstractTestHiveClient
 
                 long newCompletedBytes = pageSource.getCompletedBytes();
                 assertTrue(newCompletedBytes >= completedBytes);
-                assertTrue(newCompletedBytes <= hiveSplit.getLength() + initialPageSourceCompletedBytes);
+                assertTrue(newCompletedBytes <= hiveSplit.getFileSplit().getLength() + initialPageSourceCompletedBytes);
                 completedBytes = newCompletedBytes;
             }
 
-            assertTrue(completedBytes <= hiveSplit.getLength() + initialPageSourceCompletedBytes);
+            assertTrue(completedBytes <= hiveSplit.getFileSplit().getLength() + initialPageSourceCompletedBytes);
             assertEquals(rowNumber, 100);
         }
         finally {
@@ -5688,6 +5702,15 @@ public abstract class AbstractTestHiveClient
             List<TableConstraint<String>> expectedConstraints = tableConstraintsMap.get(table);
             compareTableConstraints(tableConstraints, expectedConstraints);
         }
+    }
+
+    protected Set<HiveStorageFormat> getSupportedCreateTableHiveStorageFormats()
+    {
+        return difference(
+                ImmutableSet.copyOf(HiveStorageFormat.values()),
+                // exclude formats that change table schema with serde
+                // exclude ALPHA because it does not support DML yet
+                ImmutableSet.of(AVRO, CSV, ALPHA));
     }
 
     private List<TableConstraint<String>> getTableConstraints(SchemaTableName tableName)

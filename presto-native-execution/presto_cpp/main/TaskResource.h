@@ -23,11 +23,11 @@ class TaskResource {
  public:
   explicit TaskResource(TaskManager& taskManager)
       : taskManager_(taskManager),
-        pool_(velox::memory::getDefaultScopedMemoryPool()) {}
+        pool_(velox::memory::getDefaultMemoryPool()) {}
 
   void registerUris(http::HttpServer& server);
 
-  velox::memory::ScopedMemoryPool* getPool() const {
+  velox::memory::MemoryPool* getPool() const {
     return pool_.get();
   }
 
@@ -40,9 +40,40 @@ class TaskResource {
       proxygen::HTTPMessage* message,
       const std::vector<std::string>& pathMatch);
 
+  /// Creates or updates a regular task. A regular task shuffles data through
+  /// standard build-in Http mechanisms.
   proxygen::RequestHandler* createOrUpdateTask(
       proxygen::HTTPMessage* message,
       const std::vector<std::string>& pathMatch);
+
+  /// Creates or updates a batch task. A batch task has additional information
+  /// that needs to be passed over in order to create custom shuffle interfaces.
+  /// Please refer to
+  /// https://github.com/prestodb/presto/blob/master/presto-spark-base/src/main/java/com/facebook/presto/spark/execution/BatchTaskUpdateRequest.java
+  /// to see the the Http POST structure which should be passed to create a
+  /// batch task.
+  /// - The shuffle write information should be passed in with
+  /// BatchTaskUpdateRequest.shuffleWriteInfo.
+  /// - The shuffle read information should be passed in with
+  /// ((RemoteSplit)(BatchTaskUpdateRequest.taskUpdateRequest.sources[x].splits.split.connectorSplit)).location.location
+  ///
+  /// The encoding format shall be decided by custom shuffle implementation.
+  /// Example could be found in:
+  /// - Passer (Java):
+  /// com.facebook.presto.spark.execution.PrestoSparkLocalShuffleInfoSerializer
+  /// - Receiver (C++): facebook::presto::operators::LocalShuffleInfo
+  proxygen::RequestHandler* createOrUpdateBatchTask(
+      proxygen::HTTPMessage* message,
+      const std::vector<std::string>& pathMatch);
+
+  proxygen::RequestHandler* createOrUpdateTaskImpl(
+      proxygen::HTTPMessage* message,
+      const std::vector<std::string>& pathMatch,
+      const std::function<void(
+          const protocol::TaskId&,
+          const std::string&,
+          protocol::TaskUpdateRequest&,
+          velox::core::PlanFragment&)>& parseFunc);
 
   proxygen::RequestHandler* deleteTask(
       proxygen::HTTPMessage* message,
@@ -65,7 +96,7 @@ class TaskResource {
       const std::vector<std::string>& pathMatch);
 
   TaskManager& taskManager_;
-  std::unique_ptr<velox::memory::ScopedMemoryPool> pool_;
+  std::shared_ptr<velox::memory::MemoryPool> pool_;
 };
 
 } // namespace facebook::presto
