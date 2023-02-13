@@ -42,10 +42,9 @@ import static java.util.Objects.requireNonNull;
 public class CachingDirectoryLister
         implements DirectoryLister
 {
+    protected final DirectoryLister delegate;
     private final Cache<Path, List<HiveFileInfo>> cache;
     private final CachedTableChecker cachedTableChecker;
-
-    protected final DirectoryLister delegate;
 
     @Inject
     public CachingDirectoryLister(@ForCachingDirectoryLister DirectoryLister delegate, HiveClientConfig hiveClientConfig)
@@ -153,6 +152,12 @@ public class CachingDirectoryLister
     public long getRequestCount()
     {
         return cache.stats().requestCount();
+    }
+
+    @Managed
+    public long getEvictionCount()
+    {
+        return cache.stats().evictionCount();
     }
 
     private static class CachedTableChecker
