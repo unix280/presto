@@ -17,13 +17,13 @@ import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.ErrorCode;
 import com.facebook.presto.common.resourceGroups.QueryType;
-import com.facebook.presto.common.transaction.TransactionId;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.cost.StatsAndCosts;
 import com.facebook.presto.execution.QueryExecution.QueryOutputInfo;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.memory.VersionedMemoryPoolId;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.server.BasicQueryInfo;
 import com.facebook.presto.server.BasicQueryStats;
 import com.facebook.presto.spi.PrestoException;
@@ -34,9 +34,9 @@ import com.facebook.presto.spi.connector.ConnectorCommitHandle;
 import com.facebook.presto.spi.function.SqlFunctionId;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
-import com.facebook.presto.spi.security.AccessControl;
 import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.sql.planner.CanonicalPlanWithInfo;
+import com.facebook.presto.transaction.TransactionId;
 import com.facebook.presto.transaction.TransactionInfo;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.base.Ticker;
@@ -161,7 +161,6 @@ public class QueryStateMachine
     private final Set<SqlFunctionId> removedSessionFunctions = Sets.newConcurrentHashSet();
 
     private final WarningCollector warningCollector;
-    private final AtomicReference<List<String>> functionNames = new AtomicReference<>(ImmutableList.of());
 
     private QueryStateMachine(
             String query,
@@ -484,7 +483,6 @@ public class QueryStateMachine
                 removedSessionFunctions,
                 Optional.ofNullable(planStatsAndCosts.get()).orElseGet(StatsAndCosts::empty),
                 session.getOptimizerInformationCollector().getOptimizationInfo(),
-                functionNames.get(),
                 Optional.ofNullable(planCanonicalInfo.get()).orElseGet(ImmutableList::of));
     }
 
@@ -550,12 +548,6 @@ public class QueryStateMachine
     {
         requireNonNull(output, "output is null");
         this.output.set(output);
-    }
-
-    public void setFunctionNames(List<String> functionNames)
-    {
-        requireNonNull(functionNames, "functionNames is null");
-        this.functionNames.set(ImmutableList.copyOf(functionNames));
     }
 
     private void addSerializedCommitOutputToOutput(ConnectorCommitHandle commitHandle)
@@ -1071,7 +1063,6 @@ public class QueryStateMachine
                 queryInfo.getRemovedSessionFunctions(),
                 StatsAndCosts.empty(),
                 queryInfo.getOptimizerInformation(),
-                queryInfo.getFunctionNames(),
                 ImmutableList.of());
         finalQueryInfo.compareAndSet(finalInfo, Optional.of(prunedQueryInfo));
     }

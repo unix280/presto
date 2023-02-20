@@ -21,7 +21,6 @@ import com.facebook.airlift.stats.Distribution.DistributionSnapshot;
 import com.facebook.presto.SessionRepresentation;
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.common.RuntimeStats;
-import com.facebook.presto.common.transaction.TransactionId;
 import com.facebook.presto.cost.HistoryBasedPlanStatisticsManager;
 import com.facebook.presto.cost.HistoryBasedPlanStatisticsTracker;
 import com.facebook.presto.cost.StatsAndCosts;
@@ -61,6 +60,7 @@ import com.facebook.presto.spi.eventlistener.ResourceDistribution;
 import com.facebook.presto.spi.eventlistener.StageStatistics;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
 import com.facebook.presto.spi.statistics.PlanStatisticsWithSourceInfo;
+import com.facebook.presto.transaction.TransactionId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.joda.time.DateTime;
@@ -218,7 +218,6 @@ public class QueryMonitor
                 ImmutableList.of(),
                 ImmutableList.of(),
                 Optional.empty(),
-                ImmutableList.of(),
                 ImmutableList.of()));
 
         logQueryTimeline(queryInfo);
@@ -252,8 +251,7 @@ public class QueryMonitor
                         createPlanStatistics(queryInfo.getPlanStatsAndCosts()),
                         historyBasedPlanStatisticsTracker.getQueryStats(queryInfo).values().stream().collect(toImmutableList()),
                         queryInfo.getExpandedQuery(),
-                        queryInfo.getOptimizerInformation(),
-                        queryInfo.getFunctionNames()));
+                        queryInfo.getOptimizerInformation()));
 
         logQueryTimeline(queryInfo);
     }

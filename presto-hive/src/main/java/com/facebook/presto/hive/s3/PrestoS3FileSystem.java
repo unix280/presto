@@ -665,7 +665,7 @@ public class PrestoS3FileSystem
             return retry()
                     .maxAttempts(maxAttempts)
                     .exponentialBackoff(BACKOFF_MIN_SLEEP, maxBackoffTime, maxRetryTime, 2.0)
-                    .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class, AbortedException.class)
+                    .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class)
                     .onRetry(STATS::newGetMetadataRetry)
                     .run("getS3ObjectMetadata", () -> {
                         try {
@@ -931,7 +931,7 @@ public class PrestoS3FileSystem
                 return retry()
                         .maxAttempts(maxAttempts)
                         .exponentialBackoff(BACKOFF_MIN_SLEEP, maxBackoffTime, maxRetryTime, 2.0)
-                        .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class, EOFException.class, FileNotFoundException.class, AbortedException.class)
+                        .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class, EOFException.class, FileNotFoundException.class)
                         .onRetry(STATS::newGetObjectRetry)
                         .run("getS3Object", () -> {
                             InputStream stream;
@@ -1101,7 +1101,7 @@ public class PrestoS3FileSystem
                 return retry()
                         .maxAttempts(maxAttempts)
                         .exponentialBackoff(BACKOFF_MIN_SLEEP, maxBackoffTime, maxRetryTime, 2.0)
-                        .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class, FileNotFoundException.class, AbortedException.class)
+                        .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class, FileNotFoundException.class)
                         .onRetry(STATS::newGetObjectRetry)
                         .run("getS3Object", () -> {
                             try {

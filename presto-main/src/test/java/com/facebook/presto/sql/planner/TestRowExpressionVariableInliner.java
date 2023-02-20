@@ -38,12 +38,6 @@ public class TestRowExpressionVariableInliner
         {
             return QualifiedObjectName.valueOf(new CatalogSchemaName("a", "b"), "c").getCatalogSchemaName();
         }
-
-        @Override
-        public String getName()
-        {
-            return "a.b.c";
-        }
     }
 
     private static final FunctionHandle TEST_FUNCTION = new TestFunctionHandle();

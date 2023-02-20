@@ -1,4 +1,4 @@
-# Prestissimo - C++ Presto worker implementation using Velox
+# presto.cpp
 
 ## Build Notes
 

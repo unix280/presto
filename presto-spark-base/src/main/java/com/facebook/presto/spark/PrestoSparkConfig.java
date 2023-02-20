@@ -61,11 +61,10 @@ public class PrestoSparkConfig
     private DataSize averageInputDataSizePerPartition = new DataSize(2, GIGABYTE);
     private int maxHashPartitionCount = 4096;
     private int minHashPartitionCount = 1024;
+    private boolean adaptiveJoinSideSwitchingEnabled;
     private boolean resourceAllocationStrategyEnabled;
     private boolean executorAllocationStrategyEnabled;
     private boolean hashPartitionCountAllocationStrategyEnabled;
-    private boolean adaptiveQueryExecutionEnabled;
-    private boolean adaptiveJoinSideSwitchingEnabled;
 
     public boolean isSparkPartitionCountAutoTuneEnabled()
     {
@@ -426,6 +425,19 @@ public class PrestoSparkConfig
         return this;
     }
 
+    public boolean isAdaptiveJoinSideSwitchingEnabled()
+    {
+        return adaptiveJoinSideSwitchingEnabled;
+    }
+
+    @Config("optimizer.adaptive-join-side-switching-enabled")
+    @ConfigDescription("Enables the adaptive optimization to choose build and probe sides of a join")
+    public PrestoSparkConfig setAdaptiveJoinSideSwitchingEnabled(boolean adaptiveJoinSideSwitchingEnabled)
+    {
+        this.adaptiveJoinSideSwitchingEnabled = adaptiveJoinSideSwitchingEnabled;
+        return this;
+    }
+
     public boolean isExecutorAllocationStrategyEnabled()
     {
         return executorAllocationStrategyEnabled;
@@ -449,32 +461,6 @@ public class PrestoSparkConfig
     public PrestoSparkConfig setHashPartitionCountAllocationStrategyEnabled(boolean hashPartitionCountAllocationStrategyEnabled)
     {
         this.hashPartitionCountAllocationStrategyEnabled = hashPartitionCountAllocationStrategyEnabled;
-        return this;
-    }
-
-    public boolean isAdaptiveQueryExecutionEnabled()
-    {
-        return adaptiveQueryExecutionEnabled;
-    }
-
-    @Config("spark.adaptive-query-execution-enabled")
-    @ConfigDescription("Enables adaptive query execution")
-    public PrestoSparkConfig setAdaptiveQueryExecutionEnabled(boolean adaptiveQueryExecutionEnabled)
-    {
-        this.adaptiveQueryExecutionEnabled = adaptiveQueryExecutionEnabled;
-        return this;
-    }
-
-    public boolean isAdaptiveJoinSideSwitchingEnabled()
-    {
-        return adaptiveJoinSideSwitchingEnabled;
-    }
-
-    @Config("optimizer.adaptive-join-side-switching-enabled")
-    @ConfigDescription("Enables the adaptive optimization to choose build and probe sides of a join")
-    public PrestoSparkConfig setAdaptiveJoinSideSwitchingEnabled(boolean adaptiveJoinSideSwitchingEnabled)
-    {
-        this.adaptiveJoinSideSwitchingEnabled = adaptiveJoinSideSwitchingEnabled;
         return this;
     }
 }

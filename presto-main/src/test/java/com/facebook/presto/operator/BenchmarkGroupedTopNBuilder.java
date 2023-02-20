@@ -16,7 +16,6 @@ package com.facebook.presto.operator;
 import com.facebook.presto.common.Page;
 import com.facebook.presto.common.PageBuilder;
 import com.facebook.presto.common.type.Type;
-import com.facebook.presto.memory.TestingMemoryContext;
 import com.google.common.collect.ImmutableList;
 import io.airlift.tpch.LineItem;
 import io.airlift.tpch.LineItemGenerator;
@@ -57,7 +56,7 @@ import static org.testng.Assert.assertFalse;
 @Fork(4)
 @Warmup(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
-public class BenchmarkInMemoryGroupedTopNBuilder
+public class BenchmarkGroupedTopNBuilder
 {
     private static final int HASH_GROUP = 0;
     private static final int EXTENDED_PRICE = 1;
@@ -89,7 +88,7 @@ public class BenchmarkInMemoryGroupedTopNBuilder
         private int groupCount = 10;
 
         private List<Page> page;
-        private InMemoryGroupedTopNBuilder topNBuilder;
+        private GroupedTopNBuilder topNBuilder;
 
         @Setup
         public void setup()
@@ -102,10 +101,10 @@ public class BenchmarkInMemoryGroupedTopNBuilder
             else {
                 groupByHash = new NoChannelGroupByHash();
             }
-            topNBuilder = new InMemoryGroupedTopNBuilder(types, comparator, topN, false, new TestingMemoryContext(0L), groupByHash);
+            topNBuilder = new GroupedTopNBuilder(types, comparator, topN, false, groupByHash);
         }
 
-        public InMemoryGroupedTopNBuilder getTopNBuilder()
+        public GroupedTopNBuilder getTopNBuilder()
         {
             return topNBuilder;
         }
@@ -119,7 +118,7 @@ public class BenchmarkInMemoryGroupedTopNBuilder
     @Benchmark
     public void topN(BenchmarkData data, Blackhole blackhole)
     {
-        InMemoryGroupedTopNBuilder topNBuilder = data.getTopNBuilder();
+        GroupedTopNBuilder topNBuilder = data.getTopNBuilder();
         for (Page page : data.getPages()) {
             Work<?> work = topNBuilder.processPage(page);
             boolean finished;
@@ -128,7 +127,7 @@ public class BenchmarkInMemoryGroupedTopNBuilder
             } while (!finished);
         }
 
-        Iterator<Page> results = topNBuilder.buildResult().iterator();
+        Iterator<Page> results = topNBuilder.buildResult();
         while (results.hasNext()) {
             blackhole.consume(results.next());
         }
@@ -136,7 +135,7 @@ public class BenchmarkInMemoryGroupedTopNBuilder
 
     public List<Page> topNToList(BenchmarkData data)
     {
-        InMemoryGroupedTopNBuilder topNBuilder = data.getTopNBuilder();
+        GroupedTopNBuilder topNBuilder = data.getTopNBuilder();
         for (Page page : data.getPages()) {
             Work<?> work = topNBuilder.processPage(page);
             boolean finished;
@@ -144,7 +143,7 @@ public class BenchmarkInMemoryGroupedTopNBuilder
                 finished = work.process();
             } while (!finished);
         }
-        return ImmutableList.copyOf(topNBuilder.buildResult().iterator());
+        return ImmutableList.copyOf(topNBuilder.buildResult());
     }
 
     @Test
@@ -160,7 +159,7 @@ public class BenchmarkInMemoryGroupedTopNBuilder
     {
         Options options = new OptionsBuilder()
                 .parent(new CommandLineOptions(args))
-                .include(".*" + BenchmarkInMemoryGroupedTopNBuilder.class.getSimpleName() + ".*")
+                .include(".*" + BenchmarkGroupedTopNBuilder.class.getSimpleName() + ".*")
                 .build();
 
         new Runner(options).run();
@@ -179,41 +178,6 @@ public class BenchmarkInMemoryGroupedTopNBuilder
             LineItem lineItem = iterator.next();
             BIGINT.writeLong(pageBuilder.getBlockBuilder(HASH_GROUP), groupCount > 1 ? random.nextInt(groupCount) : 1);
             DOUBLE.writeDouble(pageBuilder.getBlockBuilder(EXTENDED_PRICE), lineItem.getExtendedPrice());
-            DOUBLE.writeDouble(pageBuilder.getBlockBuilder(DISCOUNT), lineItem.getDiscount());
-            DATE.writeLong(pageBuilder.getBlockBuilder(SHIP_DATE), lineItem.getShipDate());
-            DOUBLE.writeDouble(pageBuilder.getBlockBuilder(QUANTITY), lineItem.getQuantity());
-
-            if (pageBuilder.getPositionCount() >= positionsPerPage) {
-                pages.add(pageBuilder.build());
-                pageBuilder.reset();
-            }
-        }
-
-        if (!pageBuilder.isEmpty()) {
-            pages.add(pageBuilder.build());
-        }
-
-        return pages;
-    }
-
-    public static List<Page> createSequentialInputPages(int positions, List<Type> types, int positionsPerPage, int groupCount, int seed)
-    {
-        List<Page> pages = new ArrayList<>();
-        PageBuilder pageBuilder = new PageBuilder(types);
-        LineItemGenerator lineItemGenerator = new LineItemGenerator(1, 1, 1);
-        Iterator<LineItem> iterator = lineItemGenerator.iterator();
-
-        long mod = positions / groupCount;
-        long groupNumber = 0;
-
-        for (int i = 0; i < positions; i++) {
-            pageBuilder.declarePosition();
-            if (i % mod == 0) {
-                groupNumber++;
-            }
-            LineItem lineItem = iterator.next();
-            BIGINT.writeLong(pageBuilder.getBlockBuilder(HASH_GROUP), groupNumber);
-            DOUBLE.writeDouble(pageBuilder.getBlockBuilder(EXTENDED_PRICE), i % mod * 2.0);
             DOUBLE.writeDouble(pageBuilder.getBlockBuilder(DISCOUNT), lineItem.getDiscount());
             DATE.writeLong(pageBuilder.getBlockBuilder(SHIP_DATE), lineItem.getShipDate());
             DOUBLE.writeDouble(pageBuilder.getBlockBuilder(QUANTITY), lineItem.getQuantity());

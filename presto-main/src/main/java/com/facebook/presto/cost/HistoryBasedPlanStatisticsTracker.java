@@ -62,18 +62,15 @@ public class HistoryBasedPlanStatisticsTracker
     private static final Set<QueryType> ALLOWED_QUERY_TYPES = ImmutableSet.of(SELECT, INSERT);
 
     private final Supplier<HistoryBasedPlanStatisticsProvider> historyBasedPlanStatisticsProvider;
-    private final HistoryBasedStatisticsCacheManager historyBasedStatisticsCacheManager;
     private final SessionPropertyManager sessionPropertyManager;
     private final HistoryBasedOptimizationConfig config;
 
     public HistoryBasedPlanStatisticsTracker(
             Supplier<HistoryBasedPlanStatisticsProvider> historyBasedPlanStatisticsProvider,
-            HistoryBasedStatisticsCacheManager historyBasedStatisticsCacheManager,
             SessionPropertyManager sessionPropertyManager,
             HistoryBasedOptimizationConfig config)
     {
         this.historyBasedPlanStatisticsProvider = requireNonNull(historyBasedPlanStatisticsProvider, "historyBasedPlanStatisticsProvider is null");
-        this.historyBasedStatisticsCacheManager = requireNonNull(historyBasedStatisticsCacheManager, "historyBasedStatisticsCacheManager is null");
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.config = requireNonNull(config, "config is null");
     }
@@ -206,9 +203,9 @@ public class HistoryBasedPlanStatisticsTracker
                                     config);
                         }));
 
-        if (!newPlanStatistics.isEmpty()) {
-            historyBasedPlanStatisticsProvider.get().putStats(ImmutableMap.copyOf(newPlanStatistics));
+        if (newPlanStatistics.isEmpty()) {
+            return;
         }
-        historyBasedStatisticsCacheManager.invalidate(queryInfo.getQueryId());
+        historyBasedPlanStatisticsProvider.get().putStats(ImmutableMap.copyOf(newPlanStatistics));
     }
 }

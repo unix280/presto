@@ -57,12 +57,6 @@ public class SqlFunctionHandle
     }
 
     @Override
-    public String getName()
-    {
-        return functionId.getFunctionName().toString();
-    }
-
-    @Override
     public boolean equals(Object obj)
     {
         if (this == obj) {

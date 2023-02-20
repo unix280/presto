@@ -19,7 +19,6 @@ import org.apache.spark.SparkEnv;
 import org.apache.spark.TaskContext;
 import org.apache.spark.scheduler.MapStatus;
 import org.apache.spark.scheduler.MapStatus$;
-import org.apache.spark.shuffle.BaseShuffleHandle;
 import org.apache.spark.shuffle.ShuffleBlockResolver;
 import org.apache.spark.shuffle.ShuffleHandle;
 import org.apache.spark.shuffle.ShuffleManager;
@@ -32,15 +31,12 @@ import scala.collection.Iterator;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.facebook.presto.spark.classloader_interface.ScalaUtils.emptyScalaIterator;
-import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
-import static java.util.Objects.requireNonNull;
 
 /*
  * {@link PrestoSparkNativeExecutionShuffleManager} is the shuffle manager implementing the Spark shuffle manager interface specifically for native execution. The reasons we have this
@@ -54,8 +50,8 @@ import static java.util.Objects.requireNonNull;
 public class PrestoSparkNativeExecutionShuffleManager
         implements ShuffleManager
 {
-    private final Map<Integer, ShuffleHandle> partitionIdToShuffleHandle = new ConcurrentHashMap<>();
-    private final Map<Integer, BaseShuffleHandle<?, ?, ?>> shuffleIdToBaseShuffleHandle = new ConcurrentHashMap<>();
+    private final Map<Integer, ShuffleHandle> shuffleDependencyMap = new ConcurrentHashMap<>();
+    private final Map<Integer, Integer> shuffleNumMaps = new ConcurrentHashMap<>();
     private final ShuffleManager fallbackShuffleManager;
     private static final String FALLBACK_SPARK_SHUFFLE_MANAGER = "spark.fallback.shuffle.manager";
 
@@ -75,27 +71,19 @@ public class PrestoSparkNativeExecutionShuffleManager
         }
     }
 
-    protected void registerShuffleHandle(BaseShuffleHandle handle, int mapId)
-    {
-        partitionIdToShuffleHandle.put(mapId, handle);
-        shuffleIdToBaseShuffleHandle.put(handle.shuffleId(), handle);
-    }
-
     @Override
     public <K, V, C> ShuffleHandle registerShuffle(int shuffleId, int numMaps, ShuffleDependency<K, V, C> dependency)
     {
+        shuffleNumMaps.put(shuffleId, numMaps);
         return fallbackShuffleManager.registerShuffle(shuffleId, numMaps, dependency);
     }
 
     @Override
     public <K, V> ShuffleWriter<K, V> getWriter(ShuffleHandle handle, int mapId, TaskContext context)
     {
-        checkState(
-                requireNonNull(handle, "handle is null") instanceof BaseShuffleHandle,
-                "class %s is not instance of BaseShuffleHandle", handle.getClass().getName());
-        BaseShuffleHandle<?, ?, ?> baseShuffleHandle = (BaseShuffleHandle<?, ?, ?>) handle;
-        registerShuffleHandle(baseShuffleHandle, mapId);
-        return new EmptyShuffleWriter<>(baseShuffleHandle.dependency().partitioner().numPartitions());
+        shuffleDependencyMap.put(mapId, handle);
+        int shuffleId = handle.shuffleId();
+        return new EmptyShuffleWriter<>(getNumOfPartitions(shuffleId));
     }
 
     @Override
@@ -130,15 +118,15 @@ public class PrestoSparkNativeExecutionShuffleManager
      */
     public Optional<ShuffleHandle> getShuffleHandle(int partitionId)
     {
-        return Optional.ofNullable(partitionIdToShuffleHandle.getOrDefault(partitionId, null));
+        return Optional.ofNullable(shuffleDependencyMap.getOrDefault(partitionId, null));
     }
 
     public int getNumOfPartitions(int shuffleId)
     {
-        if (!shuffleIdToBaseShuffleHandle.containsKey(shuffleId)) {
+        if (!shuffleNumMaps.containsKey(shuffleId)) {
             throw new RuntimeException(format("shuffleId=[%s] is not registered", shuffleId));
         }
-        return shuffleIdToBaseShuffleHandle.get(shuffleId).dependency().partitioner().numPartitions();
+        return shuffleNumMaps.get(shuffleId);
     }
 
     static class EmptyShuffleReader<K, V>
@@ -155,12 +143,10 @@ public class PrestoSparkNativeExecutionShuffleManager
             extends ShuffleWriter<K, V>
     {
         private final long[] mapStatus;
-        private static final long DEFAULT_MAP_STATUS = 1L;
 
         public EmptyShuffleWriter(int totalMapStages)
         {
             this.mapStatus = new long[totalMapStages];
-            Arrays.fill(mapStatus, DEFAULT_MAP_STATUS);
         }
 
         @Override

@@ -11,19 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark;
+package com.facebook.presto.spark.execution;
 
-import com.facebook.presto.testing.QueryRunner;
-import com.facebook.presto.tests.AbstractTestTopNQueries;
-
-import static com.facebook.presto.spark.PrestoSparkQueryRunner.createHivePrestoSparkQueryRunner;
-
-public class TestPrestoSparkTopNQueries
-        extends AbstractTestTopNQueries
+public interface PrestoSparkShuffleInfoSerializer
 {
-    @Override
-    protected QueryRunner createQueryRunner()
-    {
-        return createHivePrestoSparkQueryRunner();
-    }
+    byte[] serializeReadInfo(PrestoSparkShuffleReadInfo readInfo);
+
+    byte[] serializeWriteInfo(PrestoSparkShuffleWriteInfo writeInfo);
 }

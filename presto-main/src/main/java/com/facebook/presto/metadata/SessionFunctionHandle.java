@@ -49,12 +49,6 @@ public class SessionFunctionHandle
         return SESSION_NAMESPACE;
     }
 
-    @Override
-    public String getName()
-    {
-        return sqlFunction.getSignature().getName().toString();
-    }
-
     public FunctionMetadata getFunctionMetadata()
     {
         Signature signature = sqlFunction.getSignature();

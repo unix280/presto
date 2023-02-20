@@ -86,7 +86,6 @@ public class NativeExecutionOperator
     private final LocalMemoryContext systemMemoryContext;
     private final PlanFragment planFragment;
     private final TableWriteInfo tableWriteInfo;
-    private final Optional<String> shuffleWriteInfo;
     private final PagesSerde serde;
     private final NativeExecutionProcessFactory processFactory;
     private final NativeExecutionTaskFactory taskFactory;
@@ -104,15 +103,13 @@ public class NativeExecutionOperator
             TableWriteInfo tableWriteInfo,
             PagesSerde serde,
             NativeExecutionProcessFactory processFactory,
-            NativeExecutionTaskFactory taskFactory,
-            Optional<String> shuffleWriteInfo)
+            NativeExecutionTaskFactory taskFactory)
     {
         this.sourceId = requireNonNull(sourceId, "sourceId is null");
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.systemMemoryContext = operatorContext.localSystemMemoryContext();
         this.planFragment = requireNonNull(planFragment, "planFragment is null");
         this.tableWriteInfo = requireNonNull(tableWriteInfo, "tableWriteInfo is null");
-        this.shuffleWriteInfo = requireNonNull(shuffleWriteInfo, "shuffleWriteInfo is null");
         this.serde = requireNonNull(serde, "serde is null");
         this.processFactory = requireNonNull(processFactory, "processFactory is null");
         this.taskFactory = requireNonNull(taskFactory, "taskFactory is null");
@@ -208,8 +205,7 @@ public class NativeExecutionOperator
                 operatorContext.getDriverContext().getTaskId(),
                 planFragment,
                 ImmutableList.of(taskSource),
-                tableWriteInfo,
-                shuffleWriteInfo);
+                tableWriteInfo);
     }
 
     private Page processResult(SerializedPage page)
@@ -288,7 +284,6 @@ public class NativeExecutionOperator
         private final PlanNodeId planNodeId;
         private final PlanFragment planFragment;
         private final TableWriteInfo tableWriteInfo;
-        private final Optional<String> shuffleWriteInfo;
         private final PagesSerdeFactory serdeFactory;
         private final NativeExecutionProcessFactory processFactory;
         private final NativeExecutionTaskFactory taskFactory;
@@ -301,14 +296,12 @@ public class NativeExecutionOperator
                 TableWriteInfo tableWriteInfo,
                 PagesSerdeFactory serdeFactory,
                 NativeExecutionProcessFactory processFactory,
-                NativeExecutionTaskFactory taskFactory,
-                Optional<String> shuffleWriteInfo)
+                NativeExecutionTaskFactory taskFactory)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.planFragment = requireNonNull(planFragment, "planFragment is null");
             this.tableWriteInfo = requireNonNull(tableWriteInfo, "tableWriteInfo is null");
-            this.shuffleWriteInfo = requireNonNull(shuffleWriteInfo, "shuffleWriteInfo is null");
             this.serdeFactory = requireNonNull(serdeFactory, "serdeFactory is null");
             this.processFactory = requireNonNull(processFactory, "processFactory is null");
             this.taskFactory = requireNonNull(taskFactory, "taskFactory is null");
@@ -332,8 +325,7 @@ public class NativeExecutionOperator
                     tableWriteInfo,
                     serdeFactory.createPagesSerde(),
                     processFactory,
-                    taskFactory,
-                    shuffleWriteInfo);
+                    taskFactory);
         }
 
         @Override
@@ -353,22 +345,14 @@ public class NativeExecutionOperator
     {
         private final PlanFragment fragment;
         private final Session session;
-        private final Optional<String> shuffleWriteInfo;
         private final BlockEncodingSerde blockEncodingSerde;
         private final NativeExecutionProcessFactory processFactory;
         private final NativeExecutionTaskFactory taskFactory;
 
-        public NativeExecutionOperatorTranslator(
-                Session session,
-                PlanFragment fragment,
-                BlockEncodingSerde blockEncodingSerde,
-                NativeExecutionProcessFactory processFactory,
-                NativeExecutionTaskFactory taskFactory,
-                Optional<String> shuffleWriteInfo)
+        public NativeExecutionOperatorTranslator(Session session, PlanFragment fragment, BlockEncodingSerde blockEncodingSerde, NativeExecutionProcessFactory processFactory, NativeExecutionTaskFactory taskFactory)
         {
             this.fragment = requireNonNull(fragment, "fragment is null");
             this.session = requireNonNull(session, "session is null");
-            this.shuffleWriteInfo = requireNonNull(shuffleWriteInfo, "shuffleWriteInfo is null");
             this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
             this.processFactory = requireNonNull(processFactory, "processFactory is null");
             this.taskFactory = requireNonNull(taskFactory, "taskFactory is null");
@@ -388,8 +372,7 @@ public class NativeExecutionOperator
                         context.getTableWriteInfo(),
                         new PagesSerdeFactory(blockEncodingSerde, isExchangeCompressionEnabled(session), isExchangeChecksumEnabled(session)),
                         processFactory,
-                        taskFactory,
-                        shuffleWriteInfo);
+                        taskFactory);
                 return Optional.of(
                         new LocalExecutionPlanner.PhysicalOperation(operatorFactory, makeLayout(node), context, UNGROUPED_EXECUTION));
             }

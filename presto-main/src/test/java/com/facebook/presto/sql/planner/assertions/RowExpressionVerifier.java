@@ -110,7 +110,7 @@ final class RowExpressionVerifier
         this.symbolAliases = requireNonNull(symbolAliases, "symbolLayout is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.session = requireNonNull(session, "session is null");
-        this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
+        this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
     }
 
     @Override

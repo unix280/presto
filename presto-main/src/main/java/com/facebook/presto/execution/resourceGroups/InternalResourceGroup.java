@@ -680,7 +680,6 @@ public class InternalResourceGroup
 
     public void run(ManagedQueryExecution query)
     {
-        boolean isQueryQueueFull = false;
         synchronized (root) {
             if (!subGroups.isEmpty()) {
                 throw new PrestoException(INVALID_RESOURCE_GROUP, format("Cannot add queries to %s. It is not a leaf group.", id));
@@ -698,25 +697,21 @@ public class InternalResourceGroup
                 group = group.parent.get();
             }
             if (!canQueue && !canRun) {
-                isQueryQueueFull = true;
+                query.fail(new QueryQueueFullException(id));
+                return;
+            }
+            query.setResourceGroupQueryLimits(perQueryLimits);
+            if (canRun && queuedQueries.isEmpty()) {
+                startInBackground(query);
             }
             else {
-                query.setResourceGroupQueryLimits(perQueryLimits);
-                if (canRun && queuedQueries.isEmpty()) {
-                    startInBackground(query);
-                }
-                else {
-                    enqueueQuery(query);
-                }
-                query.addStateChangeListener(state -> {
-                    if (state.isDone()) {
-                        queryFinished(query);
-                    }
-                });
+                enqueueQuery(query);
             }
-        }
-        if (isQueryQueueFull) {
-            query.fail(new QueryQueueFullException(id));
+            query.addStateChangeListener(state -> {
+                if (state.isDone()) {
+                    queryFinished(query);
+                }
+            });
         }
     }
 

@@ -118,7 +118,7 @@ public class TestRowExpressionRewriter
             Visitor()
             {
                 this.functionAndTypeManager = createTestFunctionAndTypeManager();
-                this.functionResolution = new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver());
+                this.functionResolution = new FunctionResolution(functionAndTypeManager);
             }
 
             @Override

@@ -42,11 +42,4 @@ public class TestRaptorDistributedQueries
     {
         // TODO: disabled until we fix stackoverflow error in ExpressionTreeRewriter
     }
-
-    @Test
-    @Override
-    public void testSubfieldAccessControl()
-    {
-        // disabled as raptor doesn't support complex types
-    }
 }

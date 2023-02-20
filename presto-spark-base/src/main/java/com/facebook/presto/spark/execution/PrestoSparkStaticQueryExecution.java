@@ -19,7 +19,6 @@ import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.HistoryBasedPlanStatisticsTracker;
 import com.facebook.presto.event.QueryMonitor;
-import com.facebook.presto.execution.QueryManagerConfig;
 import com.facebook.presto.execution.QueryStateTimer;
 import com.facebook.presto.execution.TaskInfo;
 import com.facebook.presto.execution.scheduler.TableWriteInfo;
@@ -35,10 +34,10 @@ import com.facebook.presto.spark.PrestoSparkTaskDescriptor;
 import com.facebook.presto.spark.RddAndMore;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskExecutor;
 import com.facebook.presto.spark.classloader_interface.MutablePartitionId;
-import com.facebook.presto.spark.classloader_interface.PrestoSparkJavaExecutionTaskInputs;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkSerializedPage;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkShuffleStats;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskExecutorFactoryProvider;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskInputs;
 import com.facebook.presto.spark.classloader_interface.SerializedPrestoSparkTaskDescriptor;
 import com.facebook.presto.spark.classloader_interface.SerializedTaskInfo;
 import com.facebook.presto.spark.planner.PrestoSparkPlanFragmenter;
@@ -47,7 +46,6 @@ import com.facebook.presto.spark.planner.PrestoSparkRddFactory;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.page.PagesSerde;
 import com.facebook.presto.spi.storage.TempStorage;
-import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.planner.PartitioningProviderManager;
 import com.facebook.presto.sql.planner.PlanFragment;
 import com.facebook.presto.sql.planner.SubPlan;
@@ -118,8 +116,6 @@ public class PrestoSparkStaticQueryExecution
             Optional<String> queryDataOutputLocation,
             TempStorage tempStorage,
             NodeMemoryConfig nodeMemoryConfig,
-            FeaturesConfig featuresConfig,
-            QueryManagerConfig queryManagerConfig,
             Set<PrestoSparkServiceWaitTimeMetrics> waitTimeMetrics,
             Optional<ErrorClassifier> errorClassifier,
             PrestoSparkPlanFragmenter planFragmenter,
@@ -155,8 +151,6 @@ public class PrestoSparkStaticQueryExecution
                 queryDataOutputLocation,
                 tempStorage,
                 nodeMemoryConfig,
-                featuresConfig,
-                queryManagerConfig,
                 waitTimeMetrics,
                 errorClassifier,
                 planFragmenter,
@@ -243,7 +237,7 @@ public class PrestoSparkStaticQueryExecution
                     0,
                     serializedTaskDescriptor,
                     emptyScalaIterator(),
-                    new PrestoSparkJavaExecutionTaskInputs(ImmutableMap.of(), ImmutableMap.of(), inputs.build()),
+                    new PrestoSparkTaskInputs(ImmutableMap.of(), ImmutableMap.of(), inputs.build()),
                     taskInfoCollector,
                     shuffleStatsCollector,
                     PrestoSparkSerializedPage.class);

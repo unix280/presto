@@ -152,7 +152,7 @@ public class RowExpressionInterpreter
         this.optimizationLevel = optimizationLevel;
         this.functionInvoker = new InterpretedFunctionInvoker(metadata.getFunctionAndTypeManager());
         this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata.getFunctionAndTypeManager());
-        this.resolution = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
+        this.resolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
         this.functionAndTypeManager = metadata.getFunctionAndTypeManager();
 
         this.visitor = new Visitor();
@@ -281,7 +281,7 @@ public class RowExpressionInterpreter
                 RowExpression function = getSqlFunctionRowExpression(
                         functionMetadata,
                         functionImplementation,
-                        metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                        metadata,
                         session.getSqlFunctionProperties(),
                         session.getSessionFunctions(),
                         node.getArguments());
@@ -860,7 +860,7 @@ public class RowExpressionInterpreter
 
         private SpecialCallResult tryHandleLike(CallExpression callExpression, List<Object> argumentValues, List<Type> argumentTypes, Object context)
         {
-            FunctionResolution resolution = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
+            FunctionResolution resolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
             checkArgument(resolution.isLikeFunction(callExpression.getFunctionHandle()));
             checkArgument(callExpression.getArguments().size() == 2);
             RowExpression likePatternExpression = callExpression.getArguments().get(1);

@@ -68,7 +68,7 @@ public class TestJoinEnumerator
         queryRunner = new LocalQueryRunner(testSessionBuilder().build());
         metadata = queryRunner.getMetadata();
         determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
-        functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
+        functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
     }
 
     @AfterClass(alwaysRun = true)

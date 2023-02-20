@@ -99,7 +99,6 @@ public class ResourceManagerClusterStateProvider
                 resourceManagerConfig.getCompletedQueryExpirationTimeout(),
                 resourceManagerConfig.getNodeStatusTimeout(),
                 resourceManagerConfig.getMemoryPoolInfoRefreshDuration(),
-                resourceManagerConfig.getResourceGroupRuntimeInfoTimeout(),
                 requireNonNull(nodeMemoryConfig, "nodeMemoryConfig is null").isReservedPoolEnabled(),
                 requireNonNull(scheduledExecutorService, "scheduledExecutorService is null"));
     }
@@ -112,7 +111,6 @@ public class ResourceManagerClusterStateProvider
             Duration completedQueryExpirationTimeout,
             Duration nodeStatusTimeout,
             Duration memoryPoolInfoRefreshDuration,
-            Duration resourceGroupRuntimeInfoTimeout,
             boolean isReservedPoolEnabled,
             ScheduledExecutorService scheduledExecutorService)
     {
@@ -143,14 +141,6 @@ public class ResourceManagerClusterStateProvider
             for (Map.Entry<String, InternalNodeState> nodeEntry : ImmutableList.copyOf(nodeStatuses.entrySet())) {
                 if ((System.currentTimeMillis() - nodeEntry.getValue().getLastHeartbeatInMillis()) > nodeStatusTimeout.toMillis()) {
                     nodeStatuses.remove(nodeEntry.getKey());
-                }
-            }
-        }, 100, 100, MILLISECONDS);
-
-        scheduledExecutorService.scheduleAtFixedRate(() -> {
-            for (Map.Entry<String, CoordinatorResourceGroupState> resourceGroupState : ImmutableList.copyOf(resourceGroupStates.entrySet())) {
-                if ((System.currentTimeMillis() - resourceGroupState.getValue().getLastHeartbeatInMillis()) > resourceGroupRuntimeInfoTimeout.toMillis()) {
-                    resourceGroupStates.remove(resourceGroupState.getKey());
                 }
             }
         }, 100, 100, MILLISECONDS);
@@ -193,7 +183,7 @@ public class ResourceManagerClusterStateProvider
 
     public void registerResourceGroupRuntimeHeartbeat(String node, List<ResourceGroupRuntimeInfo> resourceGroupRuntimeInfos)
     {
-        resourceGroupStates.put(node, new CoordinatorResourceGroupState(node, System.currentTimeMillis(), resourceGroupRuntimeInfos));
+        resourceGroupStates.put(node, new CoordinatorResourceGroupState(node, resourceGroupRuntimeInfos));
     }
 
     public int getAdjustedQueueSize()
@@ -377,16 +367,13 @@ public class ResourceManagerClusterStateProvider
     private static class CoordinatorResourceGroupState
     {
         private final String nodeId;
-        private final long lastHeartbeatInMillis;
         private final List<ResourceGroupRuntimeInfo> resourceGroups;
 
         public CoordinatorResourceGroupState(
                 String nodeId,
-                long lastHeartbeatInMillis,
                 List<ResourceGroupRuntimeInfo> resourceGroups)
         {
             this.nodeId = requireNonNull(nodeId, "nodeId is null");
-            this.lastHeartbeatInMillis = lastHeartbeatInMillis;
             this.resourceGroups = requireNonNull(resourceGroups, "resourceGroups is null");
         }
 
@@ -398,11 +385,6 @@ public class ResourceManagerClusterStateProvider
         public String getNodeId()
         {
             return nodeId;
-        }
-
-        public long getLastHeartbeatInMillis()
-        {
-            return lastHeartbeatInMillis;
         }
     }
 

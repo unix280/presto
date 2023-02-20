@@ -22,6 +22,7 @@ import com.facebook.presto.execution.TaskInfo;
 import com.facebook.presto.execution.TaskManagerConfig;
 import com.facebook.presto.execution.TaskSource;
 import com.facebook.presto.execution.scheduler.TableWriteInfo;
+import com.facebook.presto.server.TaskUpdateRequest;
 import com.facebook.presto.sql.planner.PlanFragment;
 
 import javax.annotation.PreDestroy;
@@ -29,7 +30,6 @@ import javax.inject.Inject;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -47,7 +47,7 @@ public class NativeExecutionTaskFactory
     private final ScheduledExecutorService updateScheduledExecutor;
     private final JsonCodec<TaskInfo> taskInfoCodec;
     private final JsonCodec<PlanFragment> planFragmentCodec;
-    private final JsonCodec<BatchTaskUpdateRequest> taskUpdateRequestCodec;
+    private final JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec;
     private final TaskManagerConfig taskManagerConfig;
 
     @Inject
@@ -57,7 +57,7 @@ public class NativeExecutionTaskFactory
             ScheduledExecutorService updateScheduledExecutor,
             JsonCodec<TaskInfo> taskInfoCodec,
             JsonCodec<PlanFragment> planFragmentCodec,
-            JsonCodec<BatchTaskUpdateRequest> taskUpdateRequestCodec,
+            JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec,
             TaskManagerConfig taskManagerConfig)
     {
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
@@ -76,8 +76,7 @@ public class NativeExecutionTaskFactory
             TaskId taskId,
             PlanFragment fragment,
             List<TaskSource> sources,
-            TableWriteInfo tableWriteInfo,
-            Optional<String> shuffleWriteInfo)
+            TableWriteInfo tableWriteInfo)
     {
         return new NativeExecutionTask(
                 session,
@@ -87,7 +86,6 @@ public class NativeExecutionTaskFactory
                 sources,
                 httpClient,
                 tableWriteInfo,
-                shuffleWriteInfo,
                 executor,
                 updateScheduledExecutor,
                 taskInfoCodec,

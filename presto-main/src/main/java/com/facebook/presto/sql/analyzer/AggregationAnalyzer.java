@@ -15,6 +15,7 @@ package com.facebook.presto.sql.analyzer;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
+import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.operator.aggregation.ApproximateSetAggregation;
 import com.facebook.presto.operator.aggregation.DefaultApproximateCountDistinctAggregation;
 import com.facebook.presto.spi.PrestoWarning;
@@ -112,7 +113,7 @@ class AggregationAnalyzer
     private final List<Expression> expressions;
     private final Multimap<NodeRef<Expression>, FieldId> columnReferences;
 
-    private final FunctionAndTypeResolver functionAndTypeResolver;
+    private final Metadata metadata;
     private final Analysis analysis;
 
     private final Scope sourceScope;
@@ -125,19 +126,12 @@ class AggregationAnalyzer
             List<Expression> groupByExpressions,
             Scope sourceScope,
             Expression expression,
-            FunctionAndTypeResolver functionAndTypeResolver,
+            Metadata metadata,
             Analysis analysis,
             WarningCollector warningCollector,
             Session session)
     {
-        AggregationAnalyzer analyzer = new AggregationAnalyzer(
-                groupByExpressions,
-                sourceScope,
-                Optional.empty(),
-                functionAndTypeResolver,
-                analysis,
-                warningCollector,
-                session);
+        AggregationAnalyzer analyzer = new AggregationAnalyzer(groupByExpressions, sourceScope, Optional.empty(), metadata, analysis, warningCollector, session);
         analyzer.analyze(expression);
     }
 
@@ -146,39 +140,32 @@ class AggregationAnalyzer
             Scope sourceScope,
             Scope orderByScope,
             Expression expression,
-            FunctionAndTypeResolver functionAndTypeResolver,
+            Metadata metadata,
             Analysis analysis,
             WarningCollector warningCollector,
             Session session)
     {
-        AggregationAnalyzer analyzer = new AggregationAnalyzer(groupByExpressions, sourceScope, Optional.of(orderByScope), functionAndTypeResolver, analysis, warningCollector, session);
+        AggregationAnalyzer analyzer = new AggregationAnalyzer(groupByExpressions, sourceScope, Optional.of(orderByScope), metadata, analysis, warningCollector, session);
         analyzer.analyze(expression);
     }
 
-    private AggregationAnalyzer(
-            List<Expression> groupByExpressions,
-            Scope sourceScope,
-            Optional<Scope> orderByScope,
-            FunctionAndTypeResolver functionAndTypeResolver,
-            Analysis analysis,
-            WarningCollector warningCollector,
-            Session session)
+    private AggregationAnalyzer(List<Expression> groupByExpressions, Scope sourceScope, Optional<Scope> orderByScope, Metadata metadata, Analysis analysis, WarningCollector warningCollector, Session session)
     {
         requireNonNull(groupByExpressions, "groupByExpressions is null");
         requireNonNull(sourceScope, "sourceScope is null");
         requireNonNull(orderByScope, "orderByScope is null");
-        requireNonNull(functionAndTypeResolver, "functionAndTypeResolver is null");
+        requireNonNull(metadata, "metadata is null");
         requireNonNull(analysis, "analysis is null");
         requireNonNull(warningCollector, "warningCollector is null");
         requireNonNull(session, "session is null");
 
         this.sourceScope = sourceScope;
         this.orderByScope = orderByScope;
-        this.functionAndTypeResolver = functionAndTypeResolver;
+        this.metadata = metadata;
         this.analysis = analysis;
         this.warningCollector = warningCollector;
         this.session = session;
-        this.functionResolution = new FunctionResolution(functionAndTypeResolver);
+        this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
         this.expressions = groupByExpressions.stream()
                 .map(e -> ExpressionTreeRewriter.rewriteWith(new ParameterRewriter(analysis.getParameters()), e))
                 .collect(toImmutableList());
@@ -352,7 +339,7 @@ class AggregationAnalyzer
         @Override
         protected Boolean visitFunctionCall(FunctionCall node, Void context)
         {
-            if (functionAndTypeResolver.getFunctionMetadata(analysis.getFunctionHandle(node)).getFunctionKind() == AGGREGATE) {
+            if (metadata.getFunctionAndTypeManager().getFunctionMetadata(analysis.getFunctionHandle(node)).getFunctionKind() == AGGREGATE) {
                 if (functionResolution.isCountFunction(analysis.getFunctionHandle(node)) && node.isDistinct()) {
                     warningCollector.add(new PrestoWarning(
                             PERFORMANCE_WARNING,
@@ -387,10 +374,7 @@ class AggregationAnalyzer
                     }
                 }
                 if (!node.getWindow().isPresent()) {
-                    List<FunctionCall> aggregateFunctions = extractAggregateFunctions(
-                            analysis.getFunctionHandles(),
-                            node.getArguments(),
-                            functionAndTypeResolver);
+                    List<FunctionCall> aggregateFunctions = extractAggregateFunctions(analysis.getFunctionHandles(), node.getArguments(), metadata.getFunctionAndTypeManager());
                     List<FunctionCall> windowFunctions = extractWindowFunctions(node.getArguments());
 
                     if (!aggregateFunctions.isEmpty()) {

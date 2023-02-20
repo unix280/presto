@@ -29,7 +29,6 @@ import com.facebook.presto.metadata.HandleJsonModule;
 import com.facebook.presto.metadata.RemoteTransactionHandle;
 import com.facebook.presto.metadata.Split;
 import com.facebook.presto.server.TaskUpdateRequest;
-import com.facebook.presto.spark.execution.shuffle.PrestoSparkLocalShuffleInfoTranslator;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.split.RemoteSplit;
@@ -69,12 +68,10 @@ public class TestBatchTaskUpdateRequest
     public void testJsonConversion()
             throws Exception
     {
-        PrestoSparkLocalShuffleInfoTranslator shuffleInfoTranslator = new PrestoSparkLocalShuffleInfoTranslator(
-                PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC,
-                PRESTO_SPARK_LOCAL_SHUFFLE_WRITE_INFO_JSON_CODEC);
-        PrestoSparkLocalShuffleReadInfo readInfo = new PrestoSparkLocalShuffleReadInfo(0, "/dummy/read/path");
-
-        String stringSerializedReadInfo = shuffleInfoTranslator.createSerializedReadInfo(readInfo);
+        PrestoSparkShuffleInfoSerializer shuffleInfoSerializer = new PrestoSparkLocalShuffleInfoSerializer(PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC, PRESTO_SPARK_LOCAL_SHUFFLE_WRITE_INFO_JSON_CODEC);
+        PrestoSparkShuffleReadInfo readInfo = new PrestoSparkLocalShuffleReadInfo(0, 0, 0, "/dummy/read/path");
+        byte[] serializedReadInfo = shuffleInfoSerializer.serializeReadInfo(readInfo);
+        String stringSerializedReadInfo = PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC.toJson(PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC.fromBytes(serializedReadInfo));
         PlanNodeId planNodeId = new PlanNodeId("planNodeId");
         List<TaskSource> sources = new ArrayList<>();
         sources.add(
@@ -98,7 +95,7 @@ public class TestBatchTaskUpdateRequest
                 createInitialEmptyOutputBuffers(PARTITIONED),
                 Optional.of(new TableWriteInfo(Optional.empty(), Optional.empty(), Optional.empty())));
         String shuffleWriteInfo = "dummy-shuffle-write-info";
-        BatchTaskUpdateRequest batchUpdateRequest = new BatchTaskUpdateRequest(updateRequest, Optional.of(shuffleWriteInfo));
+        BatchTaskUpdateRequest batchUpdateRequest = new BatchTaskUpdateRequest(updateRequest, Optional.of(shuffleWriteInfo.getBytes()));
         JsonCodec<BatchTaskUpdateRequest> batchTaskUpdateRequestJsonCodec = getJsonCodec();
         byte[] batchUpdateRequestJson = batchTaskUpdateRequestJsonCodec.toBytes(batchUpdateRequest);
         BatchTaskUpdateRequest recoveredBatchUpdateRequest = batchTaskUpdateRequestJsonCodec.fromBytes(batchUpdateRequestJson);
@@ -118,22 +115,25 @@ public class TestBatchTaskUpdateRequest
     @Test
     public void testShuffleInfoSerialization()
     {
-        PrestoSparkLocalShuffleInfoTranslator shuffleTranslator = new PrestoSparkLocalShuffleInfoTranslator(
-                PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC,
-                PRESTO_SPARK_LOCAL_SHUFFLE_WRITE_INFO_JSON_CODEC);
-        PrestoSparkLocalShuffleReadInfo readInfo = new PrestoSparkLocalShuffleReadInfo(0, "/dummy/read/path");
-        PrestoSparkLocalShuffleWriteInfo writeInfo = new PrestoSparkLocalShuffleWriteInfo(1, "/dummy/write/path");
-        String stringSerializedReadInfo = shuffleTranslator.createSerializedReadInfo(readInfo);
-        String stringSerializedWriteInfo = shuffleTranslator.createSerializedWriteInfo(writeInfo);
+        PrestoSparkShuffleInfoSerializer shuffleManager = new PrestoSparkLocalShuffleInfoSerializer(PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC, PRESTO_SPARK_LOCAL_SHUFFLE_WRITE_INFO_JSON_CODEC);
+        PrestoSparkShuffleReadInfo readInfo = new PrestoSparkLocalShuffleReadInfo(0, 0, 0, "/dummy/read/path");
+        PrestoSparkShuffleWriteInfo writeInfo = new PrestoSparkLocalShuffleWriteInfo(1, 1, "/dummy/write/path");
+        byte[] serializedReadInfo = shuffleManager.serializeReadInfo(readInfo);
+        byte[] serializedWriteInfo = shuffleManager.serializeWriteInfo(writeInfo);
+        String stringSerializedReadInfo = PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC.toJson(PRESTO_SPARK_LOCAL_SHUFFLE_READ_INFO_JSON_CODEC.fromBytes(serializedReadInfo));
+        String stringSerializedWriteInfo = PRESTO_SPARK_LOCAL_SHUFFLE_WRITE_INFO_JSON_CODEC.toJson(PRESTO_SPARK_LOCAL_SHUFFLE_WRITE_INFO_JSON_CODEC.fromBytes(serializedWriteInfo));
         assertEquals(
                 stringSerializedReadInfo,
                 "{\n" +
+                        "  \"maxBytesPerPartition\" : 0,\n" +
                         "  \"numPartitions\" : 0,\n" +
+                        "  \"partitionId\" : 0,\n" +
                         "  \"rootPath\" : \"/dummy/read/path\"\n" +
                         "}");
         assertEquals(
                 stringSerializedWriteInfo,
                 "{\n" +
+                        "  \"maxBytesPerPartition\" : 1,\n" +
                         "  \"numPartitions\" : 1,\n" +
                         "  \"rootPath\" : \"/dummy/write/path\"\n" +
                         "}");

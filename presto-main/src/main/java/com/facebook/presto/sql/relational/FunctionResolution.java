@@ -17,9 +17,9 @@ import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.common.type.CharType;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.metadata.FunctionAndTypeManager;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
-import com.facebook.presto.sql.analyzer.FunctionAndTypeResolver;
 import com.facebook.presto.sql.tree.ArithmeticBinaryExpression;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.google.common.collect.ImmutableList;
@@ -55,17 +55,17 @@ import static java.util.Objects.requireNonNull;
 public final class FunctionResolution
         implements StandardFunctionResolution
 {
-    private final FunctionAndTypeResolver functionAndTypeResolver;
+    private final FunctionAndTypeManager functionAndTypeManager;
 
-    public FunctionResolution(FunctionAndTypeResolver functionAndTypeResolver)
+    public FunctionResolution(FunctionAndTypeManager functionAndTypeManager)
     {
-        this.functionAndTypeResolver = requireNonNull(functionAndTypeResolver, "functionManager is null");
+        this.functionAndTypeManager = requireNonNull(functionAndTypeManager, "functionManager is null");
     }
 
     @Override
     public FunctionHandle notFunction()
     {
-        return functionAndTypeResolver.lookupFunction("not", fromTypes(BOOLEAN));
+        return functionAndTypeManager.lookupFunction("not", fromTypes(BOOLEAN));
     }
 
     public boolean isNotFunction(FunctionHandle functionHandle)
@@ -76,67 +76,67 @@ public final class FunctionResolution
     @Override
     public FunctionHandle likeVarcharFunction()
     {
-        return functionAndTypeResolver.lookupFunction("LIKE", fromTypes(VARCHAR, LIKE_PATTERN));
+        return functionAndTypeManager.lookupFunction("LIKE", fromTypes(VARCHAR, LIKE_PATTERN));
     }
 
     @Override
     public FunctionHandle likeCharFunction(Type valueType)
     {
         checkArgument(valueType instanceof CharType, "Expected CHAR value type");
-        return functionAndTypeResolver.lookupFunction("LIKE", fromTypes(valueType, LIKE_PATTERN));
+        return functionAndTypeManager.lookupFunction("LIKE", fromTypes(valueType, LIKE_PATTERN));
     }
 
     @Override
     public boolean isLikeFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "LIKE"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "LIKE"));
     }
 
     @Override
     public FunctionHandle likePatternFunction()
     {
-        return functionAndTypeResolver.lookupFunction("LIKE_PATTERN", fromTypes(VARCHAR, VARCHAR));
+        return functionAndTypeManager.lookupFunction("LIKE_PATTERN", fromTypes(VARCHAR, VARCHAR));
     }
 
     @Override
     public boolean isLikePatternFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "LIKE_PATTERN"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "LIKE_PATTERN"));
     }
 
     @Override
     public boolean isCastFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(OperatorType.CAST));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(OperatorType.CAST));
     }
 
     public boolean isTryCastFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "TRY_CAST"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "TRY_CAST"));
     }
 
     public boolean isArrayConstructor(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, ARRAY_CONSTRUCTOR));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, ARRAY_CONSTRUCTOR));
     }
 
     @Override
     public FunctionHandle betweenFunction(Type valueType, Type lowerBoundType, Type upperBoundType)
     {
-        return functionAndTypeResolver.lookupFunction(BETWEEN.getFunctionName().getObjectName(), fromTypes(valueType, lowerBoundType, upperBoundType));
+        return functionAndTypeManager.lookupFunction(BETWEEN.getFunctionName().getObjectName(), fromTypes(valueType, lowerBoundType, upperBoundType));
     }
 
     @Override
     public boolean isBetweenFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(BETWEEN));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(BETWEEN));
     }
 
     @Override
     public FunctionHandle arithmeticFunction(OperatorType operator, Type leftType, Type rightType)
     {
         checkArgument(operator.isArithmeticOperator(), format("unexpected arithmetic type %s", operator));
-        return functionAndTypeResolver.resolveOperator(operator, fromTypes(leftType, rightType));
+        return functionAndTypeManager.resolveOperator(operator, fromTypes(leftType, rightType));
     }
 
     public FunctionHandle arithmeticFunction(ArithmeticBinaryExpression.Operator operator, Type leftType, Type rightType)
@@ -167,33 +167,33 @@ public final class FunctionResolution
     @Override
     public boolean isArithmeticFunction(FunctionHandle functionHandle)
     {
-        Optional<OperatorType> operatorType = functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType();
+        Optional<OperatorType> operatorType = functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType();
         return operatorType.isPresent() && operatorType.get().isArithmeticOperator();
     }
 
     @Override
     public FunctionHandle negateFunction(Type type)
     {
-        return functionAndTypeResolver.lookupFunction(NEGATION.getFunctionName().getObjectName(), fromTypes(type));
+        return functionAndTypeManager.lookupFunction(NEGATION.getFunctionName().getObjectName(), fromTypes(type));
     }
 
     @Override
     public boolean isNegateFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(NEGATION));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(NEGATION));
     }
 
     @Override
     public FunctionHandle arrayConstructor(List<? extends Type> argumentTypes)
     {
-        return functionAndTypeResolver.lookupFunction(ARRAY_CONSTRUCTOR, fromTypes(argumentTypes));
+        return functionAndTypeManager.lookupFunction(ARRAY_CONSTRUCTOR, fromTypes(argumentTypes));
     }
 
     @Override
     public FunctionHandle comparisonFunction(OperatorType operator, Type leftType, Type rightType)
     {
         checkArgument(operator.isComparisonOperator(), format("unexpected comparison type %s", operator));
-        return functionAndTypeResolver.resolveOperator(operator, fromTypes(leftType, rightType));
+        return functionAndTypeManager.resolveOperator(operator, fromTypes(leftType, rightType));
     }
 
     public FunctionHandle comparisonFunction(ComparisonExpression.Operator operator, Type leftType, Type rightType)
@@ -231,111 +231,111 @@ public final class FunctionResolution
     @Override
     public boolean isComparisonFunction(FunctionHandle functionHandle)
     {
-        Optional<OperatorType> operatorType = functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType();
+        Optional<OperatorType> operatorType = functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType();
         return operatorType.isPresent() && operatorType.get().isComparisonOperator();
     }
 
     public boolean isEqualsFunction(FunctionHandle functionHandle)
     {
-        Optional<OperatorType> operatorType = functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType();
+        Optional<OperatorType> operatorType = functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType();
         return operatorType.isPresent() && operatorType.get().getOperator().equals(EQUAL.getOperator());
     }
 
     @Override
     public FunctionHandle subscriptFunction(Type baseType, Type indexType)
     {
-        return functionAndTypeResolver.lookupFunction(SUBSCRIPT.getFunctionName().getObjectName(), fromTypes(baseType, indexType));
+        return functionAndTypeManager.lookupFunction(SUBSCRIPT.getFunctionName().getObjectName(), fromTypes(baseType, indexType));
     }
 
     @Override
     public boolean isSubscriptFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(SUBSCRIPT));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType().equals(Optional.of(SUBSCRIPT));
     }
 
     public FunctionHandle tryFunction(Type returnType)
     {
-        return functionAndTypeResolver.lookupFunction("$internal$try", fromTypes(returnType));
+        return functionAndTypeManager.lookupFunction("$internal$try", fromTypes(returnType));
     }
 
     public boolean isTryFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals("$internal$try");
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals("$internal$try");
     }
 
     public boolean isFailFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "fail"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "fail"));
     }
 
     @Override
     public boolean isCountFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "count"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "count"));
     }
 
     @Override
     public FunctionHandle countFunction()
     {
-        return functionAndTypeResolver.lookupFunction("count", ImmutableList.of());
+        return functionAndTypeManager.lookupFunction("count", ImmutableList.of());
     }
 
     @Override
     public FunctionHandle countFunction(Type valueType)
     {
-        return functionAndTypeResolver.lookupFunction("count", fromTypes(valueType));
+        return functionAndTypeManager.lookupFunction("count", fromTypes(valueType));
     }
 
     @Override
     public boolean isMaxFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "max"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "max"));
     }
 
     @Override
     public FunctionHandle maxFunction(Type valueType)
     {
-        return functionAndTypeResolver.lookupFunction("max", fromTypes(valueType));
+        return functionAndTypeManager.lookupFunction("max", fromTypes(valueType));
     }
 
     @Override
     public boolean isMinFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "min"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "min"));
     }
 
     @Override
     public FunctionHandle minFunction(Type valueType)
     {
-        return functionAndTypeResolver.lookupFunction("min", fromTypes(valueType));
+        return functionAndTypeManager.lookupFunction("min", fromTypes(valueType));
     }
 
     @Override
     public boolean isApproximateCountDistinctFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "approx_distinct"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "approx_distinct"));
     }
 
     @Override
     public FunctionHandle approximateCountDistinctFunction(Type valueType)
     {
-        return functionAndTypeResolver.lookupFunction("approx_distinct", fromTypes(valueType));
+        return functionAndTypeManager.lookupFunction("approx_distinct", fromTypes(valueType));
     }
 
     @Override
     public boolean isApproximateSetFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "approx_set"));
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "approx_set"));
     }
 
     @Override
     public FunctionHandle approximateSetFunction(Type valueType)
     {
-        return functionAndTypeResolver.lookupFunction("approx_set", fromTypes(valueType));
+        return functionAndTypeManager.lookupFunction("approx_set", fromTypes(valueType));
     }
 
     public boolean isEqualFunction(FunctionHandle functionHandle)
     {
-        return functionAndTypeResolver.getFunctionMetadata(functionHandle).getOperatorType().map(EQUAL::equals).orElse(false);
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getOperatorType().map(EQUAL::equals).orElse(false);
     }
 }

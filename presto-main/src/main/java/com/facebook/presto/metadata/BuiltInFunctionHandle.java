@@ -42,12 +42,6 @@ public class BuiltInFunctionHandle
     }
 
     @Override
-    public String getName()
-    {
-        return signature.getName().toString();
-    }
-
-    @Override
     public CatalogSchemaName getCatalogSchemaName()
     {
         return signature.getName().getCatalogSchemaName();

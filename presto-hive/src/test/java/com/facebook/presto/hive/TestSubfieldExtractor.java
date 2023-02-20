@@ -94,7 +94,7 @@ public class TestSubfieldExtractor
     {
         functionAndTypeManager = createTestMetadataManager().getFunctionAndTypeManager();
         subfieldExtractor = new SubfieldExtractor(
-                new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver()),
+                new FunctionResolution(functionAndTypeManager),
                 TEST_EXPRESSION_OPTIMIZER,
                 TestingSession.SESSION);
     }

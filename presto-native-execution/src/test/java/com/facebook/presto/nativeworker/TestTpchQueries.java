@@ -24,11 +24,6 @@ public class TestTpchQueries
         super(true);
     }
 
-    private Session tpchStandardTiny()
-    {
-        return Session.builder(getSession()).setCatalog("tpchstandard").setSchema("tiny").build();
-    }
-
     @Test
     public void testMissingTpchConnector()
     {
@@ -43,7 +38,10 @@ public class TestTpchQueries
     @Test
     public void testTpchTinyTables()
     {
-        Session session = tpchStandardTiny();
+        Session session = Session.builder(getSession())
+                .setCatalog("tpchstandard")
+                .setSchema("tiny")
+                .build();
 
         assertQuery(session, "SELECT count(*) FROM customer");
         assertQuery(session, "SELECT count(*) FROM lineitem");
@@ -67,14 +65,5 @@ public class TestTpchQueries
         // No row passes the filter.
         assertQuery(session,
                 "SELECT l_linenumber, l_orderkey, l_discount FROM lineitem WHERE l_discount > 0.2");
-    }
-
-    @Test
-    public void testTpchDateFilter()
-    {
-        Session session = tpchStandardTiny();
-
-        assertQuery(session, "select count(*) as l_count from lineitem where " +
-                "l_shipdate >= date '1994-01-01' and l_shipdate < date '1994-01-01' + interval '1' year");
     }
 }

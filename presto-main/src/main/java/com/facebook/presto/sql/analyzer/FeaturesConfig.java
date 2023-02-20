@@ -118,7 +118,6 @@ public class FeaturesConfig
     private boolean distributedSort = true;
     private boolean optimizeJoinsWithEmptySources;
     private boolean logFormattedQueryEnabled;
-    private boolean logInvokedFunctionNamesEnabled;
 
     private boolean dictionaryAggregation;
 
@@ -131,7 +130,6 @@ public class FeaturesConfig
     private boolean spillEnabled;
     private boolean joinSpillingEnabled = true;
     private boolean aggregationSpillEnabled = true;
-    private boolean topNSpillEnabled = true;
     private boolean distinctAggregationSpillEnabled = true;
     private boolean dedupBasedDistinctAggregationSpillEnabled;
     private boolean distinctAggregationLargeBlockSpillEnabled;
@@ -140,7 +138,6 @@ public class FeaturesConfig
     private boolean windowSpillEnabled = true;
     private boolean orderBySpillEnabled = true;
     private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, MEGABYTE);
-    private DataSize topNOperatorUnspillMemoryLimit = new DataSize(4, MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
     private int spillerThreads = 4;
     private double spillMaxUsedSpaceThreshold = 0.9;
@@ -1064,19 +1061,6 @@ public class FeaturesConfig
         return aggregationSpillEnabled;
     }
 
-    @Config("experimental.topn-spill-enabled")
-    @ConfigDescription("Spill TopN if spill is enabled")
-    public FeaturesConfig setTopNSpillEnabled(boolean topNSpillEnabled)
-    {
-        this.topNSpillEnabled = topNSpillEnabled;
-        return this;
-    }
-
-    public boolean isTopNSpillEnabled()
-    {
-        return topNSpillEnabled;
-    }
-
     @Config("experimental.distinct-aggregation-spill-enabled")
     @ConfigDescription("Spill distinct aggregations if aggregation spill is enabled")
     public FeaturesConfig setDistinctAggregationSpillEnabled(boolean distinctAggregationSpillEnabled)
@@ -1276,18 +1260,6 @@ public class FeaturesConfig
     public boolean isDefaultFilterFactorEnabled()
     {
         return defaultFilterFactorEnabled;
-    }
-
-    public DataSize getTopNOperatorUnspillMemoryLimit()
-    {
-        return topNOperatorUnspillMemoryLimit;
-    }
-
-    @Config("experimental.topn-operator-unspill-memory-limit")
-    public FeaturesConfig setTopNOperatorUnspillMemoryLimit(DataSize aggregationOperatorUnspillMemoryLimit)
-    {
-        this.topNOperatorUnspillMemoryLimit = aggregationOperatorUnspillMemoryLimit;
-        return this;
     }
 
     public DataSize getAggregationOperatorUnspillMemoryLimit()
@@ -1941,19 +1913,6 @@ public class FeaturesConfig
     public FeaturesConfig setLogFormattedQueryEnabled(boolean logFormattedQueryEnabled)
     {
         this.logFormattedQueryEnabled = logFormattedQueryEnabled;
-        return this;
-    }
-
-    public boolean isLogInvokedFunctionNamesEnabled()
-    {
-        return logInvokedFunctionNamesEnabled;
-    }
-
-    @Config("log-invoked-function-names-enabled")
-    @ConfigDescription("Log the names of the functions invoked by the query when enabled.")
-    public FeaturesConfig setLogInvokedFunctionNamesEnabled(boolean logInvokedFunctionNamesEnabled)
-    {
-        this.logInvokedFunctionNamesEnabled = logInvokedFunctionNamesEnabled;
         return this;
     }
 

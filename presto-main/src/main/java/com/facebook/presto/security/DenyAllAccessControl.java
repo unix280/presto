@@ -11,16 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spi.security;
+package com.facebook.presto.security;
 
 import com.facebook.presto.common.CatalogSchemaName;
 import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.Subfield;
-import com.facebook.presto.common.transaction.TransactionId;
 import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.security.AccessControlContext;
+import com.facebook.presto.spi.security.Identity;
+import com.facebook.presto.spi.security.PrestoPrincipal;
+import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.transaction.TransactionId;
+import com.google.common.collect.ImmutableSet;
 
 import java.security.Principal;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 
@@ -57,9 +61,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyShowRol
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowSchemas;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowTablesMetadata;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyTruncateTable;
-import static java.util.Collections.emptySet;
-import static java.util.stream.Collectors.collectingAndThen;
-import static java.util.stream.Collectors.toSet;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 public class DenyAllAccessControl
         implements AccessControl
@@ -79,7 +81,7 @@ public class DenyAllAccessControl
     @Override
     public Set<String> filterCatalogs(Identity identity, AccessControlContext context, Set<String> catalogs)
     {
-        return emptySet();
+        return ImmutableSet.of();
     }
 
     @Override
@@ -133,7 +135,7 @@ public class DenyAllAccessControl
     @Override
     public Set<SchemaTableName> filterTables(TransactionId transactionId, Identity identity, AccessControlContext context, String catalogName, Set<SchemaTableName> tableNames)
     {
-        return emptySet();
+        return ImmutableSet.of();
     }
 
     @Override
@@ -145,7 +147,7 @@ public class DenyAllAccessControl
     @Override
     public Set<String> filterSchemas(TransactionId transactionId, Identity identity, AccessControlContext context, String catalogName, Set<String> schemaNames)
     {
-        return emptySet();
+        return ImmutableSet.of();
     }
 
     @Override
@@ -229,7 +231,7 @@ public class DenyAllAccessControl
     @Override
     public void checkCanSelectFromColumns(TransactionId transactionId, Identity identity, AccessControlContext context, QualifiedObjectName tableName, Set<Subfield> columnOrSubfieldNames)
     {
-        denySelectColumns(tableName.toString(), columnOrSubfieldNames.stream().map(Subfield::getRootName).collect(collectingAndThen(toSet(), Collections::unmodifiableSet)));
+        denySelectColumns(tableName.toString(), columnOrSubfieldNames.stream().map(subfield -> subfield.getRootName()).collect(toImmutableSet()));
     }
 
     @Override

@@ -76,7 +76,7 @@ public class TestReorderJoins
                         JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name(),
                         JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name()),
                 Optional.of(4));
-        this.functionResolution = new FunctionResolution(tester.getMetadata().getFunctionAndTypeManager().getFunctionAndTypeResolver());
+        this.functionResolution = new FunctionResolution(tester.getMetadata().getFunctionAndTypeManager());
     }
 
     @AfterClass(alwaysRun = true)

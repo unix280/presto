@@ -68,7 +68,6 @@ import static com.facebook.presto.sql.planner.PlanFragmenterUtils.finalizeSubPla
 import static com.facebook.presto.sql.planner.PlanFragmenterUtils.getTableWriterNodeIds;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static com.facebook.presto.sql.planner.plan.ExchangeNode.Scope.LOCAL;
-import static com.facebook.presto.sql.planner.plan.ExchangeNode.Scope.REMOTE_MATERIALIZED;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
@@ -253,32 +252,22 @@ public class IterativePlanFragmenter
         @Override
         public PlanNode visitExchange(ExchangeNode node, RewriteContext<FragmentProperties> context)
         {
-            if (node.getScope() != REMOTE_MATERIALIZED || isFragmentReadyForExecution(node)) {
+            if (isFragmentReadyForExecution(node)) {
                 // create child fragments
                 return super.visitExchange(node, context);
             }
 
             // don't fragment
-            ImmutableList.Builder<PlanNode> builder = ImmutableList.builder();
-            for (int sourceIndex = 0; sourceIndex < node.getSources().size(); sourceIndex++) {
-                FragmentProperties childProperties = new FragmentProperties(node.getPartitioningScheme().translateOutputLayout(node.getInputs().get(sourceIndex)));
-                builder.add(context.rewrite(node.getSources().get(sourceIndex), childProperties));
-                context.get().addChildren(childProperties.getChildren());
-            }
-            return node.replaceChildren(builder.build());
+            return context.defaultRewrite(node, context.get());
         }
 
         @Override
         public PlanNode visitRemoteSource(RemoteSourceNode node, RewriteContext<FragmentProperties> context)
         {
             List<SubPlan> childSubPlans = node.getSourceFragmentIds().stream()
-                    .map(subPlanByFragmentId::get)
+                    .map(id -> subPlanByFragmentId.get(id))
                     .collect(toImmutableList());
             context.get().addChildren(childSubPlans);
-
-            // the partitioning handle should be the same as the handle from the partitioning scheme
-            // of any of the input fragments.
-            setDistributionForExchange(node.getExchangeType(), childSubPlans.get(0).getFragment().getPartitioningScheme(), context);
             return super.visitRemoteSource(node, context);
         }
 
@@ -307,11 +296,6 @@ public class IterativePlanFragmenter
         public Optional<PlanNode> getRemainingPlan()
         {
             return remainingPlan;
-        }
-
-        public boolean hasRemainingPlan()
-        {
-            return remainingPlan.isPresent();
         }
 
         public List<SubPlan> getReadyFragments()

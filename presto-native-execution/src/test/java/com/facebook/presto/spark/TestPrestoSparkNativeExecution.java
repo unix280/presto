@@ -67,16 +67,7 @@ public class TestPrestoSparkNativeExecution
                 .setCatalogSessionProperty("hive", PUSHDOWN_FILTER_ENABLED, "true")
                 .build();
 
-        // Reset the spark context to register the native execution shuffle manager. We want to let the query runner use the default spark shuffle
-        // manager to generate the test tables and only test the new native execution shuffle manager on the test below test cases.
-        PrestoSparkQueryRunner queryRunner = (PrestoSparkQueryRunner) getQueryRunner();
-        queryRunner.resetSparkContext(getNativeExecutionShuffleConfigs());
-        try {
-            assertQuerySucceeds(session, "SELECT * FROM test_order");
-        }
-        finally {
-            queryRunner.resetSparkContext();
-        }
+        assertQuerySucceeds(session, "SELECT * FROM test_order");
     }
 
     // TODO: re-enable the test once the shuffle integration is ready.

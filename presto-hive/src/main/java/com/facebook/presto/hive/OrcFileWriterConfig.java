@@ -14,7 +14,6 @@
 package com.facebook.presto.hive;
 
 import com.facebook.airlift.configuration.Config;
-import com.facebook.airlift.configuration.ConfigDescription;
 import com.facebook.presto.orc.DefaultOrcWriterFlushPolicy;
 import com.facebook.presto.orc.OrcWriterOptions;
 import com.facebook.presto.orc.metadata.DwrfStripeCacheMode;
@@ -55,7 +54,6 @@ public class OrcFileWriterConfig
     private boolean isStringDictionaryEncodingEnabled = OrcWriterOptions.DEFAULT_STRING_DICTIONARY_ENCODING_ENABLED;
     private boolean isStringDictionarySortingEnabled = OrcWriterOptions.DEFAULT_STRING_DICTIONARY_SORTING_ENABLED;
     private boolean isFlatMapWriterEnabled = DEFAULT_FLAT_MAP_WRITER_ENABLED;
-    private boolean addHostnameToFileMetadataEnabled;
 
     public OrcWriterOptions.Builder toOrcWriterOptionsBuilder()
     {
@@ -281,19 +279,6 @@ public class OrcFileWriterConfig
     public OrcFileWriterConfig setDwrfStripeCacheMode(DwrfStripeCacheMode dwrfStripeCacheMode)
     {
         this.dwrfStripeCacheMode = dwrfStripeCacheMode;
-        return this;
-    }
-
-    public boolean isAddHostnameToFileMetadataEnabled()
-    {
-        return addHostnameToFileMetadataEnabled;
-    }
-
-    @Config("hive.orc.writer.add-hostname-to-file-metadata-enabled")
-    @ConfigDescription("Add writer's hostname to the ORC/DWRF file footer. Can be used to troubleshoot file corruption issues.")
-    public OrcFileWriterConfig setAddHostnameToFileMetadataEnabled(boolean addHostnameToFileMetadataEnabled)
-    {
-        this.addHostnameToFileMetadataEnabled = addHostnameToFileMetadataEnabled;
         return this;
     }
 

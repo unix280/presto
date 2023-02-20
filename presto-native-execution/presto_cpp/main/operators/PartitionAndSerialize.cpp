@@ -57,11 +57,8 @@ class PartitionAndSerializeOperator : public Operator {
             operatorId,
             planNode->id(),
             "PartitionAndSerialize"),
-        numPartitions_(planNode->numPartitions()),
         partitionFunction_(
-            numPartitions_ == 1 ? nullptr
-                                : planNode->partitionFunctionFactory()(
-                                      planNode->numPartitions())) {}
+            planNode->partitionFunctionFactory()(planNode->numPartitions())) {}
 
   bool needsInput() const override {
     return !input_;
@@ -102,12 +99,9 @@ class PartitionAndSerializeOperator : public Operator {
  private:
   void computePartitions(FlatVector<int32_t>& partitionsVector) {
     auto numInput = input_->size();
-    if (numPartitions_ == 1) {
-      std::fill(partitions_.begin(), partitions_.end(), 0);
-    } else {
-      partitions_.resize(numInput);
-      partitionFunction_->partition(*input_, partitions_);
-    }
+
+    partitions_.resize(numInput);
+    partitionFunction_->partition(*input_, partitions_);
 
     // TODO Avoid copy.
     partitionsVector.resize(numInput);
@@ -149,7 +143,6 @@ class PartitionAndSerializeOperator : public Operator {
     }
   }
 
-  const uint32_t numPartitions_;
   std::unique_ptr<core::PartitionFunction> partitionFunction_;
   std::vector<uint32_t> partitions_;
   std::vector<size_t> rowSizes_;

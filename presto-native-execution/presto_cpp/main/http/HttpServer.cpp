@@ -12,7 +12,6 @@
  * limitations under the License.
  */
 #include "presto_cpp/main/http/HttpServer.h"
-#include "presto_cpp/main/common/Configs.h"
 
 namespace facebook::presto::http {
 
@@ -101,12 +100,6 @@ void HttpServer::start(
     std::function<void(std::exception_ptr)> onError) {
   proxygen::HTTPServer::IPConfig cfg{
       httpAddress_, proxygen::HTTPServer::Protocol::HTTP};
-
-  if (SystemConfig::instance()->httpServerReusePort()) {
-    folly::SocketOptionKey portReuseOpt = {SOL_SOCKET, SO_REUSEPORT};
-    cfg.acceptorSocketOptions.emplace();
-    cfg.acceptorSocketOptions->insert({portReuseOpt, 1});
-  }
 
   proxygen::HTTPServerOptions options;
   // The 'threads' field is not used when we provide our own executor (see us

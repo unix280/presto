@@ -205,9 +205,6 @@ proxygen::RequestHandler* TaskResource::acknowledgeResults(
           proxygen::ResponseHandler* downstream) {
         try {
           taskManager_.acknowledgeResults(taskId, bufferId, token);
-        } catch (const velox::VeloxException& e) {
-          sendErrorResponse(downstream, e.what());
-          return;
         } catch (const std::exception& e) {
           sendErrorResponse(downstream, e.what());
           return;
@@ -316,10 +313,13 @@ proxygen::RequestHandler* TaskResource::createOrUpdateBatchTask(
         auto fragment =
             velox::encoding::Base64::decode(*taskUpdateRequest.fragment);
         protocol::PlanFragment prestoPlan = json::parse(fragment);
-        VeloxBatchQueryPlanConverter converter(
-            shuffleName, std::move(serializedShuffleWriteInfo), pool_.get());
-        planFragment = converter.toVeloxQueryPlan(
-            prestoPlan, taskUpdateRequest.tableWriteInfo, taskId);
+        VeloxQueryPlanConverter converter(pool_.get());
+        planFragment = converter.toBatchVeloxQueryPlan(
+            prestoPlan,
+            taskUpdateRequest.tableWriteInfo,
+            taskId,
+            shuffleName,
+            std::move(serializedShuffleWriteInfo));
       });
 }
 
@@ -340,7 +340,7 @@ proxygen::RequestHandler* TaskResource::createOrUpdateTask(
           auto fragment =
               velox::encoding::Base64::decode(*taskUpdateRequest.fragment);
           protocol::PlanFragment prestoPlan = json::parse(fragment);
-          auto converter = VeloxInteractiveQueryPlanConverter(pool_.get());
+          VeloxQueryPlanConverter converter(pool_.get());
           planFragment = converter.toVeloxQueryPlan(
               prestoPlan, taskUpdateRequest.tableWriteInfo, taskId);
         }
@@ -365,9 +365,6 @@ proxygen::RequestHandler* TaskResource::deleteTask(
         std::unique_ptr<protocol::TaskInfo> taskInfo;
         try {
           taskInfo = taskManager_.deleteTask(taskId, abort);
-        } catch (const velox::VeloxException& e) {
-          sendErrorResponse(downstream, e.what());
-          return;
         } catch (const std::exception& e) {
           sendErrorResponse(downstream, e.what());
           return;
@@ -434,13 +431,6 @@ proxygen::RequestHandler* TaskResource::getResults(
                   .sendWithEOM();
             })
             .thenError(
-                folly::tag_t<velox::VeloxException>{},
-                [downstream, handlerState](const velox::VeloxException& e) {
-                  if (!handlerState->requestExpired()) {
-                    sendErrorResponse(downstream, e.what());
-                  }
-                })
-            .thenError(
                 folly::tag_t<std::exception>{},
                 [downstream, handlerState](const std::exception& e) {
                   if (!handlerState->requestExpired()) {
@@ -487,13 +477,6 @@ proxygen::RequestHandler* TaskResource::getTaskStatus(
                 }
               })
               .thenError(
-                  folly::tag_t<velox::VeloxException>{},
-                  [downstream, handlerState](const velox::VeloxException& e) {
-                    if (!handlerState->requestExpired()) {
-                      sendErrorResponse(downstream, e.what());
-                    }
-                  })
-              .thenError(
                   folly::tag_t<std::exception>{},
                   [downstream, handlerState](const std::exception& e) {
                     if (!handlerState->requestExpired()) {
@@ -533,13 +516,6 @@ proxygen::RequestHandler* TaskResource::getTaskInfo(
                 }
               })
               .thenError(
-                  folly::tag_t<velox::VeloxException>{},
-                  [downstream, handlerState](const velox::VeloxException& e) {
-                    if (!handlerState->requestExpired()) {
-                      sendErrorResponse(downstream, e.what());
-                    }
-                  })
-              .thenError(
                   folly::tag_t<std::exception>{},
                   [downstream, handlerState](const std::exception& e) {
                     if (!handlerState->requestExpired()) {
@@ -566,9 +542,6 @@ proxygen::RequestHandler* TaskResource::removeRemoteSource(
           proxygen::ResponseHandler* downstream) {
         try {
           taskManager_.removeRemoteSource(taskId, remoteId);
-        } catch (const velox::VeloxException& e) {
-          sendErrorResponse(downstream, e.what());
-          return;
         } catch (const std::exception& e) {
           sendErrorResponse(downstream, e.what());
           return;

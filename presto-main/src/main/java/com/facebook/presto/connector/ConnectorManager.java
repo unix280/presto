@@ -372,7 +372,7 @@ public class ConnectorManager
                 new ConnectorAwareNodeManager(nodeManager, nodeInfo.getEnvironment(), connectorId),
                 typeManager,
                 metadataManager.getFunctionAndTypeManager(),
-                new FunctionResolution(metadataManager.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                new FunctionResolution(metadataManager.getFunctionAndTypeManager()),
                 pageSorter,
                 pageIndexerFactory,
                 new ConnectorRowExpressionService(

@@ -13,14 +13,15 @@
  */
 package com.facebook.presto.sql.analyzer;
 
+import com.facebook.presto.Session;
 import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.Subfield;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.security.AccessControl;
+import com.facebook.presto.security.AllowAllAccessControl;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.function.FunctionHandle;
-import com.facebook.presto.spi.security.AccessControl;
-import com.facebook.presto.spi.security.AllowAllAccessControl;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.sql.tree.ExistsPredicate;
 import com.facebook.presto.sql.tree.Expression;
@@ -65,6 +66,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.SystemSessionProperties.isCheckAccessControlOnUtilizedColumnsOnly;
+import static com.facebook.presto.SystemSessionProperties.isCheckAccessControlWithSubfields;
 import static com.facebook.presto.sql.analyzer.Analysis.MaterializedViewAnalysisState.NOT_VISITED;
 import static com.facebook.presto.sql.analyzer.Analysis.MaterializedViewAnalysisState.VISITED;
 import static com.facebook.presto.sql.analyzer.Analysis.MaterializedViewAnalysisState.VISITING;
@@ -765,7 +768,7 @@ public class Analysis
         return joinUsing.get(NodeRef.of(node));
     }
 
-    public void addTableColumnAndSubfieldReferences(AccessControl accessControl, Identity identity, Multimap<QualifiedObjectName, Subfield> tableColumnMap, Multimap<QualifiedObjectName, Subfield> tableColumnMapForAccessControl)
+    public void addTableColumnAndSubfieldReferences(AccessControl accessControl, Identity identity, Multimap<QualifiedObjectName, Subfield> tableColumnMap)
     {
         AccessControlInfo accessControlInfo = new AccessControlInfo(accessControl, identity);
         Map<QualifiedObjectName, Set<String>> columnReferences = tableColumnReferences.computeIfAbsent(accessControlInfo, k -> new LinkedHashMap<>());
@@ -773,7 +776,7 @@ public class Analysis
                 .forEach((key, value) -> columnReferences.computeIfAbsent(key, k -> new HashSet<>()).addAll(value.stream().map(Subfield::getRootName).collect(toImmutableSet())));
 
         Map<QualifiedObjectName, Set<Subfield>> columnAndSubfieldReferences = tableColumnAndSubfieldReferences.computeIfAbsent(accessControlInfo, k -> new LinkedHashMap<>());
-        tableColumnMapForAccessControl.asMap()
+        tableColumnMap.asMap()
                 .forEach((key, value) -> columnAndSubfieldReferences.computeIfAbsent(key, k -> new HashSet<>()).addAll(value));
     }
 
@@ -799,18 +802,18 @@ public class Analysis
         return ImmutableMap.copyOf(utilizedTableColumnReferences);
     }
 
-    public Map<AccessControlInfo, Map<QualifiedObjectName, Set<Subfield>>> getTableColumnAndSubfieldReferencesForAccessControl(boolean checkAccessControlOnUtilizedColumnsOnly, boolean checkAccessControlWithSubfields)
+    public Map<AccessControlInfo, Map<QualifiedObjectName, Set<Subfield>>> getTableColumnAndSubfieldReferencesForAccessControl(Session session)
     {
         Map<AccessControlInfo, Map<QualifiedObjectName, Set<Subfield>>> references;
-        if (!checkAccessControlWithSubfields) {
-            references = (checkAccessControlOnUtilizedColumnsOnly ? utilizedTableColumnReferences : tableColumnReferences).entrySet().stream()
+        if (!isCheckAccessControlWithSubfields(session)) {
+            references = (isCheckAccessControlOnUtilizedColumnsOnly(session) ? utilizedTableColumnReferences : tableColumnReferences).entrySet().stream()
                     .collect(toImmutableMap(
                             Map.Entry::getKey,
                             accessControlEntry -> accessControlEntry.getValue().entrySet().stream().collect(toImmutableMap(
                                     Map.Entry::getKey,
                                     tableEntry -> tableEntry.getValue().stream().map(column -> new Subfield(column, ImmutableList.of())).collect(toImmutableSet())))));
         }
-        else if (!checkAccessControlOnUtilizedColumnsOnly) {
+        else if (!isCheckAccessControlOnUtilizedColumnsOnly(session)) {
             references = tableColumnAndSubfieldReferences;
         }
         else {
@@ -898,11 +901,6 @@ public class Analysis
     public Optional<QuerySpecification> getCurrentQuerySpecification()
     {
         return currentQuerySpecification;
-    }
-
-    public List<String> getInvokedFunctionNames()
-    {
-        return ImmutableList.copyOf(functionHandles.values().stream().map(FunctionHandle::getName).collect(toImmutableSet()));
     }
 
     @Immutable

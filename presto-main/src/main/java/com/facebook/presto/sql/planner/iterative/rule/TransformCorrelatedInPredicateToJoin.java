@@ -110,7 +110,7 @@ public class TransformCorrelatedInPredicateToJoin
     public TransformCorrelatedInPredicateToJoin(FunctionAndTypeManager functionAndTypeManager)
     {
         requireNonNull(functionAndTypeManager, "functionManager is null");
-        this.functionResolution = new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver());
+        this.functionResolution = new FunctionResolution(functionAndTypeManager);
     }
 
     @Override

@@ -59,7 +59,6 @@ import static com.facebook.presto.hive.HiveColumnHandle.pathColumnHandle;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_BAD_DATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_BUCKET_FILES;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_FILE_NAMES;
-import static com.facebook.presto.hive.HiveErrorCode.HIVE_UNSUPPORTED_FORMAT;
 import static com.facebook.presto.hive.HiveMetadata.shouldCreateFilesForMissingBuckets;
 import static com.facebook.presto.hive.HiveSessionProperties.getMaxInitialSplitSize;
 import static com.facebook.presto.hive.HiveSessionProperties.getNodeSelectionStrategy;
@@ -139,18 +138,9 @@ public class StoragePartitionLoader
         Optional<DirectoryLister> directoryListerOverride = Optional.empty();
         if (!isNullOrEmpty(table.getStorage().getLocation())) {
             Configuration configuration = hdfsEnvironment.getConfiguration(hdfsContext, new Path(table.getStorage().getLocation()));
-            try {
-                InputFormat<?, ?> inputFormat = getInputFormat(configuration, table.getStorage().getStorageFormat().getInputFormat(), false);
-                if (isHudiParquetInputFormat(inputFormat)) {
-                    directoryListerOverride = Optional.of(new HudiDirectoryLister(configuration, session, table));
-                }
-            }
-            catch (PrestoException ex) {
-                // Tables and partitions can have different format. When Table format is not supported,
-                // Ignore Hudi check for those tables. Partitions can still be of a supported format.
-                if (!HIVE_UNSUPPORTED_FORMAT.toErrorCode().equals(ex.getErrorCode())) {
-                    throw ex;
-                }
+            InputFormat<?, ?> inputFormat = getInputFormat(configuration, table.getStorage().getStorageFormat().getInputFormat(), false);
+            if (isHudiParquetInputFormat(inputFormat)) {
+                directoryListerOverride = Optional.of(new HudiDirectoryLister(configuration, session, table));
             }
         }
         this.directoryLister = directoryListerOverride.orElseGet(() -> requireNonNull(directoryLister, "directoryLister is null"));

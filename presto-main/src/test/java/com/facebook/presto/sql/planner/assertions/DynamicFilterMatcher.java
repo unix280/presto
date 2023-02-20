@@ -79,7 +79,7 @@ public class DynamicFilterMatcher
 
         LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(
                 new RowExpressionDeterminismEvaluator(metadata.getFunctionAndTypeManager()),
-                new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                new FunctionResolution(metadata.getFunctionAndTypeManager()),
                 metadata.getFunctionAndTypeManager());
         boolean staticFilterMatches = expectedStaticFilter.map(filter -> {
             RowExpressionVerifier verifier = new RowExpressionVerifier(symbolAliases, metadata, session);

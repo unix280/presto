@@ -37,7 +37,7 @@ public final class NullabilityAnalyzer
     public NullabilityAnalyzer(FunctionAndTypeManager functionAndTypeManager)
     {
         this.functionAndTypeManager = requireNonNull(functionAndTypeManager, "functionManager is null");
-        this.functionResolution = new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver());
+        this.functionResolution = new FunctionResolution(functionAndTypeManager);
     }
 
     public boolean mayReturnNullOnNonNullInput(RowExpression expression)

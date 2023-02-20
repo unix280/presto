@@ -69,7 +69,7 @@ public class TestPinotPlanOptimizer
 {
     private final LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(
             new RowExpressionDeterminismEvaluator(functionAndTypeManager),
-            new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver()),
+            new FunctionResolution(functionAndTypeManager),
             functionAndTypeManager);
     protected final PinotTableHandle pinotTable = TestPinotSplitManager.hybridTable;
     protected final SessionHolder defaultSessionHolder = getDefaultSessionHolder();

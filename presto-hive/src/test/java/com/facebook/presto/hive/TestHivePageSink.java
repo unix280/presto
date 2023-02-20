@@ -53,7 +53,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -117,7 +116,16 @@ public class TestHivePageSink
         File tempDir = Files.createTempDir();
         try {
             ExtendedHiveMetastore metastore = createTestingFileHiveMetastore(new File(tempDir, "metastore"));
-            for (HiveStorageFormat format : getSupportedHiveStorageFormats()) {
+            for (HiveStorageFormat format : HiveStorageFormat.values()) {
+                if (format == HiveStorageFormat.CSV) {
+                    // CSV supports only unbounded VARCHAR type, which is not provided by lineitem
+                    continue;
+                }
+                if (format == HiveStorageFormat.ALPHA) {
+                    // Alpha read/write is not supported yet
+                    continue;
+                }
+
                 config.setHiveStorageFormat(format);
                 config.setCompressionCodec(NONE);
                 long uncompressedLength = writeTestFile(config, metastoreClientConfig, metastore, makeFileName(tempDir, config));
@@ -136,14 +144,6 @@ public class TestHivePageSink
         finally {
             deleteRecursively(tempDir.toPath(), ALLOW_INSECURE);
         }
-    }
-
-    protected List<HiveStorageFormat> getSupportedHiveStorageFormats()
-    {
-        // CSV supports only unbounded VARCHAR type, and Alpha does not support DML yet
-        return Arrays.stream(HiveStorageFormat.values())
-                .filter(format -> format != HiveStorageFormat.CSV && format != HiveStorageFormat.ALPHA)
-                .collect(toImmutableList());
     }
 
     private static String makeFileName(File tempDir, HiveClientConfig config)

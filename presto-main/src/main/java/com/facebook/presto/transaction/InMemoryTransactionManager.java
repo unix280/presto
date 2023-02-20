@@ -16,7 +16,6 @@ package com.facebook.presto.transaction;
 import com.facebook.airlift.concurrent.BoundedExecutor;
 import com.facebook.airlift.concurrent.ExecutorServiceAdapter;
 import com.facebook.airlift.log.Logger;
-import com.facebook.presto.common.transaction.TransactionId;
 import com.facebook.presto.metadata.Catalog;
 import com.facebook.presto.metadata.CatalogManager;
 import com.facebook.presto.metadata.CatalogMetadata;

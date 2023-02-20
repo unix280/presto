@@ -38,8 +38,6 @@ struct ByteStream {
 
   template <typename T>
   T read() {
-    // Directly reading int128 values is not yet supported in ByteStream.
-    static_assert(sizeof(T) <= sizeof(uint64_t));
     T value = *reinterpret_cast<const T*>(data_ + offset_);
     offset_ += sizeof(T);
     return value;
@@ -60,16 +58,6 @@ struct ByteStream {
   const char* data_;
   int32_t offset_;
 };
-
-// ByteStream::read specialization for int128_t
-template <>
-velox::int128_t ByteStream::read<velox::int128_t>() {
-  // Fetching int128_t value by reading two 64-bit blocks rather than one
-  // 128-bit block to avoid general protection exception.
-  auto low = read<int64_t>();
-  auto high = read<int64_t>();
-  return velox::buildInt128(high, low);
-}
 
 velox::BufferPtr
 readNulls(int32_t count, ByteStream& stream, velox::memory::MemoryPool* pool) {
@@ -274,7 +262,28 @@ velox::VectorPtr readRleBlock(
     throw std::runtime_error("Unexpected RLE block. Expected single null.");
   }
 
-  return velox::BaseVector::createNullConstant(type, positionCount, pool);
+  if (type->kind() == velox::TypeKind::SHORT_DECIMAL ||
+      type->kind() == velox::TypeKind::LONG_DECIMAL) {
+    return velox::BaseVector::createNullConstant(type, positionCount, pool);
+  }
+
+  velox::TypeKind typeKind;
+  if (encoding == kByteArray) {
+    typeKind = velox::TypeKind::UNKNOWN;
+  } else if (encoding == kLongArray) {
+    typeKind = velox::TypeKind::BIGINT;
+  } else if (encoding == kIntArray) {
+    typeKind = velox::TypeKind::INTEGER;
+  } else if (encoding == kShortArray) {
+    typeKind = velox::TypeKind::SMALLINT;
+  } else if (encoding == kVariableWidth) {
+    typeKind = velox::TypeKind::VARCHAR;
+  } else {
+    VELOX_FAIL("Unexpected RLE block encoding: {}", encoding);
+  }
+
+  return velox::BaseVector::createConstant(
+      velox::variant(typeKind), positionCount, pool);
 }
 
 void unpackTimestampWithTimeZone(

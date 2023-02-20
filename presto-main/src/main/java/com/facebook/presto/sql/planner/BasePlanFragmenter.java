@@ -23,6 +23,7 @@ import com.facebook.presto.metadata.NewTableLayout;
 import com.facebook.presto.metadata.PartitioningMetadata;
 import com.facebook.presto.metadata.TableLayout;
 import com.facebook.presto.metadata.TableLayoutResult;
+import com.facebook.presto.metadata.TableMetadata;
 import com.facebook.presto.operator.StageExecutionDescriptor;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -33,7 +34,6 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SourceLocation;
 import com.facebook.presto.spi.TableHandle;
-import com.facebook.presto.spi.TableMetadata;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.plan.Assignments;
 import com.facebook.presto.spi.plan.PlanNode;
@@ -145,7 +145,7 @@ public abstract class BasePlanFragmenter
         this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
         this.variableAllocator = requireNonNull(variableAllocator, "variableAllocator is null");
         this.outputTableWriterNodeIds = ImmutableSet.copyOf(requireNonNull(outputTableWriterNodeIds, "outputTableWriterNodeIds is null"));
-        this.statisticsAggregationPlanner = new StatisticsAggregationPlanner(variableAllocator, metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
+        this.statisticsAggregationPlanner = new StatisticsAggregationPlanner(variableAllocator, metadata);
     }
 
     public SubPlan buildRootFragment(PlanNode root, FragmentProperties properties)
@@ -287,7 +287,12 @@ public abstract class BasePlanFragmenter
 
         PartitioningScheme partitioningScheme = exchange.getPartitioningScheme();
 
-        setDistributionForExchange(exchange.getType(), partitioningScheme, context);
+        if (exchange.getType() == ExchangeNode.Type.GATHER) {
+            context.get().setSingleNodeDistribution();
+        }
+        else if (exchange.getType() == ExchangeNode.Type.REPARTITION) {
+            context.get().setDistribution(partitioningScheme.getPartitioning().getHandle(), metadata, session);
+        }
 
         ImmutableList.Builder<SubPlan> builder = ImmutableList.builder();
         for (int sourceIndex = 0; sourceIndex < exchange.getSources().size(); sourceIndex++) {
@@ -304,16 +309,6 @@ public abstract class BasePlanFragmenter
                 .collect(toImmutableList());
 
         return new RemoteSourceNode(exchange.getSourceLocation(), exchange.getId(), childrenIds, exchange.getOutputVariables(), exchange.isEnsureSourceOrdering(), exchange.getOrderingScheme(), exchange.getType());
-    }
-
-    protected void setDistributionForExchange(ExchangeNode.Type exchangeType, PartitioningScheme partitioningScheme, RewriteContext<FragmentProperties> context)
-    {
-        if (exchangeType == ExchangeNode.Type.GATHER) {
-            context.get().setSingleNodeDistribution();
-        }
-        else if (exchangeType == ExchangeNode.Type.REPARTITION) {
-            context.get().setDistribution(partitioningScheme.getPartitioning().getHandle(), metadata, session);
-        }
     }
 
     private PlanNode createRemoteMaterializedExchange(ExchangeNode exchange, RewriteContext<FragmentProperties> context)

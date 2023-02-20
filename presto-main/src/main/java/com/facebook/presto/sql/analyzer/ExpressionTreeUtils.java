@@ -16,6 +16,7 @@ package com.facebook.presto.sql.analyzer;
 import com.facebook.presto.common.type.EnumType;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeWithName;
+import com.facebook.presto.metadata.FunctionAndTypeManager;
 import com.facebook.presto.spi.SourceLocation;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
@@ -57,12 +58,9 @@ public final class ExpressionTreeUtils
 {
     private ExpressionTreeUtils() {}
 
-    static List<FunctionCall> extractAggregateFunctions(
-            Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles,
-            Iterable<? extends Node> nodes,
-            FunctionAndTypeResolver functionAndTypeResolver)
+    static List<FunctionCall> extractAggregateFunctions(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, Iterable<? extends Node> nodes, FunctionAndTypeManager functionAndTypeManager)
     {
-        return extractExpressions(nodes, FunctionCall.class, isAggregationPredicate(functionHandles, functionAndTypeResolver));
+        return extractExpressions(nodes, FunctionCall.class, isAggregationPredicate(functionHandles, functionAndTypeManager));
     }
 
     static List<FunctionCall> extractWindowFunctions(Iterable<? extends Node> nodes)
@@ -70,9 +68,9 @@ public final class ExpressionTreeUtils
         return extractExpressions(nodes, FunctionCall.class, ExpressionTreeUtils::isWindowFunction);
     }
 
-    static List<FunctionCall> extractExternalFunctions(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, Iterable<? extends Node> nodes, FunctionAndTypeResolver functionAndTypeResolver)
+    static List<FunctionCall> extractExternalFunctions(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, Iterable<? extends Node> nodes, FunctionAndTypeManager functionAndTypeManager)
     {
-        return extractExpressions(nodes, FunctionCall.class, isExternalFunctionPredicate(functionHandles, functionAndTypeResolver));
+        return extractExpressions(nodes, FunctionCall.class, isExternalFunctionPredicate(functionHandles, functionAndTypeManager));
     }
 
     public static <T extends Expression> List<T> extractExpressions(
@@ -82,9 +80,9 @@ public final class ExpressionTreeUtils
         return extractExpressions(nodes, clazz, alwaysTrue());
     }
 
-    private static Predicate<FunctionCall> isAggregationPredicate(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeResolver functionAndTypeResolver)
+    private static Predicate<FunctionCall> isAggregationPredicate(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeManager functionAndTypeManager)
     {
-        return functionCall -> (functionAndTypeResolver.getFunctionMetadata(functionHandles.get(NodeRef.of(functionCall))).getFunctionKind() == AGGREGATE || functionCall.getFilter().isPresent())
+        return functionCall -> (functionAndTypeManager.getFunctionMetadata(functionHandles.get(NodeRef.of(functionCall))).getFunctionKind() == AGGREGATE || functionCall.getFilter().isPresent())
                 && !functionCall.getWindow().isPresent()
                 || functionCall.getOrderBy().isPresent();
     }
@@ -94,9 +92,9 @@ public final class ExpressionTreeUtils
         return functionCall.getWindow().isPresent();
     }
 
-    private static Predicate<FunctionCall> isExternalFunctionPredicate(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeResolver functionAndTypeResolver)
+    private static Predicate<FunctionCall> isExternalFunctionPredicate(Map<NodeRef<FunctionCall>, FunctionHandle> functionHandles, FunctionAndTypeManager functionAndTypeManager)
     {
-        return functionCall -> functionAndTypeResolver.getFunctionMetadata(functionHandles.get(NodeRef.of(functionCall))).getImplementationType().isExternalExecution();
+        return functionCall -> functionAndTypeManager.getFunctionMetadata(functionHandles.get(NodeRef.of(functionCall))).getImplementationType().isExternalExecution();
     }
 
     private static <T extends Expression> List<T> extractExpressions(
@@ -137,7 +135,7 @@ public final class ExpressionTreeUtils
         return expression instanceof ComparisonExpression && ((ComparisonExpression) expression).getOperator() == ComparisonExpression.Operator.EQUAL;
     }
 
-    public static Optional<TypeWithName> tryResolveEnumLiteralType(QualifiedName qualifiedName, FunctionAndTypeResolver functionAndTypeResolver)
+    public static Optional<TypeWithName> tryResolveEnumLiteralType(QualifiedName qualifiedName, FunctionAndTypeManager functionAndTypeManager)
     {
         Optional<QualifiedName> prefix = qualifiedName.getPrefix();
         if (!prefix.isPresent()) {
@@ -145,7 +143,7 @@ public final class ExpressionTreeUtils
             return Optional.empty();
         }
         try {
-            Type baseType = functionAndTypeResolver.getType(parseTypeSignature(prefix.get().toString()));
+            Type baseType = functionAndTypeManager.getType(parseTypeSignature(prefix.get().toString()));
             if (baseType instanceof TypeWithName
                     && ((TypeWithName) baseType).getType() instanceof EnumType
                     && ((EnumType<?>) ((TypeWithName) baseType).getType()).getEnumMap().containsKey(qualifiedName.getSuffix().toUpperCase(ENGLISH))) {
