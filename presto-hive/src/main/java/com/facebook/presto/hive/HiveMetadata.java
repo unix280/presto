@@ -786,7 +786,11 @@ public class HiveMetadata
         MetastoreContext metastoreContext = getMetastoreContext(session);
         for (String schemaName : listSchemas(session, schemaNameOrNull)) {
             for (String tableName : metastore.getAllTables(metastoreContext, schemaName).orElse(emptyList())) {
-                tableNames.add(new SchemaTableName(schemaName, tableName));
+                metastore.getTable(metastoreContext, schemaName, tableName).ifPresent(table -> {
+                    if (!isIcebergTable(table) && !isDeltaLakeTable(table)) {
+                        tableNames.add(new SchemaTableName(schemaName, tableName));
+                    }
+                });
             }
         }
         return tableNames.build();
