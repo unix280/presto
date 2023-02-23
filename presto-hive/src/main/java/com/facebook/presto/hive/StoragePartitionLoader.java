@@ -14,6 +14,7 @@
 package com.facebook.presto.hive;
 
 import com.facebook.presto.common.predicate.Domain;
+import com.facebook.presto.hive.cache.HiveCachingHdfsConfiguration;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.Storage;
@@ -164,7 +165,17 @@ public class StoragePartitionLoader
             return COMPLETED_FUTURE;
         }
         Path path = new Path(location);
-        Configuration configuration = hdfsEnvironment.getFileSystem(hdfsContext, path).getConf();
+        Configuration configuration = hdfsEnvironment.getConfiguration(hdfsContext, path);
+        // This is required for HUDI MOR realtime tables.
+        // Similar changes are implemented in HudiDirectoryLister for HUDI COW and MOR read-optimised tables.
+        if (directoryLister instanceof HudiDirectoryLister) {
+            if (configuration instanceof HiveCachingHdfsConfiguration.CachingJobConf) {
+                configuration = ((HiveCachingHdfsConfiguration.CachingJobConf) configuration).getConfig();
+            }
+            if (configuration instanceof CopyOnFirstWriteConfiguration) {
+                configuration = ((CopyOnFirstWriteConfiguration) configuration).getConfig();
+            }
+        }
         InputFormat<?, ?> inputFormat = getInputFormat(configuration, inputFormatName, false);
         ExtendedFileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext.getIdentity().getUser(), path, configuration);
         boolean s3SelectPushdownEnabled = shouldEnablePushdownForTable(session, table, path.toString(), partition.getPartition());

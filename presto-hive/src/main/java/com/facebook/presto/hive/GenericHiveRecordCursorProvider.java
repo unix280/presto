@@ -15,6 +15,7 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.common.type.TypeManager;
+import com.facebook.presto.hive.cache.HiveCachingHdfsConfiguration;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordCursor;
@@ -33,6 +34,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
+import static com.facebook.presto.hive.HiveUtil.isHudiRealtimeSplit;
 import static java.util.Objects.requireNonNull;
 
 public class GenericHiveRecordCursorProvider
@@ -64,17 +66,27 @@ public class GenericHiveRecordCursorProvider
     {
         // make sure the FileSystem is created with the proper Configuration object
         try {
+            if (!customSplitInfo.isEmpty() && isHudiRealtimeSplit(customSplitInfo)) {
+                if (configuration instanceof HiveCachingHdfsConfiguration.CachingJobConf) {
+                    configuration = ((HiveCachingHdfsConfiguration.CachingJobConf) configuration).getConfig();
+                }
+                if (configuration instanceof CopyOnFirstWriteConfiguration) {
+                    configuration = ((CopyOnFirstWriteConfiguration) configuration).getConfig();
+                }
+            }
             this.hdfsEnvironment.getFileSystem(session.getUser(), path, configuration);
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed getting FileSystem: " + path, e);
         }
 
+        Configuration actualConfiguration = configuration;
+
         RecordReader<?, ?> recordReader = hdfsEnvironment.doAs(session.getUser(),
-                () -> HiveUtil.createRecordReader(configuration, path, start, length, schema, columns, customSplitInfo));
+                () -> HiveUtil.createRecordReader(actualConfiguration, path, start, length, schema, columns, customSplitInfo));
         return hdfsEnvironment.doAs(session.getUser(),
                 () -> Optional.of(new GenericHiveRecordCursor<>(
-                        configuration,
+                        actualConfiguration,
                         path,
                         genericRecordReader(recordReader),
                         length,
