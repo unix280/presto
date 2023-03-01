@@ -167,7 +167,8 @@ public class IcebergHiveMetadata
                 .orElseGet(() -> metastore.getAllDatabases(metastoreContext))
                 .stream()
                 .map(table -> new SchemaTableName(schemaName.get(), table))
-                .filter(tablename -> isIcebergTable(metastore.getTable(metastoreContext, tablename.getSchemaName(), tablename.getTableName()).get()))
+                .filter(tableNames -> metastore.getTable(metastoreContext, tableNames.getSchemaName(), tableNames.getTableName()).isPresent())
+                .filter(icebergTableName -> isIcebergTable(metastore.getTable(metastoreContext, icebergTableName.getSchemaName(), icebergTableName.getTableName()).get()))
                 .collect(toList());
     }
 
