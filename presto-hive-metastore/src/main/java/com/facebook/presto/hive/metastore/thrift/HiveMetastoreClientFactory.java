@@ -55,6 +55,7 @@ public class HiveMetastoreClientFactory
     private final Optional<HostAndPort> socksProxy;
     private final int timeoutMillis;
     private final HiveMetastoreAuthentication metastoreAuthentication;
+    public static final String PROTOCOL = "SSL";
 
     public HiveMetastoreClientFactory(
             Optional<SSLContext> sslContext,
@@ -80,6 +81,15 @@ public class HiveMetastoreClientFactory
         return new ThriftHiveMetastoreClient(Transport.create(address, sslContext, socksProxy, timeoutMillis, metastoreAuthentication, token));
     }
 
+    /**
+     * Reads the truststore and keystore and returns the SSLContext
+     * @param metastoreTlsEnabled
+     * @param metastoreKeyStorePath
+     * @param metastoreKeyStorePassword
+     * @param metastoreTrustStorePath
+     * @param metastoreTrustStorePassword
+     * @return SSLContext
+     */
     private static Optional<SSLContext> metastoreSslContext(boolean metastoreTlsEnabled, Optional<File> metastoreKeyStorePath, Optional<String> metastoreKeyStorePassword, Optional<File> metastoreTrustStorePath, Optional<String> metastoreTrustStorePassword)
     {
         if (!metastoreTlsEnabled || (!metastoreKeyStorePath.isPresent() && !metastoreTrustStorePath.isPresent())) {
@@ -105,8 +115,8 @@ public class HiveMetastoreClientFactory
                         metastoreKeyStore.load(in, keyManagerPassword);
                     }
                 }
-                validateCertificates(metastoreKeyStore);
-                KeyManagerFactory metastoreKeyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                validateKeyStoreCertificates(metastoreKeyStore);
+                final KeyManagerFactory metastoreKeyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
                 metastoreKeyManagerFactory.init(metastoreKeyStore, keyManagerPassword);
                 metastoreKeyManagers = metastoreKeyManagerFactory.getKeyManagers();
             }
@@ -114,21 +124,21 @@ public class HiveMetastoreClientFactory
             // load TrustStore if configured, otherwise use KeyStore
             KeyStore metastoreTrustStore = metastoreKeyStore;
             if (metastoreTrustStorePath.isPresent()) {
-                metastoreTrustStore = loadTrustStore(metastoreTrustStorePath.get(), metastoreTrustStorePassword);
+                metastoreTrustStore = getTrustStore(metastoreTrustStorePath.get(), metastoreTrustStorePassword);
             }
 
             // create TrustManagerFactory
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(metastoreTrustStore);
 
             // get X509TrustManager
-            TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
+            final TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
             if (trustManagers.length != 1 || !(trustManagers[0] instanceof X509TrustManager)) {
                 throw new RuntimeException("Unexpected default trust managers:" + Arrays.toString(trustManagers));
             }
 
             // create SSLContext
-            SSLContext sslContext = SSLContext.getInstance("SSL");
+            final SSLContext sslContext = SSLContext.getInstance(PROTOCOL);
             sslContext.init(metastoreKeyManagers, trustManagers, null);
             return Optional.of(sslContext);
         }
@@ -137,17 +147,24 @@ public class HiveMetastoreClientFactory
         }
     }
 
-    private static KeyStore loadTrustStore(File trustStorePath, Optional<String> trustStorePassword)
+    /**
+     * Reads the truststore certificate and returns it
+     * @param trustStorePath
+     * @param trustStorePassword
+     * @throws IOException
+     * @throws GeneralSecurityException
+     */
+    private static KeyStore getTrustStore(File trustStorePath, Optional<String> trustStorePassword)
             throws IOException, GeneralSecurityException
     {
-        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        final KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
         try {
             // attempt to read the trust store as a PEM file
-            List<X509Certificate> certificateChain = PemReader.readCertificateChain(trustStorePath);
+            final List<X509Certificate> certificateChain = PemReader.readCertificateChain(trustStorePath);
             if (!certificateChain.isEmpty()) {
                 trustStore.load(null, null);
                 for (X509Certificate certificate : certificateChain) {
-                    X500Principal principal = certificate.getSubjectX500Principal();
+                    final X500Principal principal = certificate.getSubjectX500Principal();
                     trustStore.setCertificateEntry(principal.getName(), certificate);
                 }
                 return trustStore;
@@ -162,13 +179,18 @@ public class HiveMetastoreClientFactory
         return trustStore;
     }
 
-    private static void validateCertificates(KeyStore keyStore) throws GeneralSecurityException
+    /**
+     * Validate keystore certificate
+     * @param keyStore
+     * @throws GeneralSecurityException
+     */
+    private static void validateKeyStoreCertificates(KeyStore keyStore) throws GeneralSecurityException
     {
         for (String alias : list(keyStore.aliases())) {
             if (!keyStore.isKeyEntry(alias)) {
                 continue;
             }
-            Certificate certificate = keyStore.getCertificate(alias);
+            final Certificate certificate = keyStore.getCertificate(alias);
             if (!(certificate instanceof X509Certificate)) {
                 continue;
             }
