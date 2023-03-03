@@ -39,7 +39,7 @@ import java.util.Optional;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.parquet.ParquetTypeUtils.getColumnIO;
 import static com.facebook.presto.parquet.ParquetTypeUtils.lookupColumnByName;
-import static com.facebook.presto.parquet.reader.ParquetReader.MAX_BUFFER_SIZE_DATA_SOURCE_READ;
+import static com.facebook.presto.parquet.reader.ParquetColumnChunk.MAX_BUFFER_SIZE_DATA_SOURCE_READ;
 import static com.facebook.presto.parquet.reader.TestEncryption.constructField;
 import static com.facebook.presto.parquet.reader.TestEncryption.createParquetReader;
 import static com.facebook.presto.parquet.reader.TestEncryption.validateColumn;
@@ -117,7 +117,7 @@ public class TestLargeRowGroup
                 parquetReader.nextBatch();
                 int rowsRead = parquetReader.readBlock(col1).getPositionCount();
                 totalRowsRead += rowsRead;
-                maxSystemMemoryUsed = Math.max(maxSystemMemoryUsed, parquetReader.getSystemMemoryContext().getBytes());
+                maxSystemMemoryUsed = Math.max(maxSystemMemoryUsed, parquetReader.getSystemMemoryUsage());
             }
             long parquetReaderSizeAfter = sizeOf.deepSizeOf(parquetReader);
             long parquetReaderObjectGraphSize = parquetReaderSizeAfter - parquetReaderSizeBefore;

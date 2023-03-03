@@ -24,6 +24,7 @@ import com.facebook.presto.common.type.MapType;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeSignatureParameter;
 import com.facebook.presto.memory.context.AggregatedMemoryContext;
+import com.facebook.presto.memory.context.LocalMemoryContext;
 import com.facebook.presto.parquet.ColumnReader;
 import com.facebook.presto.parquet.ColumnReaderFactory;
 import com.facebook.presto.parquet.Field;
@@ -56,8 +57,8 @@ import org.apache.parquet.internal.filter2.columnindex.RowRanges;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.io.PrimitiveColumnIO;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
+import org.openjdk.jol.info.ClassLayout;
 
-import java.io.BufferedInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -82,6 +83,7 @@ import static com.facebook.presto.common.type.TinyintType.TINYINT;
 import static com.facebook.presto.parquet.ParquetValidationUtils.validateParquet;
 import static com.facebook.presto.parquet.reader.ListColumnReader.calculateCollectionOffsets;
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
@@ -90,25 +92,36 @@ import static java.util.Objects.requireNonNull;
 public class ParquetReader
         implements Closeable
 {
-    //TODO : Make this max buffer size read value configurable
-    //For S3 reads 8Mb - 32Mb fetch size is good default
-    public static final int MAX_BUFFER_SIZE_DATA_SOURCE_READ = 8 * 1024 * 1024;
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(ParquetReader.class).instanceSize();
     private static final int MAX_VECTOR_LENGTH = 1024;
     private static final int INITIAL_BATCH_SIZE = 1;
     private static final int BATCH_SIZE_GROWTH_FACTOR = 2;
+
+    private final ColumnReader[] verificationColumnReaders;
+    private final ParquetDataSource dataSource;
     private final Optional<InternalFileDecryptor> fileDecryptor;
     private final List<BlockMetaData> blocks;
     private final Optional<List<Long>> firstRowsOfBlocks;
     private final List<PrimitiveColumnIO> columns;
-    private final AggregatedMemoryContext systemMemoryContext;
     private final boolean batchReadEnabled;
     private final boolean enableVerification;
     private final FilterPredicate filter;
+    private final AggregatedMemoryContext systemMemoryContext;
+    private final LocalMemoryContext parquetReaderMemoryContext;
+    private final LocalMemoryContext pageReaderMemoryContext;
+    private final LocalMemoryContext verificationPageReaderMemoryContext;
+    private final ColumnReader[] columnReaders;
+    private final long maxReadBlockBytes;
+    private final List<ColumnIndexStore> blockIndexStores;
+    private final List<RowRanges> blockRowRanges;
+    private final Map<ColumnPath, ColumnDescriptor> paths = new HashMap<>();
+    private final boolean columnIndexFilterEnabled;
+    private final long[] maxBytesPerCell;
 
+    private BlockMetaData currentBlockMetadata;
     private int currentBlock;
     private long currentPosition;
     private long currentGroupRowCount;
-
     /**
      * Index in the Parquet file of the first row of the current group
      */
@@ -116,25 +129,9 @@ public class ParquetReader
     private RowRanges currentGroupRowRanges;
     private long nextRowInGroup;
     private int batchSize;
-
     private int nextBatchSize = INITIAL_BATCH_SIZE;
-    private final ColumnReader[] columnReaders;
-    protected final ColumnReader[] verificationColumnReaders;
-    private long[] maxBytesPerCell;
-    private long maxCombinedBytesPerRow;
-    private final long maxReadBlockBytes;
     private int maxBatchSize = MAX_VECTOR_LENGTH;
-
-    private AggregatedMemoryContext currentRowGroupMemoryContext;
-
-    private final List<ColumnIndexStore> blockIndexStores;
-    private final List<RowRanges> blockRowRanges;
-    private final Map<ColumnPath, ColumnDescriptor> paths = new HashMap<>();
-
-    protected final ParquetDataSource dataSource;
-    protected BlockMetaData currentBlockMetadata;
-
-    private final boolean columnIndexFilterEnabled;
+    private long maxCombinedBytesPerRow;
 
     public ParquetReader(
             MessageColumnIO messageColumnIO,
@@ -154,7 +151,9 @@ public class ParquetReader
         this.firstRowsOfBlocks = requireNonNull(firstRowsOfBlocks, "firstRowsOfBlocks is null");
         this.dataSource = requireNonNull(dataSource, "dataSource is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
-        this.currentRowGroupMemoryContext = systemMemoryContext.newAggregatedMemoryContext();
+        this.parquetReaderMemoryContext = systemMemoryContext.newLocalMemoryContext("ParquetReader");
+        this.pageReaderMemoryContext = systemMemoryContext.newLocalMemoryContext("PageReader");
+        this.verificationPageReaderMemoryContext = systemMemoryContext.newLocalMemoryContext("PageReader");
         this.maxReadBlockBytes = requireNonNull(maxReadBlockSize, "maxReadBlockSize is null").toBytes();
         this.batchReadEnabled = batchReadEnabled;
         columns = messageColumnIO.getLeaves();
@@ -185,12 +184,85 @@ public class ParquetReader
         this.fileDecryptor = fileDecryptor;
     }
 
+    /**
+     * The reader returns the Block type (LongArrayBlock or IntArrayBlock) based on the physical type of the column in Parquet file, but
+     * operators after scan expect output block type based on the metadata defined in Hive table. This causes issues as the operators call
+     * methods that are based on the expected output block type which the returned block type may not have implemented.
+     * To overcome this issue rewrite the block.
+     */
+    private static ColumnChunk typeCoercion(ColumnChunk columnChunk, PrimitiveTypeName physicalDataType, Type outputType)
+    {
+        Block newBlock = null;
+        if (SMALLINT.equals(outputType) || TINYINT.equals(outputType)) {
+            if (columnChunk.getBlock() instanceof IntArrayBlock) {
+                newBlock = rewriteIntegerArrayBlock((IntArrayBlock) columnChunk.getBlock(), outputType);
+            }
+            else if (columnChunk.getBlock() instanceof LongArrayBlock) {
+                newBlock = rewriteLongArrayBlock((LongArrayBlock) columnChunk.getBlock(), outputType);
+            }
+        }
+        else if (INTEGER.equals(outputType) && physicalDataType == PrimitiveTypeName.INT64) {
+            if (columnChunk.getBlock() instanceof LongArrayBlock) {
+                newBlock = rewriteLongArrayBlock((LongArrayBlock) columnChunk.getBlock(), outputType);
+            }
+        }
+        else if (BIGINT.equals(outputType) && physicalDataType == PrimitiveTypeName.INT32) {
+            if (columnChunk.getBlock() instanceof IntArrayBlock) {
+                newBlock = rewriteIntegerArrayBlock((IntArrayBlock) columnChunk.getBlock(), outputType);
+            }
+        }
+
+        if (newBlock != null) {
+            return new ColumnChunk(newBlock, columnChunk.getDefinitionLevels(), columnChunk.getRepetitionLevels());
+        }
+
+        return columnChunk;
+    }
+
+    private static Block rewriteIntegerArrayBlock(IntArrayBlock intArrayBlock, Type targetType)
+    {
+        int positionCount = intArrayBlock.getPositionCount();
+        BlockBuilder newBlockBuilder = targetType.createBlockBuilder(null, positionCount);
+        for (int position = 0; position < positionCount; position++) {
+            if (intArrayBlock.isNull(position)) {
+                newBlockBuilder.appendNull();
+            }
+            else {
+                targetType.writeLong(newBlockBuilder, intArrayBlock.getInt(position));
+            }
+        }
+
+        return newBlockBuilder.build();
+    }
+
+    private static Block rewriteLongArrayBlock(LongArrayBlock longArrayBlock, Type targetType)
+    {
+        int positionCount = longArrayBlock.getPositionCount();
+        BlockBuilder newBlockBuilder = targetType.createBlockBuilder(null, positionCount);
+        for (int position = 0; position < positionCount; position++) {
+            if (longArrayBlock.isNull(position)) {
+                newBlockBuilder.appendNull();
+            }
+            else {
+                targetType.writeLong(newBlockBuilder, longArrayBlock.getLong(position, 0));
+            }
+        }
+
+        return newBlockBuilder.build();
+    }
+
+    private static <T> List<T> listWithNulls(int size)
+    {
+        return Stream.generate(() -> (T) null).limit(size).collect(Collectors.toCollection(ArrayList<T>::new));
+    }
+
     @Override
     public void close()
             throws IOException
     {
-        currentRowGroupMemoryContext.close();
         dataSource.close();
+        parquetReaderMemoryContext.close();
+        systemMemoryContext.close();
     }
 
     public long getPosition()
@@ -230,12 +302,19 @@ public class ParquetReader
         return batchSize;
     }
 
+    public ParquetDataSource getDataSource()
+    {
+        return dataSource;
+    }
+
+    public long getSystemMemoryUsage()
+    {
+        return systemMemoryContext.getBytes();
+    }
+
     private boolean advanceToNextRowGroup()
     {
         currentBlock++;
-        currentRowGroupMemoryContext.close();
-        currentRowGroupMemoryContext = systemMemoryContext.newAggregatedMemoryContext();
-
         if (currentBlock == blocks.size()) {
             return false;
         }
@@ -325,33 +404,55 @@ public class ParquetReader
         ColumnReader columnReader = columnReaders[fieldId];
         if (!columnReader.isInitialized()) {
             validateParquet(currentBlockMetadata.getRowCount() > 0, "Row group has 0 rows");
-            ColumnChunkMetaData metadata = getColumnChunkMetaData(columnDescriptor);
-            long startingPosition = metadata.getStartingPos();
-            int totalSize = toIntExact(metadata.getTotalSize());
+            ColumnChunkMetaData columnChunkMetaData = getColumnChunkMetaData(columnDescriptor);
+            long startingPosition = columnChunkMetaData.getStartingPos();
+            int columnChunkSize = toIntExact(columnChunkMetaData.getTotalSize());
 
-            if (shouldUseColumnIndex(metadata.getPath())) {
-                OffsetIndex offsetIndex = blockIndexStores.get(currentBlock).getOffsetIndex(metadata.getPath());
+            if (shouldUseColumnIndex(columnChunkMetaData.getPath())) {
+                OffsetIndex offsetIndex = blockIndexStores.get(currentBlock).getOffsetIndex(columnChunkMetaData.getPath());
                 OffsetIndex filteredOffsetIndex = ColumnIndexFilterUtils.filterOffsetIndex(offsetIndex, currentGroupRowRanges, blocks.get(currentBlock).getRowCount());
-                List<OffsetRange> offsetRanges = ColumnIndexFilterUtils.calculateOffsetRanges(filteredOffsetIndex, metadata, offsetIndex.getOffset(0), startingPosition);
+                List<OffsetRange> offsetRanges = ColumnIndexFilterUtils.calculateOffsetRanges(filteredOffsetIndex, columnChunkMetaData, offsetIndex.getOffset(0), startingPosition);
                 List<OffsetRange> consecutiveRanges = concatRanges(offsetRanges);
-                BufferedInputStream stream = dataSourceAsBufferedStream(startingPosition, consecutiveRanges);
-                PageReader pageReader = createPageReader(stream, totalSize, metadata, columnDescriptor, filteredOffsetIndex);
+                int consecutiveRangesSize = consecutiveRanges.stream().mapToInt(range -> (int) range.getLength()).sum();
+                PageReader pageReader = createPageReader(
+                        dataSourceAsInputStream(startingPosition, consecutiveRanges),
+                        consecutiveRangesSize,
+                        columnChunkMetaData,
+                        columnDescriptor,
+                        filteredOffsetIndex,
+                        pageReaderMemoryContext);
+
                 columnReader.init(pageReader, field, currentGroupRowRanges);
 
                 if (enableVerification) {
                     ColumnReader verificationColumnReader = verificationColumnReaders[field.getId()];
-                    PageReader pageReaderVerification = createPageReader(stream, totalSize, metadata, columnDescriptor, filteredOffsetIndex);
+                    PageReader pageReaderVerification = createPageReader(
+                            dataSourceAsInputStream(startingPosition, consecutiveRanges),
+                            consecutiveRangesSize,
+                            columnChunkMetaData,
+                            columnDescriptor,
+                            filteredOffsetIndex,
+                            verificationPageReaderMemoryContext);
                     verificationColumnReader.init(pageReaderVerification, field, currentGroupRowRanges);
                 }
             }
             else {
-                BufferedInputStream stream = dataSourceAsBufferedStream(startingPosition, totalSize);
-                PageReader pageReader = createPageReader(stream, totalSize, metadata, columnDescriptor);
+                PageReader pageReader = createPageReader(
+                        dataSourceAsInputStream(startingPosition, columnChunkSize),
+                        columnChunkSize,
+                        columnChunkMetaData,
+                        columnDescriptor,
+                        pageReaderMemoryContext);
                 columnReader.init(pageReader, field, null);
 
                 if (enableVerification) {
                     ColumnReader verificationColumnReader = verificationColumnReaders[field.getId()];
-                    PageReader pageReaderVerification = createPageReader(stream, totalSize, metadata, columnDescriptor);
+                    PageReader pageReaderVerification = createPageReader(
+                            dataSourceAsInputStream(startingPosition, columnChunkSize),
+                            columnChunkSize,
+                            columnChunkMetaData,
+                            columnDescriptor,
+                            verificationPageReaderMemoryContext);
                     verificationColumnReader.init(pageReaderVerification, field, null);
                 }
             }
@@ -377,33 +478,15 @@ public class ParquetReader
         return columnChunk;
     }
 
-    private BufferedInputStream dataSourceAsBufferedStream(long startingPosition, List<OffsetRange> offsetRanges)
+    private InputStream dataSourceAsInputStream(long startingPosition, List<OffsetRange> offsetRanges)
     {
         List<InputStream> inputStreams = new ArrayList<>();
-        int totalSize = 0;
         for (OffsetRange r : offsetRanges) {
             InputStream inputStream = dataSourceAsInputStream(startingPosition + r.getOffset(), r.getLength());
             inputStreams.add(inputStream);
-            totalSize += r.getLength();
         }
 
-        return wrapAsBufferedStream(new SequenceInputStream(Collections.enumeration(inputStreams)), totalSize);
-    }
-
-    private BufferedInputStream dataSourceAsBufferedStream(long startingPosition, long totalSize)
-    {
-        InputStream stream = dataSourceAsInputStream(startingPosition, totalSize);
-        return wrapAsBufferedStream(stream, totalSize);
-    }
-
-    private BufferedInputStream wrapAsBufferedStream(InputStream inputStream, long totalSize)
-    {
-        //If totalSize to read is more than the upper bound defined,
-        //keep the total amount of memory bounded by building a buffered input stream
-        int maxBytesToBuffer = (int) Math.min(totalSize, MAX_BUFFER_SIZE_DATA_SOURCE_READ);
-        //Track this memory allocation
-        currentRowGroupMemoryContext.newLocalMemoryContext(ParquetReader.class.getSimpleName()).setBytes(maxBytesToBuffer);
-        return new BufferedInputStream(inputStream, maxBytesToBuffer);
+        return new SequenceInputStream(Collections.enumeration(inputStreams));
     }
 
     private InputStream dataSourceAsInputStream(long startingPosition, long totalSize)
@@ -462,23 +545,32 @@ public class ParquetReader
                 blockIndexStores.get(currentBlock).getColumnIndex(path) != null;
     }
 
-    protected PageReader createPageReader(InputStream inputStream, int bufferSize, ColumnChunkMetaData metadata, ColumnDescriptor columnDescriptor, OffsetIndex offsetIndex)
+    private PageReader createPageReader(InputStream inputStream, int columnChunkSize, ColumnChunkMetaData columnChunkMetaData, ColumnDescriptor columnDescriptor, OffsetIndex offsetIndex, LocalMemoryContext memoryContext)
             throws IOException
     {
-        ColumnChunkDescriptor descriptor = new ColumnChunkDescriptor(columnDescriptor, metadata, bufferSize);
-        ParquetColumnChunk columnChunk = new ParquetColumnChunk(descriptor, inputStream, offsetIndex);
-        return createPageReaderInternal(columnDescriptor, columnChunk);
+        ColumnChunkDescriptor descriptor = new ColumnChunkDescriptor(columnDescriptor, columnChunkMetaData, columnChunkSize);
+        ParquetColumnChunk columnChunk = new ParquetColumnChunk(
+                columnChunkSize,
+                descriptor,
+                inputStream,
+                offsetIndex,
+                memoryContext);
+        return createPageReaderInternal(columnDescriptor, columnChunk, memoryContext);
     }
 
-    protected PageReader createPageReader(InputStream inputStream, int bufferSize, ColumnChunkMetaData metadata, ColumnDescriptor columnDescriptor)
+    private PageReader createPageReader(InputStream inputStream, int columnChunkSize, ColumnChunkMetaData columnChunkMetaData, ColumnDescriptor columnDescriptor, LocalMemoryContext memoryContext)
             throws IOException
     {
-        ColumnChunkDescriptor descriptor = new ColumnChunkDescriptor(columnDescriptor, metadata, bufferSize);
-        ParquetColumnChunk columnChunk = new ParquetColumnChunk(descriptor, inputStream);
-        return createPageReaderInternal(columnDescriptor, columnChunk);
+        ColumnChunkDescriptor descriptor = new ColumnChunkDescriptor(columnDescriptor, columnChunkMetaData, columnChunkSize);
+        ParquetColumnChunk columnChunk = new ParquetColumnChunk(
+                columnChunkSize,
+                descriptor,
+                inputStream,
+                memoryContext);
+        return createPageReaderInternal(columnDescriptor, columnChunk, memoryContext);
     }
 
-    private PageReader createPageReaderInternal(ColumnDescriptor columnDescriptor, ParquetColumnChunk columnChunk)
+    private PageReader createPageReaderInternal(ColumnDescriptor columnDescriptor, ParquetColumnChunk columnChunk, LocalMemoryContext memoryContext)
             throws IOException
     {
         if (!isEncryptedColumn(fileDecryptor, columnDescriptor)) {
@@ -540,89 +632,22 @@ public class ParquetReader
         else {
             columnChunk = readPrimitive((PrimitiveField) field);
         }
+
+        parquetReaderMemoryContext.setBytes(getRetainedSizeInBytes());
         return columnChunk;
     }
 
-    public ParquetDataSource getDataSource()
+    private long getRetainedSizeInBytes()
     {
-        return dataSource;
-    }
-
-    public AggregatedMemoryContext getSystemMemoryContext()
-    {
-        return systemMemoryContext;
-    }
-
-    /**
-     * The reader returns the Block type (LongArrayBlock or IntArrayBlock) based on the physical type of the column in Parquet file, but
-     * operators after scan expect output block type based on the metadata defined in Hive table. This causes issues as the operators call
-     * methods that are based on the expected output block type which the returned block type may not have implemented.
-     * To overcome this issue rewrite the block.
-     */
-    private static ColumnChunk typeCoercion(ColumnChunk columnChunk, PrimitiveTypeName physicalDataType, Type outputType)
-    {
-        Block newBlock = null;
-        if (SMALLINT.equals(outputType) || TINYINT.equals(outputType)) {
-            if (columnChunk.getBlock() instanceof IntArrayBlock) {
-                newBlock = rewriteIntegerArrayBlock((IntArrayBlock) columnChunk.getBlock(), outputType);
-            }
-            else if (columnChunk.getBlock() instanceof LongArrayBlock) {
-                newBlock = rewriteLongArrayBlock((LongArrayBlock) columnChunk.getBlock(), outputType);
+        long sizeInBytes = INSTANCE_SIZE;
+        for (int i = 0; i < columnReaders.length; i++) {
+            sizeInBytes += columnReaders[i] == null ? 0 : columnReaders[i].getRetainedSizeInBytes();
+            if (verificationColumnReaders != null) {
+                sizeInBytes += verificationColumnReaders[i] == null ? 0 : verificationColumnReaders[i].getRetainedSizeInBytes();
             }
         }
-        else if (INTEGER.equals(outputType) && physicalDataType == PrimitiveTypeName.INT64) {
-            if (columnChunk.getBlock() instanceof LongArrayBlock) {
-                newBlock = rewriteLongArrayBlock((LongArrayBlock) columnChunk.getBlock(), outputType);
-            }
-        }
-        else if (BIGINT.equals(outputType) && physicalDataType == PrimitiveTypeName.INT32) {
-            if (columnChunk.getBlock() instanceof IntArrayBlock) {
-                newBlock = rewriteIntegerArrayBlock((IntArrayBlock) columnChunk.getBlock(), outputType);
-            }
-        }
-
-        if (newBlock != null) {
-            return new ColumnChunk(newBlock, columnChunk.getDefinitionLevels(), columnChunk.getRepetitionLevels());
-        }
-
-        return columnChunk;
-    }
-
-    private static Block rewriteIntegerArrayBlock(IntArrayBlock intArrayBlock, Type targetType)
-    {
-        int positionCount = intArrayBlock.getPositionCount();
-        BlockBuilder newBlockBuilder = targetType.createBlockBuilder(null, positionCount);
-        for (int position = 0; position < positionCount; position++) {
-            if (intArrayBlock.isNull(position)) {
-                newBlockBuilder.appendNull();
-            }
-            else {
-                targetType.writeLong(newBlockBuilder, intArrayBlock.getInt(position));
-            }
-        }
-
-        return newBlockBuilder.build();
-    }
-
-    private static Block rewriteLongArrayBlock(LongArrayBlock longArrayBlock, Type targetType)
-    {
-        int positionCount = longArrayBlock.getPositionCount();
-        BlockBuilder newBlockBuilder = targetType.createBlockBuilder(null, positionCount);
-        for (int position = 0; position < positionCount; position++) {
-            if (longArrayBlock.isNull(position)) {
-                newBlockBuilder.appendNull();
-            }
-            else {
-                targetType.writeLong(newBlockBuilder, longArrayBlock.getLong(position, 0));
-            }
-        }
-
-        return newBlockBuilder.build();
-    }
-
-    private static <T> List<T> listWithNulls(int size)
-    {
-        return Stream.generate(() -> (T) null).limit(size).collect(Collectors.toCollection(ArrayList<T>::new));
+        sizeInBytes += sizeOf(maxBytesPerCell);
+        return sizeInBytes;
     }
 
     private RowRanges getRowRanges(int blockIndex)
