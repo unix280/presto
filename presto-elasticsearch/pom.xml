@@ -288,12 +288,6 @@
             <artifactId>presto-main</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.lucene</groupId>
-                    <artifactId>lucene-analyzers-common</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>
@@ -306,12 +300,6 @@
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main</artifactId>
             <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.lucene</groupId>
-                    <artifactId>lucene-analyzers-common</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>
@@ -405,10 +393,6 @@
                 <exclusion>
                     <groupId>joda-time</groupId>
                     <artifactId>joda-time</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.lucene</groupId>
-                    <artifactId>lucene-analyzers-common</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
