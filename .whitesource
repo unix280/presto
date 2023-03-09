@@ -4,4 +4,3 @@
              "baseBranches": ["Experimental_dev","presto-release-0.279","presto-0.279-whitesource-fixes"]
          }
 }
-
