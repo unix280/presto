@@ -16,6 +16,13 @@
         <shadeBase>com.facebook.presto.jdbc.internal</shadeBase>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>ahana-s3-maven-repo-releases</id>
+            <url>s3://ahana-maven-repo/release</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>com.facebook.presto</groupId>

@@ -17,6 +17,13 @@
         <dep.snakeyaml.version>1.21</dep.snakeyaml.version>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>ahana-s3-maven-repo-releases</id>
+            <url>s3://ahana-maven-repo/release</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>org.yaml</groupId>
