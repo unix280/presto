@@ -13,8 +13,8 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <dep.log4j.version>2.17.1</dep.log4j.version>
-        <dep.elasticsearch.version>6.0.0</dep.elasticsearch.version>
-        <dep.snakeyaml.version>1.21</dep.snakeyaml.version>
+        <dep.elasticsearch.version>6.8.23</dep.elasticsearch.version>
+        <dep.snakeyaml.version>1.32</dep.snakeyaml.version>
     </properties>
 
     <dependencies>
@@ -128,7 +128,7 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.2</version>
+            <version>4.5.13</version>
 
             <exclusions>
                 <!-- elasticsearch-rest-high-level-client 6.0.0 brings in httpcore 4.4.5 vs (4.4.4) -->
@@ -371,12 +371,28 @@
 
         <dependency>
             <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch-core</artifactId>
+            <version>${dep.elasticsearch.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch-x-content</artifactId>
+            <version>${dep.elasticsearch.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch</artifactId>
             <version>${dep.elasticsearch.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.elasticsearch</groupId>
                     <artifactId>jna</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>joda-time</groupId>
+                    <artifactId>joda-time</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
