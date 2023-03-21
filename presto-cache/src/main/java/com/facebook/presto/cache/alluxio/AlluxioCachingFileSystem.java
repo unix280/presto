@@ -34,6 +34,7 @@ import static alluxio.Constants.SCHEME;
 import static alluxio.conf.PropertyKey.USER_CLIENT_CACHE_QUOTA_ENABLED;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_READ_CACHE;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_REQUESTED_EXTERNAL;
+import static alluxio.metrics.MetricKey.CLIENT_CACHE_BYTES_WRITTEN_CACHE;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_HIT_RATE;
 import static alluxio.metrics.MetricKey.CLIENT_CACHE_PAGES_EVICTED;
 import static alluxio.metrics.MetricsSystem.getMetricName;
@@ -100,10 +101,7 @@ public class AlluxioCachingFileSystem
         // in progress. Once we upgrade to alluxio version with this fix, we can safely remove
         // the below call and associated changes.
         Metrics.registerGauges();
-        // In recent changes of alluxio, the below metric was inlined, so unless there is a cache
-        // eviction during a query run, it was not being registered. To make it appear after the
-        // initialization of this class, adding it here.
-        MetricsSystem.meter(CLIENT_CACHE_PAGES_EVICTED.getName());
+        Metrics.registerMeters();
     }
 
     @Override
@@ -157,6 +155,16 @@ public class AlluxioCachingFileSystem
                         }
                         return 0;
                     });
+        }
+
+        private static void registerMeters()
+        {
+            // In recent changes of alluxio, the below metrics were inlined, so unless there is a cache
+            // eviction/cache write during a query run, it was not being registered. Even then, it won't
+            // be registered on the coordinator and jmx metrics won't show these. To initialize these on
+            // the coordinator on startup rather than on any cache operations, adding it here.
+            MetricsSystem.meter(CLIENT_CACHE_PAGES_EVICTED.getName());
+            MetricsSystem.meter(CLIENT_CACHE_BYTES_WRITTEN_CACHE.getName());
         }
     }
 }
