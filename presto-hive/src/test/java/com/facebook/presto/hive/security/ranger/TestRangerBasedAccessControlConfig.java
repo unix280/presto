@@ -33,6 +33,7 @@ import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlC
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_MGR_KEYSTORE_PWD;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_MGR_TRUST_STORE_PATH;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_MGR_TRUST_STORE_PWD;
+import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_SECURE_MODE_ENABLED;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_GROUPS_AUTH_PASSWORD;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_GROUPS_AUTH_USERNAME;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +49,7 @@ public class TestRangerBasedAccessControlConfig
                 .setRangerHiveServiceName(null)
                 .setBasicAuthUser(null)
                 .setBasicAuthPassword(null)
+                .setRangerRestSecureModeEnabled(false)
                 .setRangerRestKeystorePath(null)
                 .setRangerRestKeystorePwd(null)
                 .setRangerRestTruststorePath(null)
@@ -64,6 +66,7 @@ public class TestRangerBasedAccessControlConfig
                 .put(RANGER_REST_POLICY_HIVE_SERVICE_NAME, "hiveServiceName")
                 .put(RANGER_REST_USER_GROUPS_AUTH_USERNAME, "admin")
                 .put(RANGER_REST_USER_GROUPS_AUTH_PASSWORD, "admin")
+                .put(RANGER_REST_SECURE_MODE_ENABLED, "true")
                 .put(RANGER_REST_POLICY_MGR_KEYSTORE_PATH, "key_path")
                 .put(RANGER_REST_POLICY_MGR_KEYSTORE_PWD, "key_pwd")
                 .put(RANGER_REST_POLICY_MGR_TRUST_STORE_PATH, "trust_path")
@@ -77,6 +80,7 @@ public class TestRangerBasedAccessControlConfig
                 .setRangerHiveServiceName("hiveServiceName")
                 .setBasicAuthUser("admin")
                 .setBasicAuthPassword("admin")
+                .setRangerRestSecureModeEnabled(true)
                 .setRangerRestKeystorePath("key_path")
                 .setRangerRestKeystorePwd("key_pwd")
                 .setRangerRestTruststorePath("trust_path")

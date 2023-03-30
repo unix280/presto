@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 import static com.facebook.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static com.facebook.airlift.json.JsonCodec.jsonCodec;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_MGR_DOWNLOAD_URL;
+import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_POLICY_MGR_SECURE_DOWNLOAD_URL;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_GROUP_URL;
 import static com.facebook.presto.hive.security.ranger.RangerBasedAccessControlConfig.RANGER_REST_USER_ROLES_URL;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyAddColumn;
@@ -128,8 +129,12 @@ public class RangerBasedAccessControl
     private ServicePolicies getHiveServicePolicies(OkHttpClient client, RangerBasedAccessControlConfig config)
             throws IOException
     {
+        String rangerRestPolicyUrl = RANGER_REST_POLICY_MGR_DOWNLOAD_URL;
+        if (config.isRangerRestSecureModeEnabled()) {
+            rangerRestPolicyUrl = RANGER_REST_POLICY_MGR_SECURE_DOWNLOAD_URL;
+        }
         HttpUrl hiveServicePolicyUrl = requireNonNull(HttpUrl.get(uriBuilderFrom(URI.create(config.getRangerHttpEndPoint()))
-                .appendPath(RANGER_REST_POLICY_MGR_DOWNLOAD_URL + "/" + config.getRangerHiveServiceName())
+                .appendPath(rangerRestPolicyUrl + "/" + config.getRangerHiveServiceName())
                 .build()));
         Response response = doRequest(client, hiveServicePolicyUrl);
         if (!response.isSuccessful()) {

@@ -28,8 +28,10 @@ public class RangerBasedAccessControlConfig
     public static final String RANGER_REST_POLICY_HIVE_SERVICE_NAME = "hive.ranger.policy.hive-servicename";
     public static final String RANGER_REST_USER_GROUPS_AUTH_USERNAME = "hive.ranger.service.basic-auth-username";
     public static final String RANGER_REST_USER_GROUPS_AUTH_PASSWORD = "hive.ranger.service.basic-auth-password";
+    public static final String RANGER_REST_SECURE_MODE_ENABLED = "hive.ranger.service.secure-mode-enabled";
 
     public static final String RANGER_REST_POLICY_MGR_DOWNLOAD_URL = "/service/plugins/policies/download";
+    public static final String RANGER_REST_POLICY_MGR_SECURE_DOWNLOAD_URL = "/service/plugins/secure/policies/download";
     public static final String RANGER_REST_USER_GROUP_URL = "/service/xusers/users";
     public static final String RANGER_REST_USER_ROLES_URL = "/service/roles/roles/user";
 
@@ -50,6 +52,7 @@ public class RangerBasedAccessControlConfig
     private String rangerRestTruststorePath;
     private String rangerRestTruststorePwd;
     private String rangerHiveAuditPath;
+    private boolean rangerSecureModeEnabled;
 
     @MinDuration("60s")
     public Duration getRefreshPeriod()
@@ -113,6 +116,18 @@ public class RangerBasedAccessControlConfig
     public RangerBasedAccessControlConfig setBasicAuthPassword(String basicAuthPassword)
     {
         this.basicAuthPassword = basicAuthPassword;
+        return this;
+    }
+
+    public boolean isRangerRestSecureModeEnabled()
+    {
+        return rangerSecureModeEnabled;
+    }
+
+    @Config(RANGER_REST_SECURE_MODE_ENABLED)
+    public RangerBasedAccessControlConfig setRangerRestSecureModeEnabled(boolean rangerSecureModeEnabled)
+    {
+        this.rangerSecureModeEnabled = rangerSecureModeEnabled;
         return this;
     }
 
