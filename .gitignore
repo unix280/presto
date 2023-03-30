@@ -15,7 +15,6 @@ test-reports/
 .classpath
 .settings
 .github
-.circleci
 .project
 temp-testng-customsuite.xml
 test-output

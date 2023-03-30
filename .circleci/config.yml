@@ -1253,7 +1253,7 @@ workflows:
             - docker_hub
             - presto_maven
           module: presto-orc
-          resource_class: medium
+          resource_class: large
           requires:
             - start_test_suite
       - test_specific_module:
