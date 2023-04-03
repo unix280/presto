@@ -36,6 +36,12 @@
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-llap-common</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-lang3</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -52,6 +58,12 @@
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
             <artifactId>hive-apache</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-lang</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -164,4 +176,31 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.basepom.maven</groupId>
+                    <artifactId>duplicate-finder-maven-plugin</artifactId>
+                    <configuration>
+                        <ignoredResourcePatterns>
+                            <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                            <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                            <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
+                        </ignoredResourcePatterns>
+                        <ignoredClassPatterns>
+                            <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                            <ignoredClassPattern>module-info</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                        </ignoredClassPatterns>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

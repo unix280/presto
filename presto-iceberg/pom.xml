@@ -516,12 +516,21 @@
                             <ignoredResourcePattern>org.apache.avro.data/Json.avsc</ignoredResourcePattern>
                             <ignoredResourcePattern>iceberg-build.properties</ignoredResourcePattern>
                             <ignoredResourcePattern>mozilla/public-suffix-list.txt</ignoredResourcePattern>
+                            <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                            <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
                         </ignoredResourcePatterns>
                         <ignoredClassPatterns>
                             <ignoredClassPattern>shaded.parquet.it.unimi.dsi.fastutil.*</ignoredClassPattern>
                             <ignoredClassPattern>module-info</ignoredClassPattern>
                             <ignoredClassPattern>org.apache.avro.*</ignoredClassPattern>
                             <ignoredClassPattern>org.apache.parquet.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                            <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                            <ignoredClassPattern>com.github.benmanes.caffeine.*</ignoredClassPattern>
                         </ignoredClassPatterns>
                     </configuration>
                 </plugin>

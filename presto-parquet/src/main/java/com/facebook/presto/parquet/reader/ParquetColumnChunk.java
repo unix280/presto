@@ -81,7 +81,7 @@ public class ParquetColumnChunk
     protected PageHeader readPageHeader(BlockCipher.Decryptor headerBlockDecryptor, byte[] pageHeaderAadditionalAuthenticationData)
             throws IOException
     {
-        return Util.readPageHeader(stream, headerBlockDecryptor, pageHeaderAadditionalAuthenticationData);
+        return Util.readPageHeader(stream);
     }
 
     public PageReader readAllPages(Optional<InternalFileDecryptor> fileDecryptor, int rowGroupOrdinal, int columnOrdinal)

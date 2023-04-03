@@ -253,7 +253,6 @@
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
-            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -318,4 +317,47 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.basepom.maven</groupId>
+                    <artifactId>duplicate-finder-maven-plugin</artifactId>
+                    <configuration>
+                        <ignoredResourcePatterns>
+                            <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                            <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                            <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
+                        </ignoredResourcePatterns>
+                        <ignoredClassPatterns>
+                            <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                            <ignoredClassPattern>module-info</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                            <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                        </ignoredClassPatterns>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <configuration>
+                        <rules>
+                            <requireUpperBoundDeps>
+                                <excludes>
+                                    <exclude>org.apache.lucene:lucene-analyzers-common</exclude>
+                                </excludes>
+                            </requireUpperBoundDeps>
+                        </rules>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+
 </project>
