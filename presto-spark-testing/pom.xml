@@ -178,7 +178,7 @@
                 <artifactId>maven-dependency-plugin</artifactId>
                 <configuration>
                     <ignoredUsedUndeclaredDependencies>
-                        <ignoredUsedUndeclaredDependency>com.facebook.presto.hive:hive-apache:jar:3.0.0-8</ignoredUsedUndeclaredDependency>
+                        <ignoredUsedUndeclaredDependency>com.facebook.presto.hive:hive-apache-ibm:jar:3.0.0-8</ignoredUsedUndeclaredDependency>
                     </ignoredUsedUndeclaredDependencies>
                 </configuration>
             </plugin>

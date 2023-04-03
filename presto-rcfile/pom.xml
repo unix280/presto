@@ -104,7 +104,7 @@
 
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
+            <artifactId>hive-apache-ibm</artifactId>
             <scope>test</scope>
         </dependency>
 

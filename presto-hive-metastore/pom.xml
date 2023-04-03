@@ -89,8 +89,7 @@
 
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
-            <version>3.0.0-8</version>
+            <artifactId>hive-apache-ibm</artifactId>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
