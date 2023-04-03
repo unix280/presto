@@ -25,7 +25,6 @@ import java.util.Properties;
 public class PrestoAvroSerDe
         extends AvroSerDe
 {
-    @Override
     public Schema determineSchemaOrReturnErrorSchema(Configuration conf, Properties props)
     {
         // AvroSerDe does not propagate initialization exceptions. Instead, it stores just an exception's message in

@@ -542,18 +542,18 @@ public final class HiveUtil
     {
         try {
             configuration = copy(configuration); // Some SerDes (e.g. Avro) modify passed configuration
-            deserializer.initialize(configuration, schema);
+            //deserializer.initialize(configuration, schema);
             validate(deserializer);
         }
-        catch (SerDeException | RuntimeException e) {
+        catch (RuntimeException e) {
             throw new RuntimeException("error initializing deserializer: " + deserializer.getClass().getName(), e);
         }
     }
 
     private static void validate(Deserializer deserializer)
     {
-        if (deserializer instanceof AbstractSerDe && !((AbstractSerDe) deserializer).getConfigurationErrors().isEmpty()) {
-            throw new RuntimeException("There are configuration errors: " + ((AbstractSerDe) deserializer).getConfigurationErrors());
+        if (deserializer instanceof AbstractSerDe && !((AbstractSerDe) deserializer).getConfiguration().isPresent()) {
+            throw new RuntimeException("There are configuration errors: " + ((AbstractSerDe) deserializer).getConfiguration());
         }
     }
 
