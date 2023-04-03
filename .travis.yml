@@ -1,7 +1,48 @@
+sudo: required
+services:
+  - docker
+
+cache:
+  directories:
+    - $HOME/.m2
+
 language: java
-dist: jammy
+jdk:
+ - openjdk11
+
+python:
+  - '3.7'
+dist: bionic
+
+notifications:
+  email: false
+
 addons:
   apt:
     packages:
-      - python3-venv
-script: mvn clean package -DskipTests=true
+    - jq
+    - lynx
+
+before_install:
+  - source travis/update_catalog.sh
+  - source travis/download_source_code.sh
+  #- source travis/db2/setup_db2.sh
+
+
+# this skips the install step which would otherwise run a Maven build by default
+install: 
+  - pip install -r travis/requirements.txt
+  - ls -lrt
+  - ./mvnw clean install --no-transfer-progress -DskipTests -q
+  - source travis/presto/presto_image_setup.sh
+  - python3 travis/test/PrestoConnectorInitalSetup/deploy_dc.py
+  - cat travis/test/PrestoConnectorInitalSetup/log/all.log
+  - sleep 60
+  - python3 travis/test/PrestoCertSetUp/node_cert_handler.py
+  - cat travis/test/PrestoCertSetUp/log/all.log
+  - sleep 60
+  - docker images
+  - docker ps
+script:
+  - python3 travis/travis_pytest/travis_checks.py
+  - cat travis/travis_pytest/log/all.log
