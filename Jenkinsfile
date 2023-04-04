@@ -57,8 +57,7 @@ pipeline {
                                 returnStdout: true).trim()
                             env.PRESTO_PKG = "presto-server-${PRESTO_VERSION}.tar.gz"
                             env.PRESTO_CLI_JAR = "presto-cli-${PRESTO_VERSION}-executable.jar"
-                            env.PRESTO_BUILD_VERSION = env.PRESTO_VERSION + '-' +
-                                                    sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+                            env.PRESTO_BUILD_VERSION = env.PRESTO_VERSION + '-' + env.GIT_COMMIT.substring(0, 7)
                             env.DOCKER_IMAGE = env.AWS_ECR + "/ahanaio/prestodb:${PRESTO_BUILD_VERSION}"
                             env.DOCKER_IMAGE_LATEST = env.AWS_ECR + "/ahanaio/prestodb:latest"
                             env.DOCKER_NATIVE_IMAGE = env.AWS_ECR + "/ahanaio/prestodb-native:${PRESTO_BUILD_VERSION}"
@@ -133,6 +132,9 @@ pipeline {
                 }
 
                 stage('Docker Native Build') {
+                    when {
+                        expression { false }
+                    }
                     steps {
                         echo "Building ${DOCKER_NATIVE_IMAGE}"
                         withCredentials([[
@@ -150,7 +152,7 @@ pipeline {
                     }
                 }
 
-                stage('Publish Docker Images') {
+                stage('Publish Docker Image') {
                     when {
                         anyOf {
                             expression { params.PUBLISH_ARTIFACTS_ON_CURRENT_BRANCH }
@@ -170,10 +172,29 @@ pipeline {
                                 docker image ls
                                 aws ecr get-login-password | docker login --username AWS --password-stdin ${AWS_ECR}
                                 docker push "${DOCKER_IMAGE}"
-                                docker push "${DOCKER_NATIVE_IMAGE}"
                                 docker buildx imagetools inspect "${DOCKER_IMAGE}"
-                                docker buildx imagetools inspect "${DOCKER_NATIVE_IMAGE}"
                                 docker push "${DOCKER_IMAGE_LATEST}"
+                            '''
+                        }
+                    }
+                }
+
+                stage('Publish Native Docker Image') {
+                    when {
+                        expression { false }
+                    }
+
+                    steps {
+                        withCredentials([[
+                                $class:            'AmazonWebServicesCredentialsBinding',
+                                credentialsId:     "${AWS_CREDENTIAL_ID}",
+                                accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                                secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                            sh '''
+                                docker image ls
+                                aws ecr get-login-password | docker login --username AWS --password-stdin ${AWS_ECR}
+                                docker push "${DOCKER_NATIVE_IMAGE}"
+                                docker buildx imagetools inspect "${DOCKER_NATIVE_IMAGE}"
                                 docker push "${DOCKER_NATIVE_IMAGE_LATEST}"
                             '''
                         }
