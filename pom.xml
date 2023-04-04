@@ -145,7 +145,7 @@
         <module>presto-benchmark-driver</module>
         <module>presto-server</module>
         <module>presto-server-rpm</module>
-        <module>presto-docs</module>
+<!--        <module>presto-docs</module>-->
         <module>presto-verifier</module>
         <module>presto-testing-server-launcher</module>
         <module>presto-plugin-toolkit</module>
@@ -2431,6 +2431,23 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <id>Run Script</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>installHiveDep.sh</executable>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
