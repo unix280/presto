@@ -27,7 +27,7 @@ import org.apache.parquet.io.api.Binary;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -137,7 +137,8 @@ public class TestParquetUtils
             case 96: {
                 for (int i = 0; i < valueCount; i++) {
                     long millisValue = Long.valueOf(random.nextInt(1572281176) * 1000);
-                    NanoTime nanoTime = NanoTimeUtils.getNanoTime(new Timestamp(millisValue), false);
+                    ZoneId zoneId = ZoneId.systemDefault();
+                    NanoTime nanoTime = NanoTimeUtils.getNanoTime(new org.apache.hadoop.hive.common.type.Timestamp(), zoneId, false);
                     writer.writeLong(nanoTime.getTimeOfDayNanos());
                     writer.writeInteger(nanoTime.getJulianDay());
                     addedValues.add(millisValue);

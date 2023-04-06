@@ -24,6 +24,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.thrift.transport.TSaslClientTransport;
 import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.transport.TTransportException;
 
 import javax.inject.Inject;
 import javax.security.auth.callback.Callback;
@@ -95,8 +96,8 @@ public class KerberosHiveMetastoreAuthentication
                     rawTransport);
             return new TUGIAssumingTransport(saslTransport, UserGroupInformation.getCurrentUser());
         }
-        catch (IOException ex) {
-            throw new UncheckedIOException(ex);
+        catch (IOException | TTransportException ex) {
+            throw new UncheckedIOException((IOException) ex);
         }
     }
 
@@ -172,8 +173,8 @@ public class KerberosHiveMetastoreAuthentication
 
             return new TUGIAssumingTransport(saslTransport, authentication.getUserGroupInformation());
         }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
+        catch (IOException | TTransportException e) {
+            throw new UncheckedIOException((IOException) e);
         }
     }
 }
