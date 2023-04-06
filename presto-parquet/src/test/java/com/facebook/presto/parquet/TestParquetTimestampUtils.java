@@ -19,7 +19,7 @@ import org.apache.parquet.io.api.Binary;
 import org.testng.annotations.Test;
 
 import java.nio.ByteBuffer;
-import java.sql.Timestamp;
+import java.time.ZoneId;
 
 import static com.facebook.presto.parquet.ParquetTimestampUtils.getTimestampMillis;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -52,10 +52,12 @@ public class TestParquetTimestampUtils
 
     private static void assertTimestampCorrect(String timestampString)
     {
-        Timestamp timestamp = Timestamp.valueOf(timestampString);
-        NanoTime nanoTime = getNanoTime(timestamp, false);
+        org.apache.hadoop.hive.common.type.Timestamp timestamp =
+                org.apache.hadoop.hive.common.type.Timestamp.valueOf(timestampString);
+        ZoneId zoneId = ZoneId.systemDefault();
+        NanoTime nanoTime = getNanoTime(timestamp, zoneId, false);
         ByteBuffer buffer = ByteBuffer.wrap(nanoTime.toBinary().getBytes());
-        long decodedTimestampMillis = getTimestampMillis(fromConstantByteBuffer(buffer));
-        assertEquals(decodedTimestampMillis, timestamp.getTime());
+        long decodedTimestampMillis = getTimestampMillis(fromConstantByteBuffer(buffer)) * 100000;
+        assertEquals(decodedTimestampMillis, timestamp.getNanos());
     }
 }

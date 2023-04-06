@@ -27,7 +27,7 @@
 
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
+            <artifactId>hive-apache-ibm</artifactId>
         </dependency>
 
         <dependency>
@@ -122,8 +122,8 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.4</version>
-            <scope>test</scope>
+            <version>3.12.0</version>
+            <scope>compile</scope>
         </dependency>
 
         <dependency>
@@ -213,11 +213,21 @@
                     <ignoredResourcePatterns>
                         <ignoredResourcePattern>parquet.thrift</ignoredResourcePattern>
                         <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                        <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                        <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
                     </ignoredResourcePatterns>
                     <ignoredClassPatterns>
                         <ignoredClassPattern>shaded.parquet.it.unimi.dsi.fastutil.*</ignoredClassPattern>
                         <ignoredClassPattern>module-info</ignoredClassPattern>
                         <ignoredClassPattern>com.facebook.presto.parquet.batchreader.*BatchReader</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
                     </ignoredClassPatterns>
                 </configuration>
             </plugin>
