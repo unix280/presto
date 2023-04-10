@@ -92,7 +92,7 @@
         <!-- for testing -->
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
+            <artifactId>hive-apache-ibm</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -182,6 +182,31 @@
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.basepom.maven</groupId>
+                    <artifactId>duplicate-finder-maven-plugin</artifactId>
+                    <configuration>
+                        <ignoredResourcePatterns>
+                            <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                            <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                            <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
+                        </ignoredResourcePatterns>
+                        <ignoredClassPatterns>
+                            <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                            <ignoredClassPattern>module-info</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                            <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                        </ignoredClassPatterns>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

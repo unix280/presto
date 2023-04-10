@@ -177,7 +177,8 @@ public class ThriftHiveMetastoreClient
     public List<ColumnStatisticsObj> getTableColumnStatistics(String databaseName, String tableName, List<String> columnNames)
             throws TException
     {
-        TableStatsRequest tableStatsRequest = new TableStatsRequest(databaseName, tableName, columnNames);
+        String engine = "presto";
+        TableStatsRequest tableStatsRequest = new TableStatsRequest(databaseName, tableName, columnNames, engine);
         return client.get_table_statistics_req(tableStatsRequest).getTableStats();
     }
 
@@ -194,14 +195,14 @@ public class ThriftHiveMetastoreClient
     public void deleteTableColumnStatistics(String databaseName, String tableName, String columnName)
             throws TException
     {
-        client.delete_table_column_statistics(databaseName, tableName, columnName);
+        client.delete_table_column_statistics(databaseName, tableName, columnName, "presto");
     }
 
     @Override
     public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(String databaseName, String tableName, List<String> partitionNames, List<String> columnNames)
             throws TException
     {
-        PartitionsStatsRequest partitionsStatsRequest = new PartitionsStatsRequest(databaseName, tableName, columnNames, partitionNames);
+        PartitionsStatsRequest partitionsStatsRequest = new PartitionsStatsRequest(databaseName, tableName, columnNames, partitionNames, "presto");
         return client.get_partitions_statistics_req(partitionsStatsRequest).getPartStats();
     }
 
@@ -219,7 +220,7 @@ public class ThriftHiveMetastoreClient
     public void deletePartitionColumnStatistics(String databaseName, String tableName, String partitionName, String columnName)
             throws TException
     {
-        client.delete_partition_column_statistics(databaseName, tableName, partitionName, columnName);
+        client.delete_partition_column_statistics(databaseName, tableName, partitionName, columnName, "presto");
     }
 
     @Override

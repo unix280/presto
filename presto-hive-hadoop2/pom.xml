@@ -139,6 +139,30 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-client</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-io</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-http</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-util</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <profiles>
         <profile>
@@ -166,12 +190,51 @@
                             <ignoredResourcePatterns>
                                 <ignoredResourcePattern>parquet.thrift</ignoredResourcePattern>
                                 <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                                <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                                <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                                <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                                <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                                <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
                             </ignoredResourcePatterns>
                             <ignoredClassPatterns>
                                 <ignoredClassPattern>shaded.parquet.it.unimi.dsi.fastutil.*</ignoredClassPattern>
                                 <ignoredClassPattern>module-info</ignoredClassPattern>
+                                <ignoredClassPattern>com.facebook.presto.parquet.batchreader.*BatchReader</ignoredClassPattern>
+                                <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                                <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                                <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                                <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                                <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
                             </ignoredClassPatterns>
                         </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <configuration>
+                            <ignoredUsedUndeclaredDependencies>
+                                <ignoredUsedUndeclaredDependency>com.facebook.presto.hive:hive-apache-ibm:jar:3.0.0-8</ignoredUsedUndeclaredDependency>
+                            </ignoredUsedUndeclaredDependencies>
+                            <ignoredUnusedDeclaredDependencies>
+                                <ignoredUnusedDeclaredDependency>com.google.guava:guava:jar:26.0-jre</ignoredUnusedDeclaredDependency>
+                                <ignoredUnusedDeclaredDependency>com.facebook.presto:presto-hive-metastore:jar:0.279.1-SNAPSHOT</ignoredUnusedDeclaredDependency>
+                            </ignoredUnusedDeclaredDependencies>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>default-testCompile</id>
+                                <phase>test-compile</phase>
+                                <goals>
+                                    <goal>testCompile</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>

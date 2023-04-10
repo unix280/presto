@@ -127,7 +127,7 @@ public class EncryptionTestFileBuilder
                 .withExtraMetaData(extraMeta)
                 .withValidation(true)
                 .withPageSize(pageSize)
-                .withEncryption(encryptionProperties)
+                //.withEncryption(encryptionProperties)
                 .withCompressionCodec(CompressionCodecName.valueOf(codec));
         try (ParquetWriter writer = builder.build()) {
             for (int i = 0; i < fileContent.length; i++) {
