@@ -95,8 +95,8 @@ public class TestIcebergMetadataListing
     @Test
     public void testTableListing()
     {
-        // For now, iceberg connector will show all the tables(iceberg and non-iceberg) under a schema.
-        assertQuery("SHOW TABLES FROM iceberg.test_schema", "VALUES 'iceberg_table1', 'iceberg_table2', 'hive_table'");
+        assertQuery("SHOW TABLES FROM iceberg.test_schema", "VALUES 'iceberg_table1', 'iceberg_table2'");
+        assertQuery("SHOW TABLES FROM hive.test_schema", "VALUES 'hive_table'");
     }
 
     @Test
