@@ -223,7 +223,7 @@ public class TestEncryption
         MessageType schema = createSchema();
         String[] encryptColumns = {"name"};
         String[] maskingColumn = {"name"};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(10000)
                 .withCodec("GZIP")
@@ -245,7 +245,7 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(10000)
                 .withCodec("GZIP")
@@ -268,7 +268,7 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withDataMaskingTest()
                 .withCodec("GZIP")
@@ -288,7 +288,7 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withDataMaskingTest()
                 .withCodec("GZIP")
@@ -307,7 +307,7 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withDataMaskingTest()
                 .withCodec("GZIP")
@@ -327,7 +327,7 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withDataMaskingTest()
                 .withCodec("GZIP")
@@ -347,7 +347,7 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(1)
                 .withDataMaskingTest()
@@ -367,7 +367,7 @@ public class TestEncryption
                 put("key1", "value1");
                 put("key2", "value2");
             }};
-        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+        TestFile inputFile = new TestFileBuilder(conf, schema)
                 .withEncryptColumns(encryptColumns)
                 .withNumRecord(10000)
                 .withDataMaskingTest()
@@ -402,7 +402,7 @@ public class TestEncryption
         validateFile(parquetReader, messageColumn, inputFile);
     }
 
-    private void validateMasking(EncryptionTestFile inputFile, String[] maskingColumn)
+    private void validateMasking(TestFile inputFile, String[] maskingColumn)
             throws IOException
     {
         Path path = new Path(inputFile.getFileName());
@@ -428,16 +428,23 @@ public class TestEncryption
         return Optional.empty();
     }
 
-    private static void validateFile(ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile)
+    private void validateFile(ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile)
+            throws IOException
+    {
+        String[] maskingColumn = {};
+        validateFile(parquetReader, messageColumn, inputFile, maskingColumn);
+    }
+
+    private static void validateFile(ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile, String[] maskingColumn)
             throws IOException
     {
         int rowIndex = 0;
         int batchSize = parquetReader.nextBatch();
         while (batchSize > 0) {
-            validateColumn("id", BIGINT, rowIndex, parquetReader, messageColumn, inputFile);
-            validateColumn("bal", INTEGER, rowIndex, parquetReader, messageColumn, inputFile);
-            validateColumn("name", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
-            validateColumn("gender", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
+            validateColumn("id", BIGINT, rowIndex, parquetReader, messageColumn, inputFile, maskingColumn);
+            validateColumn("bal", INTEGER, rowIndex, parquetReader, messageColumn, inputFile, maskingColumn);
+            validateColumn("name", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile, maskingColumn);
+            validateColumn("gender", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile, maskingColumn);
             rowIndex += batchSize;
             batchSize = parquetReader.nextBatch();
         }
@@ -475,7 +482,7 @@ public class TestEncryption
     }
 
     @VisibleForTesting
-    static void validateColumn(String name, Type type, int rowIndex, ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile)
+    static void validateColumn(String name, Type type, int rowIndex, ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile, String[] maskingColumn)
             throws IOException
     {
         HashSet<String> maskingColumnSet = new HashSet<>(Arrays.asList(maskingColumn));

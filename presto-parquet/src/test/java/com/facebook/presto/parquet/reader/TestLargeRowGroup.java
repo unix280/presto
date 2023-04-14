@@ -162,7 +162,7 @@ public class TestLargeRowGroup
         FSDataInputStream inputStream = fileSystem.open(path);
         long fileSize = fileSystem.getFileStatus(path).getLen();
         MockParquetDataSource dataSource = new MockParquetDataSource(new ParquetDataSourceId(path.toString()), fileSize, inputStream);
-        ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, inputFile.getFileSize(), Optional.empty()).getParquetMetadata();
+        ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, inputFile.getFileSize(), Optional.empty(), false).getParquetMetadata();
         FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
         MessageType fileSchema = fileMetaData.getSchema();
         MessageColumnIO messageColumn = getColumnIO(fileSchema, fileSchema);
@@ -177,7 +177,7 @@ public class TestLargeRowGroup
         int rowIndex = 0;
         int batchSize = parquetReader.nextBatch();
         while (batchSize > 0) {
-            validateColumn("col1", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile);
+            validateColumn("col1", VARCHAR, rowIndex, parquetReader, messageColumn, inputFile, new String[0]);
             rowIndex += batchSize;
             batchSize = parquetReader.nextBatch();
         }

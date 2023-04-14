@@ -52,6 +52,7 @@ public class TestFileBuilder
     private String[] encryptColumns = {};
     private ParquetCipher cipher = ParquetCipher.AES_GCM_V1;
     private Boolean footerEncryption = false;
+    private Boolean dataMaskingTest = false;
     private int rowGroupSize = 8 * 1024 * 1024;
     private boolean dictionaryEnabled;
     private int dictionaryPerValueRepeatCount = 10;
@@ -115,6 +116,12 @@ public class TestFileBuilder
     public TestFileBuilder withFooterEncryption()
     {
         this.footerEncryption = true;
+        return this;
+    }
+
+    public TestFileBuilder withDataMaskingTest()
+    {
+        this.dataMaskingTest = true;
         return this;
     }
 
