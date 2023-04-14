@@ -31,10 +31,8 @@ import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.spi.session.ResourceEstimates;
 import com.facebook.presto.spi.session.SessionPropertyConfigurationManager.SystemSessionPropertyConfiguration;
 import com.facebook.presto.spi.tracing.Tracer;
-import com.facebook.presto.sql.tree.Execute;
 import com.facebook.presto.transaction.TransactionId;
 import com.facebook.presto.transaction.TransactionManager;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -283,11 +281,6 @@ public final class Session
         return preparedStatements;
     }
 
-    public String getPreparedStatementFromExecute(Execute execute)
-    {
-        return getPreparedStatement(execute.getName().getValue());
-    }
-
     public String getPreparedStatement(String name)
     {
         String sql = preparedStatements.get(name);
@@ -391,7 +384,9 @@ public final class Session
                         identity.getPrincipal(),
                         roles.build(),
                         identity.getExtraCredentials(),
-                        identity.getExtraAuthenticators()),
+                        identity.getExtraAuthenticators(),
+                        identity.getSelectedUser(),
+                        identity.getReasonForSelect()),
                 source,
                 catalog,
                 schema,
@@ -560,7 +555,6 @@ public final class Session
         return new SessionBuilder(sessionPropertyManager);
     }
 
-    @VisibleForTesting
     public static SessionBuilder builder(Session session)
     {
         return new SessionBuilder(session);

@@ -81,6 +81,11 @@ int32_t SystemConfig::numIoThreads() const {
   return opt.hasValue() ? opt.value() : kNumIoThreadsDefault;
 }
 
+int32_t SystemConfig::numSpillThreads() const {
+  auto opt = optionalProperty<int32_t>(std::string(kNumSpillThreads));
+  return opt.hasValue() ? opt.value() : std::thread::hardware_concurrency();
+}
+
 int32_t SystemConfig::shutdownOnsetSec() const {
   auto opt = optionalProperty<int32_t>(std::string(kShutdownOnsetSec));
   return opt.hasValue() ? opt.value() : kShutdownOnsetSecDefault;
@@ -91,8 +96,8 @@ int32_t SystemConfig::systemMemoryGb() const {
   return opt.hasValue() ? opt.value() : kSystemMemoryGbDefault;
 }
 
-int32_t SystemConfig::asyncCacheSsdGb() const {
-  auto opt = optionalProperty<int32_t>(std::string(kAsyncCacheSsdGb));
+uint64_t SystemConfig::asyncCacheSsdGb() const {
+  auto opt = optionalProperty<uint64_t>(std::string(kAsyncCacheSsdGb));
   return opt.hasValue() ? opt.value() : kAsyncCacheSsdGbDefault;
 }
 
@@ -111,6 +116,23 @@ bool SystemConfig::enableVeloxTaskLogging() const {
       optionalProperty<bool>(std::string(kEnableVeloxTaskLogging));
   return loggingOpt.hasValue() ? loggingOpt.value()
                                : kEnableVeloxTaskLoggingDefault;
+}
+
+bool SystemConfig::enableVeloxExprSetLogging() const {
+  auto loggingOpt =
+      optionalProperty<bool>(std::string(kEnableVeloxExprSetLogging));
+  return loggingOpt.hasValue() ? loggingOpt.value()
+                               : kEnableVeloxExprSetLoggingDefault;
+}
+
+bool SystemConfig::useMmapArena() const {
+  auto opt = optionalProperty<bool>(std::string(kUseMmapArena));
+  return opt.hasValue() ? opt.value() : kUseMmapArenaDefault;
+}
+
+int32_t SystemConfig::mmapArenaCapacityRatio() const {
+  auto opt = optionalProperty<int32_t>(std::string(kMmapArenaCapacityRatio));
+  return opt.hasValue() ? opt.value() : kMmapArenaCapacityRatioDefault;
 }
 
 NodeConfig* NodeConfig::instance() {

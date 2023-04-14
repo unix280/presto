@@ -17,14 +17,12 @@ package com.facebook.presto.pinot;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.google.common.collect.ImmutableList;
-import io.airlift.units.Duration;
 
 import javax.inject.Inject;
 
 import java.util.List;
 
 import static com.facebook.presto.common.type.IntegerType.INTEGER;
-import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.spi.session.PropertyMetadata.booleanProperty;
 import static com.facebook.presto.spi.session.PropertyMetadata.integerProperty;
 import static com.facebook.presto.spi.session.PropertyMetadata.stringProperty;
@@ -32,14 +30,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 public class PinotSessionProperties
 {
-    public static final String CONNECTION_TIMEOUT = "connection_timeout";
     public static final String FORBID_BROKER_QUERIES = "forbid_broker_queries";
     public static final String ATTEMPT_BROKER_QUERIES = "attempt_broker_queries";
-    public static final String IGNORE_EMPTY_RESPONSES = "ignore_empty_responses";
     public static final String RETRY_COUNT = "retry_count";
     public static final String MARK_DATA_FETCH_EXCEPTIONS_AS_RETRIABLE = "mark_data_fetch_exceptions_as_retriable";
     public static final String USE_DATE_TRUNC = "use_date_trunc";
-    public static final String USE_PINOT_SQL_FOR_BROKER_QUERIES = "use_pinot_sql_for_broker_queries";
     public static final String NON_AGGREGATE_LIMIT_FOR_BROKER_QUERIES = "non_aggregate_limit_for_broker_queries";
     public static final String PUSHDOWN_TOPN_BROKER_QUERIES = "pushdown_topn_broker_queries";
     public static final String PUSHDOWN_PROJECT_EXPRESSIONS = "pushdown_project_expressions";
@@ -52,6 +47,7 @@ public class PinotSessionProperties
     public static final String CONTROLLER_AUTHENTICATION_PASSWORD = "controller_authentication_password";
     public static final String BROKER_AUTHENTICATION_USER = "broker_authentication_user";
     public static final String BROKER_AUTHENTICATION_PASSWORD = "broker_authentication_password";
+    public static final String QUERY_OPTIONS = "query_options";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -76,16 +72,6 @@ public class PinotSessionProperties
         return session.getProperty(ATTEMPT_BROKER_QUERIES, Boolean.class);
     }
 
-    public static Duration getConnectionTimeout(ConnectorSession session)
-    {
-        return session.getProperty(CONNECTION_TIMEOUT, Duration.class);
-    }
-
-    public static boolean isIgnoreEmptyResponses(ConnectorSession session)
-    {
-        return session.getProperty(IGNORE_EMPTY_RESPONSES, Boolean.class);
-    }
-
     public static int getPinotRetryCount(ConnectorSession session)
     {
         return session.getProperty(RETRY_COUNT, Integer.class);
@@ -99,11 +85,6 @@ public class PinotSessionProperties
     public static boolean isUseDateTruncation(ConnectorSession session)
     {
         return session.getProperty(USE_DATE_TRUNC, Boolean.class);
-    }
-
-    public static boolean isUsePinotSqlForBrokerQueries(ConnectorSession session)
-    {
-        return session.getProperty(USE_PINOT_SQL_FOR_BROKER_QUERIES, Boolean.class);
     }
 
     public static int getNonAggregateLimitForBrokerQueries(ConnectorSession session)
@@ -156,6 +137,11 @@ public class PinotSessionProperties
         return session.getProperty(BROKER_AUTHENTICATION_PASSWORD, String.class);
     }
 
+    public static String getQueryOptions(ConnectorSession session)
+    {
+        return session.getProperty(QUERY_OPTIONS, String.class);
+    }
+
     @Inject
     public PinotSessionProperties(PinotConfig pinotConfig)
     {
@@ -174,11 +160,6 @@ public class PinotSessionProperties
                         ATTEMPT_BROKER_QUERIES,
                         "Attempt broker queries",
                         pinotConfig.isAttemptBrokerQueries(),
-                        false),
-                booleanProperty(
-                        IGNORE_EMPTY_RESPONSES,
-                        "Ignore empty or missing pinot server responses",
-                        pinotConfig.isIgnoreEmptyResponses(),
                         false),
                 integerProperty(
                         RETRY_COUNT,
@@ -230,15 +211,15 @@ public class PinotSessionProperties
                         "Broker authentication password",
                         pinotConfig.getBrokerAuthenticationPassword(),
                         false),
+                stringProperty(
+                        QUERY_OPTIONS,
+                        "Query Options, in the format of k1:v1,k2:v2",
+                        pinotConfig.getQueryOptions(),
+                        false),
                 booleanProperty(
                         USE_DATE_TRUNC,
                         "Use the new UDF dateTrunc in pinot that is more presto compatible",
                         pinotConfig.isUseDateTrunc(),
-                        false),
-                booleanProperty(
-                        USE_PINOT_SQL_FOR_BROKER_QUERIES,
-                        "Use Pinot SQL syntax and endpoint for broker query",
-                        pinotConfig.isUsePinotSqlForBrokerQueries(),
                         false),
                 booleanProperty(
                         PUSHDOWN_TOPN_BROKER_QUERIES,
@@ -250,15 +231,6 @@ public class PinotSessionProperties
                         "Push down expressions in projection to Pinot broker",
                         pinotConfig.isPushdownProjectExpressions(),
                         false),
-                new PropertyMetadata<>(
-                        CONNECTION_TIMEOUT,
-                        "Connection Timeout to talk to Pinot servers",
-                        createUnboundedVarcharType(),
-                        Duration.class,
-                        pinotConfig.getConnectionTimeout(),
-                        false,
-                        value -> Duration.valueOf((String) value),
-                        Duration::toString),
                 new PropertyMetadata<>(
                         NUM_SEGMENTS_PER_SPLIT,
                         "Number of segments of the same host per split",

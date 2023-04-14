@@ -71,6 +71,7 @@ import static com.facebook.presto.sql.planner.CanonicalPartitioningScheme.getCan
 import static com.facebook.presto.sql.planner.CanonicalTableScanNode.CanonicalTableHandle.getCanonicalTableHandle;
 import static com.facebook.presto.sql.planner.RowExpressionVariableInliner.inlineVariables;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.graph.Traverser.forTree;
 import static java.lang.String.format;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
@@ -267,7 +268,14 @@ public class CanonicalPlanGenerator
             sources.sort(comparing(sourceKeys::get));
         }
 
-        List<PlanNode> newSources = sources.stream().map(source -> source.accept(this, context).get()).collect(toImmutableList());
+        ImmutableList.Builder<PlanNode> newSources = ImmutableList.builder();
+        for (PlanNode source : sources) {
+            Optional<PlanNode> newSource = source.accept(this, context);
+            if (!newSource.isPresent()) {
+                return Optional.empty();
+            }
+            newSources.add(newSource.get());
+        }
         Set<JoinNode.EquiJoinClause> newCriterias = criterias.build().stream()
                 .map(criteria -> canonicalize(criteria, context))
                 .sorted(comparing(JoinNode.EquiJoinClause::toString))
@@ -283,7 +291,7 @@ public class CanonicalPlanGenerator
 
         PlanNode result = new CanonicalJoinNode(
                 planNodeidAllocator.getNextId(),
-                newSources,
+                newSources.build(),
                 node.getType(),
                 newCriterias,
                 newFilters,
@@ -781,6 +789,8 @@ public class CanonicalPlanGenerator
     {
         private final Map<VariableReferenceExpression, VariableReferenceExpression> expressions = new HashMap<>();
         private final Map<PlanNode, CanonicalPlan> canonicalPlans = new IdentityHashMap<>();
+        private final Map<PlanNode, PlanNode> canonicalPlanToPlan = new IdentityHashMap<>();
+        private final Map<PlanNode, List<TableScanNode>> inputTables = new IdentityHashMap<>();
 
         public Map<VariableReferenceExpression, VariableReferenceExpression> getExpressions()
         {
@@ -792,6 +802,11 @@ public class CanonicalPlanGenerator
             return canonicalPlans;
         }
 
+        public Map<PlanNode, List<TableScanNode>> getInputTables()
+        {
+            return inputTables;
+        }
+
         public void mapExpression(VariableReferenceExpression from, VariableReferenceExpression to)
         {
             expressions.put(from, to);
@@ -799,7 +814,17 @@ public class CanonicalPlanGenerator
 
         public void addPlan(PlanNode plan, CanonicalPlan canonicalPlan)
         {
+            ImmutableList.Builder<TableScanNode> inputs = ImmutableList.builder();
             canonicalPlans.put(plan, canonicalPlan);
+            canonicalPlanToPlan.put(canonicalPlan.getPlan(), plan);
+            for (PlanNode node : forTree(PlanNode::getSources).depthFirstPreOrder(canonicalPlan.getPlan())) {
+                if (node instanceof CanonicalTableScanNode) {
+                    if (canonicalPlanToPlan.containsKey(node)) {
+                        inputs.add((TableScanNode) canonicalPlanToPlan.get(node));
+                    }
+                }
+            }
+            inputTables.put(plan, inputs.build());
         }
     }
 }

@@ -168,6 +168,7 @@ public class TestingPrestoServer
     private final boolean resourceManager;
     private final boolean catalogServer;
     private final boolean coordinator;
+    private final boolean nodeSchedulerIncludeCoordinator;
     private final ServerInfoResource serverInfoResource;
     private final ResourceManagerClusterStateProvider clusterStateProvider;
 
@@ -273,6 +274,7 @@ public class TestingPrestoServer
         this.preserveData = dataDirectory.isPresent();
 
         properties = new HashMap<>(properties);
+        this.nodeSchedulerIncludeCoordinator = (properties.getOrDefault("node-scheduler.include-coordinator", "true")).equals("true");
         String coordinatorPort = properties.remove("http-server.http.port");
         if (coordinatorPort == null) {
             coordinatorPort = "0";
@@ -513,6 +515,9 @@ public class TestingPrestoServer
     public ConnectorId createCatalog(String catalogName, String connectorName, Map<String, String> properties)
     {
         ConnectorId connectorId = connectorManager.createConnection(catalogName, connectorName, properties);
+        if (coordinator && !nodeSchedulerIncludeCoordinator) {
+            return connectorId;
+        }
         updateConnectorIdAnnouncement(announcer, connectorId, nodeManager);
         return connectorId;
     }
@@ -655,6 +660,11 @@ public class TestingPrestoServer
     public boolean isCoordinator()
     {
         return coordinator;
+    }
+
+    public boolean nodeSchedulerIncludeCoordinator()
+    {
+        return nodeSchedulerIncludeCoordinator;
     }
 
     public boolean isResourceManager()

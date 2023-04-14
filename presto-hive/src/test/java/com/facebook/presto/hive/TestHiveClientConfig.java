@@ -171,6 +171,7 @@ public class TestHiveClientConfig
                 .setHudiMetadataEnabled(false)
                 .setThriftProtocol(Protocol.BINARY)
                 .setThriftBufferSize(new DataSize(128, BYTE))
+                .setReadNullMaskedParquetEncryptedValue(false)
                 .setCopyOnFirstWriteConfigurationEnabled(false)
                 .setPartitionFilteringFromMetastoreEnabled(true));
     }
@@ -300,6 +301,7 @@ public class TestHiveClientConfig
                 .put("hive.hudi-metadata-enabled", "true")
                 .put("hive.internal-communication.thrift-transport-protocol", "COMPACT")
                 .put("hive.internal-communication.thrift-transport-buffer-size", "256B")
+                .put("hive.read-null-masked-parquet-encrypted-value-enabled", "true")
                 .put("hive.copy-on-first-write-configuration-enabled", "true")
                 .put("hive.partition-filtering-from-metastore-enabled", "false")
                 .build();
@@ -426,6 +428,7 @@ public class TestHiveClientConfig
                 .setUseRecordPageSourceForCustomSplit(false)
                 .setThriftProtocol(Protocol.COMPACT)
                 .setThriftBufferSize(new DataSize(256, BYTE))
+                .setReadNullMaskedParquetEncryptedValue(true)
                 .setCopyOnFirstWriteConfigurationEnabled(true)
                 .setPartitionFilteringFromMetastoreEnabled(false);
 

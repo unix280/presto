@@ -14,6 +14,7 @@
 package com.facebook.presto.execution;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.HistoryBasedPlanStatisticsCalculator;
 import com.facebook.presto.cost.StatsProvider;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.Plugin;
@@ -73,7 +74,23 @@ public class TestHistoryBasedStatsTracking
     public void setUp()
     {
         DistributedQueryRunner queryRunner = (DistributedQueryRunner) getQueryRunner();
+        ((HistoryBasedPlanStatisticsCalculator) queryRunner.getStatsCalculator()).invalidateCache();
         getHistoryProvider().clearCache();
+    }
+
+    @Test
+    public void testStrategyTracking()
+    {
+        // CBO Statistics
+        assertPlan(
+                "SELECT * FROM nation where substr(name, 1, 1) = 'A'",
+                anyTree(node(FilterNode.class, any()).withOutputRowCount(Double.NaN)));
+
+        // HBO Statistics
+        executeAndTrackHistory("SELECT *, 1 FROM nation where substr(name, 1, 1) = 'A'");
+        assertPlan(
+                "SELECT *, 2 FROM nation where substr(name, 1, 1) = 'A'",
+                anyTree(node(ProjectNode.class, anyTree(any())).withOutputRowCount(2)));
     }
 
     @Test
@@ -89,11 +106,6 @@ public class TestHistoryBasedStatsTracking
         assertPlan(
                 "SELECT * FROM nation where substr(name, 1, 1) = 'A'",
                 anyTree(node(FilterNode.class, any()).withOutputRowCount(2)));
-
-        executeAndTrackHistory("SELECT *, 1 FROM nation where substr(name, 1, 1) = 'A'");
-        assertPlan(
-                "SELECT *, 2 FROM nation where substr(name, 1, 1) = 'A'",
-                anyTree(node(ProjectNode.class, anyTree(any())).withOutputRowCount(2)));
 
         // CBO Statistics
         assertPlan(
@@ -179,11 +191,8 @@ public class TestHistoryBasedStatsTracking
 
     private void executeAndTrackHistory(String sql)
     {
-        DistributedQueryRunner queryRunner = (DistributedQueryRunner) getQueryRunner();
-        InMemoryHistoryBasedPlanStatisticsProvider provider = getHistoryProvider();
-
-        queryRunner.execute(sql);
-        provider.waitProcessQueryEvents();
+        getQueryRunner().execute(sql);
+        getHistoryProvider().waitProcessQueryEvents();
     }
 
     private InMemoryHistoryBasedPlanStatisticsProvider getHistoryProvider()

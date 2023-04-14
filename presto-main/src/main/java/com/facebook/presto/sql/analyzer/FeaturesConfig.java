@@ -219,6 +219,7 @@ public class FeaturesConfig
     private boolean queryOptimizationWithMaterializedViewEnabled;
 
     private AggregationIfToFilterRewriteStrategy aggregationIfToFilterRewriteStrategy = AggregationIfToFilterRewriteStrategy.DISABLED;
+    private AnalyzerType analyzerType = AnalyzerType.BUILTIN;
     private boolean verboseRuntimeStatsEnabled;
     private boolean hashBasedDistinctLimitEnabled;
     private int hashBasedDistinctLimitThreshold = 10000;
@@ -233,6 +234,12 @@ public class FeaturesConfig
     private double hyperloglogStandardErrorWarningThreshold = 0.004;
 
     private boolean hideUnauthorizedColumns;
+    private boolean pushRemoteExchangeThroughGroupId;
+    private boolean isOptimizeMultipleApproxPercentileOnSameFieldEnabled = true;
+    private boolean nativeExecutionEnabled;
+    private String nativeExecutionExecutablePath = "./presto_server";
+    private boolean randomizeOuterJoinNullKey;
+    private boolean isOptimizeConditionalAggregationEnabled;
 
     public enum PartitioningPrecisionStrategy
     {
@@ -315,6 +322,12 @@ public class FeaturesConfig
         FILTER_WITH_IF, // Rewrites AGG(IF(condition, expr)) to AGG(IF(condition, expr)) FILTER (WHERE condition).
         UNWRAP_IF_SAFE, // Rewrites AGG(IF(condition, expr)) to AGG(expr) FILTER (WHERE condition) if it is safe to do so.
         UNWRAP_IF // Rewrites AGG(IF(condition, expr)) to AGG(expr) FILTER (WHERE condition).
+    }
+
+    public enum AnalyzerType
+    {
+        BUILTIN,
+        NATIVE
     }
 
     public double getCpuCostWeight()
@@ -2061,6 +2074,19 @@ public class FeaturesConfig
         return this;
     }
 
+    public AnalyzerType getAnalyzerType()
+    {
+        return analyzerType;
+    }
+
+    @Config("analyzer-type")
+    @ConfigDescription("Set the analyzer type for parsing and analyzing.")
+    public FeaturesConfig setAnalyzerType(AnalyzerType analyzerType)
+    {
+        this.analyzerType = analyzerType;
+        return this;
+    }
+
     public boolean isHashBasedDistinctLimitEnabled()
     {
         return hashBasedDistinctLimitEnabled;
@@ -2175,6 +2201,83 @@ public class FeaturesConfig
     public FeaturesConfig setQuickDistinctLimitEnabled(boolean quickDistinctLimitEnabled)
     {
         this.quickDistinctLimitEnabled = quickDistinctLimitEnabled;
+        return this;
+    }
+
+    public boolean isPushRemoteExchangeThroughGroupId()
+    {
+        return pushRemoteExchangeThroughGroupId;
+    }
+
+    @Config("optimizer.push-remote-exchange-through-group-id")
+    public FeaturesConfig setPushRemoteExchangeThroughGroupId(boolean value)
+    {
+        this.pushRemoteExchangeThroughGroupId = value;
+        return this;
+    }
+
+    public boolean isOptimizeMultipleApproxPercentileOnSameFieldEnabled()
+    {
+        return isOptimizeMultipleApproxPercentileOnSameFieldEnabled;
+    }
+
+    @Config("optimizer.optimize-multiple-approx-percentile-on-same-field")
+    @ConfigDescription("Enable combining individual approx_percentile calls on the same individual field to evaluation on an array")
+    public FeaturesConfig setOptimizeMultipleApproxPercentileOnSameFieldEnabled(boolean isOptimizeMultipleApproxPercentileOnSameFieldEnabled)
+    {
+        this.isOptimizeMultipleApproxPercentileOnSameFieldEnabled = isOptimizeMultipleApproxPercentileOnSameFieldEnabled;
+        return this;
+    }
+
+    @Config("native-execution-enabled")
+    @ConfigDescription("Enable execution on native engine")
+    public FeaturesConfig setNativeExecutionEnabled(boolean nativeExecutionEnabled)
+    {
+        this.nativeExecutionEnabled = nativeExecutionEnabled;
+        return this;
+    }
+
+    public boolean isNativeExecutionEnabled()
+    {
+        return this.nativeExecutionEnabled;
+    }
+
+    @Config("native-execution-executable-path")
+    @ConfigDescription("Native execution executable file path")
+    public FeaturesConfig setNativeExecutionExecutablePath(String nativeExecutionExecutablePath)
+    {
+        this.nativeExecutionExecutablePath = nativeExecutionExecutablePath;
+        return this;
+    }
+
+    public String getNativeExecutionExecutablePath()
+    {
+        return this.nativeExecutionExecutablePath;
+    }
+
+    public boolean isRandomizeOuterJoinNullKeyEnabled()
+    {
+        return randomizeOuterJoinNullKey;
+    }
+
+    @Config("optimizer.randomize-outer-join-null-key")
+    @ConfigDescription("Randomize null join key for outer join")
+    public FeaturesConfig setRandomizeOuterJoinNullKeyEnabled(boolean randomizeOuterJoinNullKey)
+    {
+        this.randomizeOuterJoinNullKey = randomizeOuterJoinNullKey;
+        return this;
+    }
+
+    public boolean isOptimizeConditionalAggregationEnabled()
+    {
+        return isOptimizeConditionalAggregationEnabled;
+    }
+
+    @Config("optimizer.optimize-conditional-aggregation-enabled")
+    @ConfigDescription("Enable rewriting IF(condition, AGG(x)) to AGG(x) with condition included in mask")
+    public FeaturesConfig setOptimizeConditionalAggregationEnabled(boolean isOptimizeConditionalAggregationEnabled)
+    {
+        this.isOptimizeConditionalAggregationEnabled = isOptimizeConditionalAggregationEnabled;
         return this;
     }
 }

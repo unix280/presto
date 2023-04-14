@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +45,7 @@ import static com.facebook.presto.common.type.Decimals.isShortDecimal;
 import static com.facebook.presto.common.type.DoubleType.DOUBLE;
 import static com.facebook.presto.common.type.IntegerType.INTEGER;
 import static com.facebook.presto.common.type.RealType.REAL;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.HIVE_DEFAULT_DYNAMIC_PARTITION;
 import static com.facebook.presto.hudi.HudiErrorCode.HUDI_CURSOR_ERROR;
 import static com.facebook.presto.hudi.HudiErrorCode.HUDI_INVALID_PARTITION_VALUE;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -190,9 +193,9 @@ public class HudiPageSource
         }
     }
 
-    private static Object deserializePartitionValue(Type type, String valueString, String name, TimeZoneKey timeZoneKey)
+    static Object deserializePartitionValue(Type type, String valueString, String name, TimeZoneKey timeZoneKey)
     {
-        if (valueString == null) {
+        if (valueString == null || HIVE_DEFAULT_DYNAMIC_PARTITION.equals(valueString)) {
             return null;
         }
 
@@ -219,7 +222,7 @@ public class HudiPageSource
                 return parseDouble(valueString);
             }
             if (type.equals(DATE)) {
-                return parseLong(valueString);
+                return LocalDate.parse(valueString, DateTimeFormatter.ISO_LOCAL_DATE).toEpochDay();
             }
             if (type instanceof VarcharType) {
                 return utf8Slice(valueString);
@@ -246,6 +249,6 @@ public class HudiPageSource
                     name));
         }
         // Hudi tables don't partition by non-primitive-type columns.
-        throw new PrestoException(NOT_SUPPORTED, "Invalid partition type " + type.toString());
+        throw new PrestoException(NOT_SUPPORTED, "Invalid partition type " + type);
     }
 }

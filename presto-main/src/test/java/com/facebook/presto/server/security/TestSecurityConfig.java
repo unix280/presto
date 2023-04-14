@@ -30,7 +30,8 @@ public class TestSecurityConfig
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(SecurityConfig.class)
                 .setEnableForwardingHttps(true)
-                .setAuthenticationTypes(""));
+                .setAuthenticationTypes("")
+                .setAuthorizedIdentitySelectionEnabled(false));
     }
 
     @Test
@@ -39,11 +40,13 @@ public class TestSecurityConfig
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("http-server.authentication.type", "KERBEROS,PASSWORD")
                 .put("http-server.authentication.allow-forwarded-https", "false")
+                .put("permissions.authorized-identity-selection-enabled", "true")
                 .build();
 
         SecurityConfig expected = new SecurityConfig()
-                .setEnableForwardingHttps(false)
                 .setAuthenticationTypes(ImmutableList.of(KERBEROS, PASSWORD));
+                .setEnableForwardingHttps(false)
+                .setAuthorizedIdentitySelectionEnabled(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

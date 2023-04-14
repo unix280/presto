@@ -12,7 +12,7 @@
 add_executable(
   presto_server_test
   PrestoExchangeSourceTest.cpp TaskManagerTest.cpp HttpServerWrapper.cpp
-  PrestoTaskIdTest.cpp AnnouncerTest.cpp QueryContextCacheTest.cpp)
+  PrestoTaskTest.cpp AnnouncerTest.cpp QueryContextCacheTest.cpp)
 
 add_test(presto_server_test presto_server_test)
 
@@ -21,9 +21,10 @@ target_link_libraries(
   presto_server_lib
   $<TARGET_OBJECTS:presto_type_converter>
   $<TARGET_OBJECTS:presto_types>
-  velox_exec_test_util
+  velox_exec_test_lib
   velox_dwio_common_test_utils
   velox_hive_connector
+  velox_tpch_connector
   velox_presto_serializer
   velox_functions_prestosql
   velox_aggregates

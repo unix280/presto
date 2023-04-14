@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.session;
 
-import com.facebook.presto.spi.resourceGroups.QueryType;
+import com.facebook.presto.common.resourceGroups.QueryType;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
 import com.facebook.presto.spi.session.SessionConfigurationContext;
 import com.google.common.collect.ImmutableList;

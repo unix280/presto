@@ -170,13 +170,22 @@ public class HiveExternalWorkerQueryRunner
                         if (cacheMaxSize > 0) {
                             Files.write(catalogDirectoryPath.resolve("hive.properties"),
                                     format("connector.name=hive%n" +
-                                            "cache.enabled=true%n" +
-                                            "cache.max-cache-size=%s", cacheMaxSize).getBytes());
+                                           "cache.enabled=true%n" +
+                                           "cache.max-cache-size=%s", cacheMaxSize).getBytes());
                         }
                         else {
                             Files.write(catalogDirectoryPath.resolve("hive.properties"),
                                     format("connector.name=hive").getBytes());
                         }
+                        // Add a hive catalog with caching always enabled.
+                        Files.write(catalogDirectoryPath.resolve("hivecached.properties"),
+                                format("connector.name=hive%n" +
+                                        "cache.enabled=true%n" +
+                                        "cache.max-cache-size=32").getBytes());
+
+                        // Add a tpch catalog.
+                        Files.write(catalogDirectoryPath.resolve("tpchstandard.properties"),
+                                format("connector.name=tpch%n").getBytes());
 
                         // Disable stack trace capturing as some queries (using TRY) generate a lot of exceptions.
                         return new ProcessBuilder(prestoServerPath, "--logtostderr=1", "--v=1")

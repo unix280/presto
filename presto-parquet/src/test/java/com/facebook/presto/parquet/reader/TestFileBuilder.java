@@ -129,7 +129,7 @@ public class TestFileBuilder
     {
         String fileName = createTempFile("test");
         SimpleGroup[] fileContent = createFileContent(schema);
-        FileEncryptionProperties encryptionProperties = EncryptDecryptUtil.getFileEncryptionProperties(Arrays.asList(encryptColumns), cipher, footerEncryption);
+        FileEncryptionProperties encryptionProperties = EncryptDecryptUtil.getFileEncryptionProperties(Arrays.asList(encryptColumns), cipher, footerEncryption, dataMaskingTest);
         ExampleParquetWriter.Builder builder = ExampleParquetWriter.builder(new Path(fileName))
                 .withConf(conf)
                 .withWriterVersion(writerVersion)

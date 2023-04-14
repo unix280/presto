@@ -13,21 +13,23 @@
  */
 package com.facebook.presto;
 
+import com.facebook.presto.common.WarningHandlingLevel;
 import com.facebook.presto.execution.QueryManagerConfig;
 import com.facebook.presto.execution.QueryManagerConfig.ExchangeMaterializationStrategy;
 import com.facebook.presto.execution.TaskManagerConfig;
 import com.facebook.presto.execution.scheduler.NodeSchedulerConfig;
 import com.facebook.presto.execution.scheduler.NodeSchedulerConfig.ResourceAwareSchedulingStrategy;
 import com.facebook.presto.execution.warnings.WarningCollectorConfig;
-import com.facebook.presto.execution.warnings.WarningHandlingLevel;
 import com.facebook.presto.memory.MemoryManagerConfig;
 import com.facebook.presto.memory.NodeMemoryConfig;
+import com.facebook.presto.server.security.SecurityConfig;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spiller.NodeSpillConfig;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.AggregationIfToFilterRewriteStrategy;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.AggregationPartitioningMergingStrategy;
+import com.facebook.presto.sql.analyzer.FeaturesConfig.AnalyzerType;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.PartialAggregationStrategy;
@@ -236,15 +238,23 @@ public final class SystemSessionProperties
     public static final String TRACK_HISTORY_BASED_PLAN_STATISTICS = "track_history_based_plan_statistics";
     public static final String MAX_LEAF_NODES_IN_PLAN = "max_leaf_nodes_in_plan";
     public static final String LEAF_NODE_LIMIT_ENABLED = "leaf_node_limit_enabled";
-
-    //TODO: Prestissimo related session properties that are temporarily put here. They will be relocated in the future
-    public static final String PRESTISSIMO_SIMPLIFIED_EXPRESSION_EVALUATION_ENABLED = "simplified_expression_evaluation_enabled";
+    public static final String PUSH_REMOTE_EXCHANGE_THROUGH_GROUP_ID = "push_remote_exchange_through_group_id";
+    public static final String OPTIMIZE_MULTIPLE_APPROX_PERCENTILE_ON_SAME_FIELD = "optimize_multiple_approx_percentile_on_same_field";
+    public static final String RANDOMIZE_OUTER_JOIN_NULL_KEY = "randomize_outer_join_null_key";
     public static final String KEY_BASED_SAMPLING_ENABLED = "key_based_sampling_enabled";
     public static final String KEY_BASED_SAMPLING_PERCENTAGE = "key_based_sampling_percentage";
     public static final String KEY_BASED_SAMPLING_FUNCTION = "key_based_sampling_function";
     public static final String HASH_BASED_DISTINCT_LIMIT_ENABLED = "hash_based_distinct_limit_enabled";
     public static final String HASH_BASED_DISTINCT_LIMIT_THRESHOLD = "hash_based_distinct_limit_threshold";
     public static final String QUICK_DISTINCT_LIMIT_ENABLED = "quick_distinct_limit_enabled";
+    public static final String OPTIMIZE_CONDITIONAL_AGGREGATION_ENABLED = "optimize_conditional_aggregation_enabled";
+    public static final String ANALYZER_TYPE = "analyzer_type";
+
+    // TODO: Native execution related session properties that are temporarily put here. They will be relocated in the future.
+    public static final String NATIVE_SIMPLIFIED_EXPRESSION_EVALUATION_ENABLED = "simplified_expression_evaluation_enabled";
+    public static final String NATIVE_AGGREGATION_SPILL_MEMORY_THRESHOLD = "aggregation_spill_memory_threshold";
+    public static final String NATIVE_EXECUTION_ENABLED = "native_execution_enabled";
+    public static final String NATIVE_EXECUTION_EXECUTABLE_PATH = "native_execution_executable_path";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -260,7 +270,8 @@ public final class SystemSessionProperties
                 new NodeSchedulerConfig(),
                 new NodeSpillConfig(),
                 new TracingConfig(),
-                new CompilerConfig());
+                new CompilerConfig(),
+                new SecurityConfig());
     }
 
     @Inject
@@ -274,7 +285,8 @@ public final class SystemSessionProperties
             NodeSchedulerConfig nodeSchedulerConfig,
             NodeSpillConfig nodeSpillConfig,
             TracingConfig tracingConfig,
-            CompilerConfig compilerConfig)
+            CompilerConfig compilerConfig,
+            SecurityConfig securityConfig)
     {
         sessionProperties = ImmutableList.of(
                 stringProperty(
@@ -1260,11 +1272,6 @@ public final class SystemSessionProperties
                         false,
                         value -> AggregationIfToFilterRewriteStrategy.valueOf(((String) value).toUpperCase()),
                         AggregationIfToFilterRewriteStrategy::name),
-                booleanProperty(
-                        PRESTISSIMO_SIMPLIFIED_EXPRESSION_EVALUATION_ENABLED,
-                        "Enable simplified path in expression evaluation",
-                        false,
-                        false),
                 new PropertyMetadata<>(
                         RESOURCE_AWARE_SCHEDULING_STRATEGY,
                         format("Task assignment strategy to use. Options are %s",
@@ -1277,6 +1284,18 @@ public final class SystemSessionProperties
                         false,
                         value -> ResourceAwareSchedulingStrategy.valueOf(((String) value).toUpperCase()),
                         ResourceAwareSchedulingStrategy::name),
+                new PropertyMetadata<>(
+                        ANALYZER_TYPE,
+                        format("Analyzer type to use. Options are %s",
+                                Stream.of(AnalyzerType.values())
+                                        .map(AnalyzerType::name)
+                                        .collect(joining(","))),
+                        VARCHAR,
+                        AnalyzerType.class,
+                        featuresConfig.getAnalyzerType(),
+                        true,
+                        value -> AnalyzerType.valueOf(((String) value).toUpperCase()),
+                        AnalyzerType::name),
                 booleanProperty(
                         HEAP_DUMP_ON_EXCEEDED_MEMORY_LIMIT_ENABLED,
                         "Trigger heap dump to `EXCEEDED_MEMORY_LIMIT_HEAP_DUMP_FILE_PATH` on exceeded memory limit exceptions",
@@ -1352,6 +1371,46 @@ public final class SystemSessionProperties
                         LEAF_NODE_LIMIT_ENABLED,
                         "Throw exception if the number of leaf nodes in logical plan exceeds threshold set in max_leaf_nodes_in_plan",
                         compilerConfig.getLeafNodeLimitEnabled(),
+                        false),
+                booleanProperty(
+                        PUSH_REMOTE_EXCHANGE_THROUGH_GROUP_ID,
+                        "Enable optimization rule to push remote exchange through GroupId",
+                        featuresConfig.isPushRemoteExchangeThroughGroupId(),
+                        false),
+                booleanProperty(
+                        OPTIMIZE_MULTIPLE_APPROX_PERCENTILE_ON_SAME_FIELD,
+                        "Combine individual approx_percentile calls on individual field to evaluation on an array",
+                        featuresConfig.isOptimizeMultipleApproxPercentileOnSameFieldEnabled(),
+                        false),
+                booleanProperty(
+                        NATIVE_SIMPLIFIED_EXPRESSION_EVALUATION_ENABLED,
+                        "Native Execution only. Enable simplified path in expression evaluation",
+                        false,
+                        false),
+                integerProperty(
+                        NATIVE_AGGREGATION_SPILL_MEMORY_THRESHOLD,
+                        "Native Execution only. The max memory that a final aggregation can use before spilling. If it is 0, then there is no limit",
+                        0,
+                        false),
+                booleanProperty(
+                        NATIVE_EXECUTION_ENABLED,
+                        "Enable execution on native engine",
+                        featuresConfig.isNativeExecutionEnabled(),
+                        false),
+                stringProperty(
+                        NATIVE_EXECUTION_EXECUTABLE_PATH,
+                        "The native engine executable file path for native engine execution",
+                        featuresConfig.getNativeExecutionExecutablePath(),
+                        false),
+                booleanProperty(
+                        RANDOMIZE_OUTER_JOIN_NULL_KEY,
+                        "Randomize null join key for outer join",
+                        featuresConfig.isRandomizeOuterJoinNullKeyEnabled(),
+                        false),
+                booleanProperty(
+                        OPTIMIZE_CONDITIONAL_AGGREGATION_ENABLED,
+                        "Enable rewriting IF(condition, AGG(x)) to AGG(x) with condition included in mask",
+                        featuresConfig.isOptimizeConditionalAggregationEnabled(),
                         false));
     }
 
@@ -2235,6 +2294,11 @@ public final class SystemSessionProperties
         return session.getSystemProperty(SEGMENTED_AGGREGATION_ENABLED, Boolean.class);
     }
 
+    public static boolean isCombineApproxPercentileEnabled(Session session)
+    {
+        return session.getSystemProperty(OPTIMIZE_MULTIPLE_APPROX_PERCENTILE_ON_SAME_FIELD, Boolean.class);
+    }
+
     public static AggregationIfToFilterRewriteStrategy getAggregationIfToFilterRewriteStrategy(Session session)
     {
         return session.getSystemProperty(AGGREGATION_IF_TO_FILTER_REWRITE_STRATEGY, AggregationIfToFilterRewriteStrategy.class);
@@ -2243,6 +2307,11 @@ public final class SystemSessionProperties
     public static ResourceAwareSchedulingStrategy getResourceAwareSchedulingStrategy(Session session)
     {
         return session.getSystemProperty(RESOURCE_AWARE_SCHEDULING_STRATEGY, ResourceAwareSchedulingStrategy.class);
+    }
+
+    public static AnalyzerType getAnalyzerType(Session session)
+    {
+        return session.getSystemProperty(ANALYZER_TYPE, AnalyzerType.class);
     }
 
     public static Boolean isHeapDumpOnExceededMemoryLimitEnabled(Session session)
@@ -2278,5 +2347,30 @@ public final class SystemSessionProperties
     public static boolean trackHistoryBasedPlanStatisticsEnabled(Session session)
     {
         return session.getSystemProperty(TRACK_HISTORY_BASED_PLAN_STATISTICS, Boolean.class);
+    }
+
+    public static boolean shouldPushRemoteExchangeThroughGroupId(Session session)
+    {
+        return session.getSystemProperty(PUSH_REMOTE_EXCHANGE_THROUGH_GROUP_ID, Boolean.class);
+    }
+
+    public static boolean isNativeExecutionEnabled(Session session)
+    {
+        return session.getSystemProperty(NATIVE_EXECUTION_ENABLED, Boolean.class);
+    }
+
+    public static String getNativeExecutionExecutablePath(Session session)
+    {
+        return session.getSystemProperty(NATIVE_EXECUTION_EXECUTABLE_PATH, String.class);
+    }
+
+    public static boolean randomizeOuterJoinNullKeyEnabled(Session session)
+    {
+        return session.getSystemProperty(RANDOMIZE_OUTER_JOIN_NULL_KEY, Boolean.class);
+    }
+
+    public static boolean isOptimizeConditionalAggregationEnabled(Session session)
+    {
+        return session.getSystemProperty(OPTIMIZE_CONDITIONAL_AGGREGATION_ENABLED, Boolean.class);
     }
 }

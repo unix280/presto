@@ -33,6 +33,7 @@ public class SecurityConfig
 
     private List<AuthenticationType> authenticationTypes = ImmutableList.of();
     private boolean enableForwardingHttps = true;
+    private boolean authorizedIdentitySelectionEnabled;
 
     public enum AuthenticationType
     {
@@ -82,5 +83,18 @@ public class SecurityConfig
     {
         this.enableForwardingHttps = enableForwardingHttps;
         return this;
+    }
+
+    @Config("permissions.authorized-identity-selection-enabled")
+    @ConfigDescription("Authorized identity selection enabled")
+    public SecurityConfig setAuthorizedIdentitySelectionEnabled(boolean authorizedIdentitySelectionEnabled)
+    {
+        this.authorizedIdentitySelectionEnabled = authorizedIdentitySelectionEnabled;
+        return this;
+    }
+
+    public boolean isAuthorizedIdentitySelectionEnabled()
+    {
+        return authorizedIdentitySelectionEnabled;
     }
 }

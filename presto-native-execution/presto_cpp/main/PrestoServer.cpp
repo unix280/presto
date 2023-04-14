@@ -38,7 +38,9 @@
 #include "velox/dwio/dwrf/reader/DwrfReader.h"
 #include "velox/exec/Driver.h"
 #include "velox/exec/PartitionedOutputBufferManager.h"
+#include "velox/functions/prestosql/aggregates/RegisterAggregateFunctions.h"
 #include "velox/functions/prestosql/registration/RegistrationFunctions.h"
+#include "velox/functions/prestosql/window/WindowFunctionsRegistration.h"
 #include "velox/serializers/PrestoSerializer.h"
 
 #ifdef PRESTO_ENABLE_PARQUET
@@ -144,6 +146,7 @@ void PrestoServer::run() {
   velox::filesystems::registerLocalFileSystem();
   registerOptionalHiveStorageAdapters();
   protocol::registerHiveConnectors();
+  protocol::registerTpchConnector();
 
   auto executor = std::make_shared<folly::IOThreadPoolExecutor>(
       systemConfig->numIoThreads(),
@@ -225,6 +228,8 @@ void PrestoServer::run() {
       });
 
   velox::functions::prestosql::registerAllScalarFunctions();
+  velox::aggregate::prestosql::registerAllAggregateFunctions();
+  velox::window::registerWindowFunctions();
   if (!velox::isRegisteredVectorSerde()) {
     velox::serializer::presto::PrestoVectorSerde::registerVectorSerde();
   }
@@ -249,6 +254,12 @@ void PrestoServer::run() {
   if (systemConfig->enableVeloxTaskLogging()) {
     if (auto listener = getTaskListiner()) {
       exec::registerTaskListener(listener);
+    }
+  }
+
+  if (systemConfig->enableVeloxExprSetLogging()) {
+    if (auto listener = getExprSetListener()) {
+      exec::registerExprSetListener(listener);
     }
   }
 
@@ -333,7 +344,11 @@ void PrestoServer::initializeAsyncCache() {
   }
   auto memoryBytes = memoryGb << 30;
 
-  memory::MmapAllocatorOptions options = {memoryBytes};
+  memory::MmapAllocatorOptions options;
+  options.capacity = memoryBytes;
+  options.useMmapArena = systemConfig->useMmapArena();
+  options.mmapArenaCapacityRatio = systemConfig->mmapArenaCapacityRatio();
+  
   auto allocator = std::make_shared<memory::MmapAllocator>(options);
   mappedMemory_ = std::make_shared<cache::AsyncDataCache>(
       allocator, memoryBytes, std::move(ssd));
@@ -396,6 +411,11 @@ std::shared_ptr<velox::exec::TaskListener> PrestoServer::getTaskListiner() {
   return nullptr;
 }
 
+std::shared_ptr<velox::exec::ExprSetListener>
+PrestoServer::getExprSetListener() {
+  return nullptr;
+}
+
 std::vector<std::string> PrestoServer::registerConnectors(
     const fs::path& configDirectoryPath) {
   static const std::string kPropertiesExtension = ".properties";
@@ -454,7 +474,7 @@ std::shared_ptr<velox::connector::Connector> PrestoServer::connectorWithCache(
   LOG(INFO) << "STARTUP: Using AsyncDataCache";
   return facebook::velox::connector::getConnectorFactory(connectorName)
       ->newConnector(
-          connectorName, std::move(properties), connectorIoExecutor_.get());
+          catalogName, std::move(properties), connectorIoExecutor_.get());
 }
 
 void PrestoServer::populateMemAndCPUInfo() {

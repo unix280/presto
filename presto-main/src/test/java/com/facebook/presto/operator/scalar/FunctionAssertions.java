@@ -22,6 +22,7 @@ import com.facebook.presto.common.function.SqlFunctionProperties;
 import com.facebook.presto.common.type.RowType;
 import com.facebook.presto.common.type.TimeZoneKey;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.execution.ScheduledSplit;
 import com.facebook.presto.metadata.FunctionAndTypeManager;
 import com.facebook.presto.metadata.FunctionListBuilder;
 import com.facebook.presto.metadata.Metadata;
@@ -126,22 +127,22 @@ import static com.facebook.presto.common.type.DateTimeEncoding.packDateTimeWithZ
 import static com.facebook.presto.common.type.DoubleType.DOUBLE;
 import static com.facebook.presto.common.type.IntegerType.INTEGER;
 import static com.facebook.presto.common.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
-import static com.facebook.presto.common.type.UnknownType.UNKNOWN;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
+import static com.facebook.presto.geospatial.type.GeometryType.GEOMETRY;
 import static com.facebook.presto.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.facebook.presto.sql.ExpressionUtils.rewriteIdentifiersToSymbolReferences;
-import static com.facebook.presto.sql.ParsingUtil.createParsingOptions;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.analyzeExpressions;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.getExpressionTypes;
 import static com.facebook.presto.sql.planner.iterative.rule.CanonicalizeExpressionRewriter.canonicalizeExpression;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 import static com.facebook.presto.sql.relational.SqlToRowExpressionTranslator.translate;
 import static com.facebook.presto.testing.TestingTaskContext.createTaskContext;
+import static com.facebook.presto.util.AnalyzerUtil.createParsingOptions;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static java.lang.String.format;
@@ -323,8 +324,8 @@ public final class FunctionAssertions
     public void assertInvalidFunction(String projection)
     {
         try {
-            evaluateInvalid(projection);
-            fail("Expected to fail");
+            Object value = evaluateInvalid(projection);
+            fail(format("Expected to throw but got %s", value));
         }
         catch (RuntimeException e) {
             // Expected
@@ -334,8 +335,8 @@ public final class FunctionAssertions
     public void assertInvalidFunction(String projection, StandardErrorCode errorCode, String messagePattern)
     {
         try {
-            evaluateInvalid(projection);
-            fail("Expected to throw a PrestoException with message matching " + messagePattern);
+            Object value = evaluateInvalid(projection);
+            fail("Expected to throw a PrestoException with message matching " + messagePattern + " but got " + value);
         }
         catch (PrestoException e) {
             try {
@@ -357,8 +358,8 @@ public final class FunctionAssertions
     public void assertInvalidFunction(String projection, SemanticErrorCode expectedErrorCode)
     {
         try {
-            evaluateInvalid(projection);
-            fail(format("Expected to throw %s exception", expectedErrorCode));
+            Object value = evaluateInvalid(projection);
+            fail(format("Expected to throw %s exception but got %s", expectedErrorCode, value));
         }
         catch (SemanticException e) {
             try {
@@ -374,8 +375,8 @@ public final class FunctionAssertions
     public void assertInvalidFunction(String projection, SemanticErrorCode expectedErrorCode, String message)
     {
         try {
-            evaluateInvalid(projection);
-            fail(format("Expected to throw %s exception", expectedErrorCode));
+            Object value = evaluateInvalid(projection);
+            fail(format("Expected to throw %s exception but got %s", expectedErrorCode, value));
         }
         catch (SemanticException e) {
             try {
@@ -392,8 +393,8 @@ public final class FunctionAssertions
     public void assertInvalidFunction(String projection, ErrorCodeSupplier expectedErrorCode)
     {
         try {
-            evaluateInvalid(projection);
-            fail(format("Expected to throw %s exception", expectedErrorCode.toErrorCode()));
+            Object value = evaluateInvalid(projection);
+            fail(format("Expected to throw %s exception but got %s", expectedErrorCode, value));
         }
         catch (PrestoException e) {
             try {
@@ -416,8 +417,8 @@ public final class FunctionAssertions
     public void assertNumericOverflow(String projection, String message)
     {
         try {
-            evaluateInvalid(projection);
-            fail("Expected to throw an NUMERIC_VALUE_OUT_OF_RANGE exception with message " + message);
+            Object value = evaluateInvalid(projection);
+            fail("Expected to throw an NUMERIC_VALUE_OUT_OF_RANGE exception with message " + message + " but got " + value);
         }
         catch (PrestoException e) {
             try {
@@ -434,8 +435,8 @@ public final class FunctionAssertions
     public void assertInvalidCast(String projection)
     {
         try {
-            evaluateInvalid(projection);
-            fail("Expected to throw an INVALID_CAST_ARGUMENT exception");
+            Object value = evaluateInvalid(projection);
+            fail("Expected to throw an INVALID_CAST_ARGUMENT exception but got " + value);
         }
         catch (PrestoException e) {
             try {
@@ -451,8 +452,8 @@ public final class FunctionAssertions
     public void assertInvalidCast(String projection, String message)
     {
         try {
-            evaluateInvalid(projection);
-            fail("Expected to throw an INVALID_CAST_ARGUMENT exception");
+            Object value = evaluateInvalid(projection);
+            fail("Expected to throw an INVALID_CAST_ARGUMENT exception, but got " + value);
         }
         catch (PrestoException e) {
             try {
@@ -466,10 +467,9 @@ public final class FunctionAssertions
         }
     }
 
-    private void evaluateInvalid(String projection)
+    private Object evaluateInvalid(String projection)
     {
-        // type isn't necessary as the function is not valid
-        selectSingleValue(projection, UNKNOWN, compiler);
+        return selectSingleValue(projection, GEOMETRY, compiler);
     }
 
     public void assertCachedInstanceHasBoundedRetainedSize(String projection)
@@ -662,7 +662,7 @@ public final class FunctionAssertions
     private Object selectSingleValue(SourceOperatorFactory operatorFactory, Type type, Split split, Session session)
     {
         SourceOperator operator = operatorFactory.createOperator(createDriverContext(session));
-        operator.addSplit(split);
+        operator.addSplit(new ScheduledSplit(0, operator.getSourceId(), split));
         operator.noMoreSplits();
         return selectSingleValue(operator, type);
     }
@@ -828,7 +828,7 @@ public final class FunctionAssertions
     private static boolean executeFilter(SourceOperatorFactory operatorFactory, Split split, Session session)
     {
         SourceOperator operator = operatorFactory.createOperator(createDriverContext(session));
-        operator.addSplit(split);
+        operator.addSplit(new ScheduledSplit(0, operator.getSourceId(), split));
         operator.noMoreSplits();
         return executeFilter(operator);
     }

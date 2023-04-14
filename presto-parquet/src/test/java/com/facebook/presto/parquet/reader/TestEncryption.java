@@ -47,7 +47,9 @@ import org.apache.parquet.schema.PrimitiveType;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,6 +70,7 @@ import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64;
 import static org.apache.parquet.schema.Type.Repetition.OPTIONAL;
 import static org.apache.parquet.schema.Type.Repetition.REQUIRED;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 public class TestEncryption
 {
@@ -213,6 +216,166 @@ public class TestEncryption
         decryptAndValidate(inputFile);
     }
 
+    @Test
+    public void testDataMaskingSingleColumn()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"name"};
+        String[] maskingColumn = {"name"};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withNumRecord(10000)
+                .withCodec("GZIP")
+                .withPageSize(1000)
+                .withFooterEncryption()
+                .withDataMaskingTest()
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
+    @Test
+    public void testDataMaskingMultipleColumns()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"name", "gender"};
+        String[] maskingColumn = {"name", "gender"};
+        Map<String, String> extraMetadata = new HashMap<String, String>() {{
+                put("key1", "value1");
+                put("key2", "value2");
+            }};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withNumRecord(10000)
+                .withCodec("GZIP")
+                .withExtraMeta(extraMetadata)
+                .withPageSize(1000)
+                .withFooterEncryption()
+                .withDataMaskingTest()
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
+    @Test
+    public void testDataMaskingEncryptedFooter()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"name", "gender"};
+        String[] maskingColumn = {"name", "gender"};
+        Map<String, String> extraMetadata = new HashMap<String, String>() {{
+                put("key1", "value1");
+                put("key2", "value2");
+            }};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withDataMaskingTest()
+                .withCodec("GZIP")
+                .withFooterEncryption()
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
+    @Test
+    public void testDataMaskingPlaintextFooter()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"name", "gender"};
+        String[] maskingColumn = {"name", "gender"};
+        Map<String, String> extraMetadata = new HashMap<String, String>() {{
+                put("key1", "value1");
+                put("key2", "value2");
+            }};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withDataMaskingTest()
+                .withCodec("GZIP")
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
+    @Test
+    public void testDataMaskingGcmCtr()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"name", "gender"};
+        String[] maskingColumn = {"name", "gender"};
+        Map<String, String> extraMetadata = new HashMap<String, String>() {{
+                put("key1", "value1");
+                put("key2", "value2");
+            }};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withDataMaskingTest()
+                .withCodec("GZIP")
+                .withEncrytionAlgorithm(ParquetCipher.AES_GCM_CTR_V1)
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
+    @Test
+    public void testDataMaskingLargePage()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"name", "gender"};
+        String[] maskingColumn = {"name", "gender"};
+        Map<String, String> extraMetadata = new HashMap<String, String>() {{
+                put("key1", "value1");
+                put("key2", "value2");
+            }};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withDataMaskingTest()
+                .withCodec("GZIP")
+                .withPageSize(100000)
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
+    @Test
+    public void testDataMaskingOneRecord()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"name", "gender"};
+        String[] maskingColumn = {"name", "gender"};
+        Map<String, String> extraMetadata = new HashMap<String, String>() {{
+                put("key1", "value1");
+                put("key2", "value2");
+            }};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withNumRecord(1)
+                .withDataMaskingTest()
+                .withCodec("GZIP")
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
+    @Test
+    public void testDataMaskingAllColumns()
+            throws IOException
+    {
+        MessageType schema = createSchema();
+        String[] encryptColumns = {"id", "name", "gender"};
+        String[] maskingColumn = {"id", "name", "gender"};
+        Map<String, String> extraMetadata = new HashMap<String, String>() {{
+                put("key1", "value1");
+                put("key2", "value2");
+            }};
+        EncryptionTestFile inputFile = new EncryptionTestFileBuilder(conf, schema)
+                .withEncryptColumns(encryptColumns)
+                .withNumRecord(10000)
+                .withDataMaskingTest()
+                .withCodec("GZIP")
+                .build();
+        validateMasking(inputFile, maskingColumn);
+    }
+
     private MessageType createSchema()
     {
         return new MessageType("schema",
@@ -231,12 +394,29 @@ public class TestEncryption
         long fileSize = fileSystem.getFileStatus(path).getLen();
         Optional<InternalFileDecryptor> fileDecryptor = createFileDecryptor();
         ParquetDataSource dataSource = new MockParquetDataSource(new ParquetDataSourceId(path.toString()), fileSize, inputStream);
-        ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, inputFile.getFileSize(), fileDecryptor).getParquetMetadata();
+        ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, inputFile.getFileSize(), fileDecryptor, false).getParquetMetadata();
         FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
         MessageType fileSchema = fileMetaData.getSchema();
         MessageColumnIO messageColumn = getColumnIO(fileSchema, fileSchema);
         ParquetReader parquetReader = createParquetReader(parquetMetadata, messageColumn, dataSource, fileDecryptor);
         validateFile(parquetReader, messageColumn, inputFile);
+    }
+
+    private void validateMasking(EncryptionTestFile inputFile, String[] maskingColumn)
+            throws IOException
+    {
+        Path path = new Path(inputFile.getFileName());
+        FileSystem fileSystem = path.getFileSystem(conf);
+        FSDataInputStream inputStream = fileSystem.open(path);
+        long fileSize = fileSystem.getFileStatus(path).getLen();
+        Optional<InternalFileDecryptor> fileDecryptor = createFileDecryptor();
+        ParquetDataSource dataSource = new MockParquetDataSource(new ParquetDataSourceId(path.toString()), fileSize, inputStream);
+        ParquetMetadata parquetMetadata = MetadataReader.readFooter(dataSource, inputFile.getFileSize(), fileDecryptor, true).getParquetMetadata();
+        FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
+        MessageType fileSchema = fileMetaData.getSchema();
+        MessageColumnIO messageColumn = getColumnIO(fileSchema, fileSchema);
+        ParquetReader parquetReader = createParquetReader(parquetMetadata, messageColumn, dataSource, fileDecryptor);
+        validateFile(parquetReader, messageColumn, inputFile, maskingColumn);
     }
 
     private Optional<InternalFileDecryptor> createFileDecryptor()
@@ -298,16 +478,23 @@ public class TestEncryption
     static void validateColumn(String name, Type type, int rowIndex, ParquetReader parquetReader, MessageColumnIO messageColumn, TestFile inputFile)
             throws IOException
     {
-        Block block = parquetReader.readBlock(constructField(type, lookupColumnByName(messageColumn, name)).orElse(null));
-        for (int i = 0; i < block.getPositionCount(); i++) {
-            if (type.equals(BIGINT)) {
-                assertEquals(inputFile.getFileContent()[rowIndex++].getLong(name, 0), block.getLong(i));
-            }
-            else if (type.equals(INT32)) {
-                assertEquals(inputFile.getFileContent()[rowIndex++].getInteger(name, 0), block.getInt(i));
-            }
-            else if (type.equals(VARCHAR)) {
-                assertEquals(inputFile.getFileContent()[rowIndex++].getString(name, 0), block.getSlice(i, 0, block.getSliceLength(i)).toStringUtf8());
+        HashSet<String> maskingColumnSet = new HashSet<>(Arrays.asList(maskingColumn));
+        if (maskingColumnSet.contains(name)) {
+            Field columnIO = constructField(type, lookupColumnByName(messageColumn, name)).orElse(null);
+            assertNull(columnIO);
+        }
+        else {
+            Block block = parquetReader.readBlock(constructField(type, lookupColumnByName(messageColumn, name)).orElse(null));
+            for (int i = 0; i < block.getPositionCount(); i++) {
+                if (type.equals(BIGINT)) {
+                    assertEquals(inputFile.getFileContent()[rowIndex++].getLong(name, 0), block.getLong(i));
+                }
+                else if (type.equals(INT32)) {
+                    assertEquals(inputFile.getFileContent()[rowIndex++].getInteger(name, 0), block.getInt(i));
+                }
+                else if (type.equals(VARCHAR)) {
+                    assertEquals(inputFile.getFileContent()[rowIndex++].getString(name, 0), block.getSlice(i, 0, block.getSliceLength(i)).toStringUtf8());
+                }
             }
         }
     }

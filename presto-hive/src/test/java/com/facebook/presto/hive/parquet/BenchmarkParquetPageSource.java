@@ -266,7 +266,7 @@ public class BenchmarkParquetPageSource
             PageFunctionCompiler pageFunctionCompiler = new PageFunctionCompiler(metadata, 0);
             pageProcessor = new ExpressionCompiler(metadata, pageFunctionCompiler).compilePageProcessor(testSession.getSqlFunctionProperties(), filterConjunction(), projections).get();
 
-            parquetMetadata = MetadataReader.readFooter(new FileParquetDataSource(parquetFile), parquetFile.length(), Optional.empty()).getParquetMetadata();
+            parquetMetadata = MetadataReader.readFooter(new FileParquetDataSource(parquetFile), parquetFile.length(), Optional.empty(), false).getParquetMetadata();
         }
 
         @TearDown

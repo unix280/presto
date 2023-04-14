@@ -19,6 +19,7 @@ import com.facebook.presto.spi.CatalogSchemaTableName;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.security.AccessControlContext;
+import com.facebook.presto.spi.security.AuthorizedIdentity;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.Privilege;
@@ -27,6 +28,7 @@ import com.facebook.presto.spi.security.SystemAccessControlFactory;
 import com.facebook.presto.spi.security.ViewExpression;
 
 import java.security.Principal;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -63,6 +65,12 @@ public class AllowAllSystemAccessControl
     @Override
     public void checkQueryIntegrity(Identity identity, AccessControlContext context, String query)
     {
+    }
+
+    @Override
+    public AuthorizedIdentity selectAuthorizedIdentity(Identity identity, AccessControlContext context, String userName, List<X509Certificate> certificates)
+    {
+        return new AuthorizedIdentity(userName, "", true);
     }
 
     @Override

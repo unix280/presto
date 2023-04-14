@@ -9,6 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+add_subdirectory(operators)
 add_subdirectory(types)
 add_subdirectory(http)
 add_subdirectory(common)
@@ -54,6 +55,7 @@ target_link_libraries(
   velox_dwio_common_exception
   velox_functions_lib
   velox_hive_partition_function
+  velox_window
   ${THRIFT_LIBRARY}
   ${RE2}
   ${FOLLY_WITH_DEPENDENCIES}
@@ -70,6 +72,7 @@ target_link_libraries(
   velox_functions_prestosql
   velox_aggregates
   velox_hive_connector
+  velox_tpch_connector
   velox_presto_serializer
   velox_dwio_dwrf_reader)
 

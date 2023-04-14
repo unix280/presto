@@ -74,18 +74,6 @@ void setTiming(
   cpu = protocol::Duration(timing.cpuNanos, protocol::TimeUnit::NANOSECONDS);
 }
 
-protocol::RuntimeMetric toRuntimeMetric(
-    const std::string& name,
-    const RuntimeMetric& metric) {
-  return protocol::RuntimeMetric{
-      name,
-      toPrestoRuntimeUnit(metric.unit),
-      metric.sum,
-      metric.count,
-      metric.min,
-      metric.max};
-}
-
 } // namespace
 
 PrestoTask::PrestoTask(const std::string& taskId) : id(taskId) {
@@ -330,6 +318,9 @@ protocol::TaskInfo PrestoTask::updateInfoLocked() {
       opOut.peakTotalMemoryReservation = protocol::DataSize(
           op.memoryStats.peakTotalMemoryReservation, protocol::DataUnit::BYTE);
 
+      opOut.spilledDataSize =
+          protocol::DataSize(op.spilledBytes, protocol::DataUnit::BYTE);
+
       for (const auto& stat : op.runtimeStats) {
         auto statName =
             fmt::format("{}.{}.{}", op.operatorType, op.planNodeId, stat.first);
@@ -402,6 +393,18 @@ protocol::TaskInfo PrestoTask::updateInfoLocked() {
     }
   }
   return str;
+}
+
+protocol::RuntimeMetric toRuntimeMetric(
+    const std::string& name,
+    const RuntimeMetric& metric) {
+  return protocol::RuntimeMetric{
+      name,
+      toPrestoRuntimeUnit(metric.unit),
+      metric.sum,
+      metric.count,
+      metric.max,
+      metric.min};
 }
 
 } // namespace facebook::presto
