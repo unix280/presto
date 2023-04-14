@@ -191,6 +191,8 @@ public final class QueryEventListener
                 queryCompletedEvent.getEndTime(),
                 queryCompletedEvent.getStageStatistics(),
                 queryCompletedEvent.getOperatorStatistics(),
+                queryCompletedEvent.getPlanStatisticsRead(),
+                queryCompletedEvent.getPlanStatisticsWritten(),
                 queryCompletedEvent.getExpandedQuery());
 
         try {
