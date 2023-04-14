@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.276</version>
+        <version>0.277</version>
     </parent>
 
     <artifactId>presto-pinot-toolkit</artifactId>
@@ -606,6 +606,11 @@
             <groupId>com.facebook.airlift</groupId>
             <artifactId>concurrent</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -641,6 +646,7 @@
                                     <ignoredDependency>org.apache.pinot:pinot-core-jdk8::</ignoredDependency>
                                     <ignoredDependency>com.google.protobuf:protobuf-java::</ignoredDependency>
                                     <ignoredDependency>io.grpc:::</ignoredDependency>
+                                    <ignoredDependency>commons-codec:commons-codec::</ignoredDependency>
                                 </ignoredDependencies>
                             </configuration>
                         </execution>

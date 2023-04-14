@@ -183,6 +183,8 @@ public class PrestoServer
                 injector.getInstance(OAuth2Client.class).load();
             }
 
+            startAssociatedProcesses(injector);
+
             injector.getInstance(Announcer.class).start();
 
             log.info("======== SERVER STARTED ========");
@@ -196,6 +198,10 @@ public class PrestoServer
     protected Iterable<? extends Module> getAdditionalModules()
     {
         return ImmutableList.of();
+    }
+
+    protected void startAssociatedProcesses(Injector injector)
+    {
     }
 
     private static void updateConnectorIds(Announcer announcer, CatalogManager metadata, ServerConfig serverConfig, NodeSchedulerConfig schedulerConfig)

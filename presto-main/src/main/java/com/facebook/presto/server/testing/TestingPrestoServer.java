@@ -135,7 +135,7 @@ public class TestingPrestoServer
         implements Closeable
 {
     private final Injector injector;
-    private final Path baseDataDir;
+    private final Path dataDirectory;
     private final boolean preserveData;
     private final LifeCycleManager lifeCycleManager;
     private final PluginManager pluginManager;
@@ -234,7 +234,7 @@ public class TestingPrestoServer
             URI discoveryUri,
             SqlParserOptions parserOptions,
             List<Module> additionalModules,
-            Optional<Path> baseDataDir)
+            Optional<Path> dataDirectory)
             throws Exception
     {
         this(
@@ -248,7 +248,7 @@ public class TestingPrestoServer
                 discoveryUri,
                 parserOptions,
                 additionalModules,
-                baseDataDir);
+                dataDirectory);
     }
 
     public TestingPrestoServer(
@@ -262,15 +262,15 @@ public class TestingPrestoServer
             URI discoveryUri,
             SqlParserOptions parserOptions,
             List<Module> additionalModules,
-            Optional<Path> baseDataDir)
+            Optional<Path> dataDirectory)
             throws Exception
     {
         this.resourceManager = resourceManager;
         this.catalogServer = catalogServer;
         this.coordinator = coordinator;
 
-        this.baseDataDir = baseDataDir.orElseGet(TestingPrestoServer::tempDirectory);
-        this.preserveData = baseDataDir.isPresent();
+        this.dataDirectory = dataDirectory.orElseGet(TestingPrestoServer::tempDirectory);
+        this.preserveData = dataDirectory.isPresent();
 
         properties = new HashMap<>(properties);
         String coordinatorPort = properties.remove("http-server.http.port");
@@ -470,8 +470,8 @@ public class TestingPrestoServer
             throw new RuntimeException(e);
         }
         finally {
-            if (isDirectory(baseDataDir) && !preserveData) {
-                deleteRecursively(baseDataDir, ALLOW_INSECURE);
+            if (isDirectory(dataDirectory) && !preserveData) {
+                deleteRecursively(dataDirectory, ALLOW_INSECURE);
             }
         }
     }
@@ -517,9 +517,9 @@ public class TestingPrestoServer
         return connectorId;
     }
 
-    public Path getBaseDataDir()
+    public Path getDataDirectory()
     {
-        return baseDataDir;
+        return dataDirectory;
     }
 
     public URI getBaseUrl()

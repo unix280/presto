@@ -5,7 +5,7 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>com.facebook.presto</groupId>
-        <version>0.276</version>
+        <version>0.277</version>
     </parent>
 
     <artifactId>presto-tests</artifactId>
@@ -47,6 +47,11 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-analyzer</artifactId>
         </dependency>
 
         <dependency>
@@ -319,7 +324,7 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
-        
+
     </dependencies>
 
     <build>
