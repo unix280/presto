@@ -782,6 +782,7 @@ public class HiveMetadata
     @Override
     public List<SchemaTableName> listTables(ConnectorSession session, String schemaNameOrNull)
     {
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!list table entry" + System.currentTimeMillis());
         ImmutableList.Builder<SchemaTableName> tableNames = ImmutableList.builder();
         MetastoreContext metastoreContext = getMetastoreContext(session);
         for (String schemaName : listSchemas(session, schemaNameOrNull)) {
@@ -794,6 +795,7 @@ public class HiveMetadata
                 });
             }
         }
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!list table exit" + System.currentTimeMillis());
         return tableNames.build();
     }
 
