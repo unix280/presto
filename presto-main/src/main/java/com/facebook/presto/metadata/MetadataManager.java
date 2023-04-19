@@ -529,12 +529,10 @@ public class MetadataManager
     public List<QualifiedObjectName> listTables(Session session, QualifiedTablePrefix prefix)
     {
         requireNonNull(prefix, "prefix is null");
-        System.out.println("**********************************main list table entry 1 -" + System.currentTimeMillis());
         Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, transactionManager, prefix.getCatalogName());
         Set<QualifiedObjectName> tables = new LinkedHashSet<>();
         if (catalog.isPresent()) {
             CatalogMetadata catalogMetadata = catalog.get();
-            System.out.println("**********************************main list table entry 2 -" + System.currentTimeMillis());
             for (ConnectorId connectorId : catalogMetadata.listConnectorIds()) {
                 ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
                 ConnectorSession connectorSession = session.toConnectorSession(connectorId);
@@ -543,9 +541,7 @@ public class MetadataManager
                         .filter(prefix::matches)
                         .forEach(tables::add);
             }
-            System.out.println("**********************************main list table entry 3 -" + System.currentTimeMillis());
         }
-        System.out.println("**********************************main list table entry 4 -" + System.currentTimeMillis());
         return ImmutableList.copyOf(tables);
     }
 
