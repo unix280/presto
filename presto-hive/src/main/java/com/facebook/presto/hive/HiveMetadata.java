@@ -782,20 +782,13 @@ public class HiveMetadata
     @Override
     public List<SchemaTableName> listTables(ConnectorSession session, String schemaNameOrNull)
     {
-        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!list table entry" + System.currentTimeMillis());
         ImmutableList.Builder<SchemaTableName> tableNames = ImmutableList.builder();
         MetastoreContext metastoreContext = getMetastoreContext(session);
         for (String schemaName : listSchemas(session, schemaNameOrNull)) {
             for (String tableName : metastore.getAllTables(metastoreContext, schemaName).orElse(emptyList())) {
-                //Using getTable for conversion from String to Table as no implementation of getAllTables provides it.
-                metastore.getTable(metastoreContext, schemaName, tableName).ifPresent(table -> {
-                    if (!isIcebergTable(table) && !isDeltaLakeTable(table)) {
-                        tableNames.add(new SchemaTableName(schemaName, tableName));
-                    }
-                });
+                tableNames.add(new SchemaTableName(schemaName, tableName));
             }
         }
-        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!list table exit" + System.currentTimeMillis());
         return tableNames.build();
     }
 

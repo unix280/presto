@@ -161,16 +161,13 @@ public class IcebergHiveMetadata
     @Override
     public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName)
     {
-        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!list table entry" + System.currentTimeMillis());
         MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), Optional.empty(), false, HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
-        List<SchemaTableName> mytableName = metastore
+        return metastore
                 .getAllTables(metastoreContext, schemaName.get())
                 .orElseGet(() -> metastore.getAllDatabases(metastoreContext))
                 .stream()
                 .map(table -> new SchemaTableName(schemaName.get(), table))
                 .collect(toList());
-        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!list table exit" + System.currentTimeMillis());
-        return mytableName;
     }
 
     @Override
