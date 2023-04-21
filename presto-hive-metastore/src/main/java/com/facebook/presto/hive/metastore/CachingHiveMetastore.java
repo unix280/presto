@@ -360,6 +360,13 @@ public class CachingHiveMetastore
         return get(databaseNamesCache, getCachingKey(metastoreContext, ""));
     }
 
+    @Override
+    public Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        /*TODO : check if caching can be added skipping for now*/
+        return delegate.getTablesByParameterType(metastoreContext, databaseName, tableType);
+    }
+
     private List<String> loadAllDatabases(KeyAndContext<String> key)
     {
         return delegate.getAllDatabases(key.getContext());

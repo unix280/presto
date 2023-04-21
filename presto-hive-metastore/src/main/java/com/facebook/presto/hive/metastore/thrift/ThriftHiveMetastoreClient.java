@@ -63,6 +63,7 @@ public class ThriftHiveMetastoreClient
 {
     private final TTransport transport;
     private final ThriftHiveMetastore.Client client;
+    public static final String ENGINE_NAME = "presto";
 
     public ThriftHiveMetastoreClient(TTransport transport)
     {
@@ -115,6 +116,13 @@ public class ThriftHiveMetastoreClient
             throws TException
     {
         return client.get_table_names_by_filter(databaseName, filter, (short) -1);
+    }
+
+    @Override
+    public List<String> getTablesByParameterType(String databaseName, String tableType)
+            throws TException
+    {
+        return client.get_tables_by_parametertype(databaseName, tableType, (short) -1);
     }
 
     @Override
@@ -177,8 +185,7 @@ public class ThriftHiveMetastoreClient
     public List<ColumnStatisticsObj> getTableColumnStatistics(String databaseName, String tableName, List<String> columnNames)
             throws TException
     {
-        String engine = "presto";
-        TableStatsRequest tableStatsRequest = new TableStatsRequest(databaseName, tableName, columnNames, engine);
+        TableStatsRequest tableStatsRequest = new TableStatsRequest(databaseName, tableName, columnNames, ENGINE_NAME);
         return client.get_table_statistics_req(tableStatsRequest).getTableStats();
     }
 
@@ -195,14 +202,14 @@ public class ThriftHiveMetastoreClient
     public void deleteTableColumnStatistics(String databaseName, String tableName, String columnName)
             throws TException
     {
-        client.delete_table_column_statistics(databaseName, tableName, columnName, "presto");
+        client.delete_table_column_statistics(databaseName, tableName, columnName, ENGINE_NAME);
     }
 
     @Override
     public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(String databaseName, String tableName, List<String> partitionNames, List<String> columnNames)
             throws TException
     {
-        PartitionsStatsRequest partitionsStatsRequest = new PartitionsStatsRequest(databaseName, tableName, columnNames, partitionNames, "presto");
+        PartitionsStatsRequest partitionsStatsRequest = new PartitionsStatsRequest(databaseName, tableName, columnNames, partitionNames, ENGINE_NAME);
         return client.get_partitions_statistics_req(partitionsStatsRequest).getPartStats();
     }
 
@@ -220,7 +227,7 @@ public class ThriftHiveMetastoreClient
     public void deletePartitionColumnStatistics(String databaseName, String tableName, String partitionName, String columnName)
             throws TException
     {
-        client.delete_partition_column_statistics(databaseName, tableName, partitionName, columnName, "presto");
+        client.delete_partition_column_statistics(databaseName, tableName, partitionName, columnName, ENGINE_NAME);
     }
 
     @Override

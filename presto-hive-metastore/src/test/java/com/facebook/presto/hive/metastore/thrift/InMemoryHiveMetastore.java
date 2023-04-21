@@ -295,6 +295,11 @@ public class InMemoryHiveMetastore
         return Optional.of(tables.build());
     }
 
+    public synchronized Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        throw new UnsupportedOperationException();
+    }
+
     @Override
     public synchronized Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {

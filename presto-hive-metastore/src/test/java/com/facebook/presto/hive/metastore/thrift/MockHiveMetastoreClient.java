@@ -139,6 +139,11 @@ public class MockHiveMetastoreClient
         }
         return ImmutableList.of(TEST_TABLE, TEST_TABLE_WITH_CONSTRAINTS);
     }
+    @Override
+    public List<String> getTablesByParameterType(String databaseName, String tableType)
+    {
+        throw new UnsupportedOperationException();
+    }
 
     @Override
     public Database getDatabase(String name)

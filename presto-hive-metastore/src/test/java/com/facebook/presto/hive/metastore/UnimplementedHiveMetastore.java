@@ -85,6 +85,12 @@ public class UnimplementedHiveMetastore
     }
 
     @Override
+    public Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {
         throw new UnsupportedOperationException();

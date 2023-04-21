@@ -382,6 +382,8 @@ public class HiveMetadata
     private static final String ORC_BLOOM_FILTER_FPP_KEY = "orc.bloom.filter.fpp";
 
     private static final String PRESTO_TEMPORARY_TABLE_NAME_PREFIX = "__presto_temporary_table_";
+    public static final String HIVE_TABLE_TYPE_VALUE = "hive";
+    public static final String TABLE_TYPE_NAME = "table_type";
 
     // Comma is not a reserved keyword with or without quote
     // See https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-Keywords,Non-reservedKeywordsandReservedKeywords
@@ -785,7 +787,7 @@ public class HiveMetadata
         ImmutableList.Builder<SchemaTableName> tableNames = ImmutableList.builder();
         MetastoreContext metastoreContext = getMetastoreContext(session);
         for (String schemaName : listSchemas(session, schemaNameOrNull)) {
-            for (String tableName : metastore.getAllTables(metastoreContext, schemaName).orElse(emptyList())) {
+            for (String tableName : metastore.getTablesByParameterType(metastoreContext, schemaName, HIVE_TABLE_TYPE_VALUE).orElse(emptyList())) {
                 tableNames.add(new SchemaTableName(schemaName, tableName));
             }
         }
@@ -1262,7 +1264,7 @@ public class HiveMetadata
                     checkFormatForProperty(hiveStorageFormat, HiveStorageFormat.CSV, CSV_SEPARATOR);
                     tableProperties.put(CSV_SEPARATOR_KEY, separator.toString());
                 });
-
+        tableProperties.put(TABLE_TYPE_NAME, HIVE_TABLE_TYPE_VALUE);
         // Table comment property
         tableMetadata.getComment().ifPresent(value -> tableProperties.put(TABLE_COMMENT, value));
 

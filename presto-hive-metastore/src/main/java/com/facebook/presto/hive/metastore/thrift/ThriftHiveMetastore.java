@@ -352,6 +352,40 @@ public class ThriftHiveMetastore
             throw propagate(e);
         }
     }
+    @Override
+    public Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        Callable<List<String>> getTablesByParameterType = stats.getTablesByParameterType().wrap(() ->
+                getMetastoreClientThenCall(metastoreContext, client -> client.getTablesByParameterType(databaseName, tableType)));
+
+        Callable<Void> getDatabase = stats.getGetDatabase().wrap(() -> {
+            getMetastoreClientThenCall(metastoreContext, client -> client.getDatabase(databaseName));
+            return null;
+        });
+
+        try {
+            return retry()
+                    .stopOn(NoSuchObjectException.class)
+                    .stopOnIllegalExceptions()
+                    .run("getTablesByParameterType", () -> {
+                        List<String> tables = getTablesByParameterType.call();
+                        if (tables.isEmpty()) {
+                            // Check to see if the database exists
+                            getDatabase.call();
+                        }
+                        return Optional.of(tables);
+                    });
+        }
+        catch (NoSuchObjectException e) {
+            return Optional.empty();
+        }
+        catch (TException e) {
+            throw new PrestoException(HIVE_METASTORE_ERROR, e);
+        }
+        catch (Exception e) {
+            throw propagate(e);
+        }
+    }
 
     @Override
     public Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName)
