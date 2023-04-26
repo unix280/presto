@@ -131,7 +131,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.lang.String.format;
-import static java.lang.System.currentTimeMillis;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
@@ -537,12 +536,10 @@ public class MetadataManager
             for (ConnectorId connectorId : catalogMetadata.listConnectorIds()) {
                 ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
                 ConnectorSession connectorSession = session.toConnectorSession(connectorId);
-                log.debug("Metadata manager list table entry point %s", connectorId.getCatalogName(), currentTimeMillis());
                 metadata.listTables(connectorSession, prefix.getSchemaName()).stream()
                         .map(convertFromSchemaTableName(prefix.getCatalogName()))
                         .filter(prefix::matches)
                         .forEach(tables::add);
-                log.debug("Metadata manager list table exit point %s", connectorId.getCatalogName(), currentTimeMillis());
             }
         }
         return ImmutableList.copyOf(tables);

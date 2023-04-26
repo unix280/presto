@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.thrift;
 
+import com.facebook.airlift.log.Logger;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hive.metastore.api.CheckLockRequest;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
@@ -64,6 +65,7 @@ public class ThriftHiveMetastoreClient
     private final TTransport transport;
     private final ThriftHiveMetastore.Client client;
     public static final String ENGINE_NAME = "presto";
+    private static final Logger log = Logger.get(ThriftHiveMetastoreClient.class);
 
     public ThriftHiveMetastoreClient(TTransport transport)
     {
@@ -122,7 +124,11 @@ public class ThriftHiveMetastoreClient
     public List<String> getTablesByParameterType(String databaseName, String tableType)
             throws TException
     {
-        return client.get_tables_by_parametertype(databaseName, tableType, (short) -1);
+        long startTime = System.currentTimeMillis();
+        List<String> tableNamesList = client.get_tables(databaseName, tableType);
+        long endTime = System.currentTimeMillis();
+        log.info("Metadata manager list table time taken for %d ms", (endTime - startTime));
+        return tableNamesList;
     }
 
     @Override
