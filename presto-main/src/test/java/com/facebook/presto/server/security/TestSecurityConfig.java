@@ -44,7 +44,7 @@ public class TestSecurityConfig
                 .build();
 
         SecurityConfig expected = new SecurityConfig()
-                .setAuthenticationTypes(ImmutableList.of(KERBEROS, PASSWORD));
+                .setAuthenticationTypes(ImmutableList.of(KERBEROS, PASSWORD))
                 .setEnableForwardingHttps(false)
                 .setAuthorizedIdentitySelectionEnabled(true);
 
