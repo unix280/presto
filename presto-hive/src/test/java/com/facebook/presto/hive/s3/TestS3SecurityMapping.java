@@ -237,7 +237,7 @@ public class TestS3SecurityMapping
 
             ConnectorSession connectorSession = new TestingConnectorSession(
                     new ConnectorIdentity(
-                            user, Optional.empty(), Optional.empty(), extraCredentials.build(), emptyMap()),
+                            user, Optional.empty(), Optional.empty(), extraCredentials.build(), emptyMap(), Optional.empty(), Optional.empty()),
                     new HiveSessionProperties(
                             new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig(), new CacheConfig()
                     ).getSessionProperties());

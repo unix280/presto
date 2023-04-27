@@ -516,45 +516,6 @@ public class ParquetPageSourceFactory
         return getParquetType(prestoType, messageType, useParquetColumnNames, column, tableName, path);
     }
 
-    @Override
-    public Optional<? extends ConnectorPageSource> createPageSource(
-            Configuration configuration,
-            ConnectorSession session,
-            Path path,
-            long start,
-            long length,
-            long fileSize,
-            Storage storage,
-            SchemaTableName tableName,
-            Map<String, String> tableParameters,
-            List<HiveColumnHandle> columns,
-            TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone,
-            HiveFileContext hiveFileContext,
-            Optional<EncryptionInformation> encryptionInformation)
-    {
-        if (!PARQUET_SERDE_CLASS_NAMES.contains(storage.getStorageFormat().getSerDe())) {
-            return Optional.empty();
-        }
-
-        return Optional.of(createParquetPageSource(
-                hdfsEnvironment,
-                session,
-                configuration,
-                path,
-                start,
-                length,
-                fileSize,
-                columns,
-                tableName,
-                typeManager,
-                functionResolution,
-                effectivePredicate,
-                stats,
-                hiveFileContext,
-                parquetMetadataSource));
-    }
-
     public static Optional<InternalFileDecryptor> createDecryptor(Configuration configuration, Path path)
     {
         DecryptionPropertiesFactory cryptoFactory = loadFactory(configuration);

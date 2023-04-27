@@ -14,11 +14,11 @@
 package com.facebook.presto.hive;
 
 import com.facebook.presto.cache.CacheConfig;
+import com.facebook.presto.hive.authentication.MetastoreContext;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.datasink.OutputStreamDataSinkFactory;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
 import com.facebook.presto.hive.metastore.Database;
-import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.MetastoreOperationResult;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.PartitionStatistics;
@@ -187,17 +187,17 @@ public class TestHiveCommitHandleOutput
 
         // Get the partition; the last commit output should equal to the one returned when adding the partition.
         hiveMeta = getHiveMetadata(metastore, hiveClientConfig, listeningExecutor);
+        MetastoreContext context = new MetastoreContext(
+                connectorSession.getUser(),
+                connectorSession.getQueryId(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
         Map<String, Optional<Partition>> partitions = hiveMeta.getMetastore().getPartitionsByNames(
-                new MetastoreContext(
-                        connectorSession.getUser(),
-                        connectorSession.getQueryId(),
-                        Optional.empty(),
-                        Optional.empty(),
-                        Optional.empty(),
-                        false,
-                        HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER),
-                TEST_SCHEMA,
-                TEST_TABLE,
+                context,
+                metastore.getTable(context, TEST_SCHEMA, TEST_TABLE).get(),
                 ImmutableList.of(partitionName));
         handle = hiveMeta.commit();
 
@@ -243,7 +243,6 @@ public class TestHiveCommitHandleOutput
                 true,
                 hiveClientConfig.getMaxPartitionBatchSize(),
                 hiveClientConfig.getMaxPartitionsPerScan(),
-                false,
                 10_000,
                 FUNCTION_AND_TYPE_MANAGER,
                 new HiveLocationService(hdfsEnvironment),
@@ -385,9 +384,9 @@ public class TestHiveCommitHandleOutput
         }
 
         @Override
-        public Optional<Partition> getPartition(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionValues)
+        public Optional<Partition> getPartition(MetastoreContext metastoreContext, Table table, List<String> partitionValues)
         {
-            String partitionKey = createPartitionKey(databaseName, tableName, partitionValues);
+            String partitionKey = createPartitionKey(table.getDatabaseName(), table.getTableName(), partitionValues);
             long time = lastDataCommitTimes.getOrDefault(partitionKey, 0L);
 
             Partition partition = partitions.get(partitionKey);
@@ -400,12 +399,12 @@ public class TestHiveCommitHandleOutput
         }
 
         @Override
-        public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, String databaseName, String tableName, List<String> partitionNames)
+        public Map<String, Optional<Partition>> getPartitionsByNames(MetastoreContext metastoreContext, Table table, List<String> partitionNames)
         {
             Map<String, Optional<Partition>> result = new HashMap<>();
             for (String partitionName : partitionNames) {
                 List<String> partitionValues = toPartitionValues(partitionName);
-                String partitionKey = createPartitionKey(databaseName, tableName, partitionValues);
+                String partitionKey = createPartitionKey(table.getDatabaseName(), table.getTableName(), partitionValues);
                 long time = lastDataCommitTimes.getOrDefault(partitionKey, 0L);
 
                 Partition partition = partitions.get(partitionKey);

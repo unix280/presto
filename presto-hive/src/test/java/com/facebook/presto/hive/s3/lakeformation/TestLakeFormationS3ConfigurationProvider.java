@@ -199,7 +199,7 @@ public class TestLakeFormationS3ConfigurationProvider
         {
             ConnectorSession connectorSession = new TestingConnectorSession(
                     new ConnectorIdentity(
-                            user, Optional.empty(), Optional.empty(), emptyMap(), emptyMap()),
+                            user, Optional.empty(), Optional.empty(), emptyMap(), emptyMap(), Optional.empty(), Optional.empty()),
                     new HiveSessionProperties(
                             new HiveClientConfig(), new OrcFileWriterConfig(), new ParquetFileWriterConfig(), new CacheConfig()
                     ).getSessionProperties());

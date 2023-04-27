@@ -761,7 +761,7 @@ public class SemiTransactionalHiveMetastore
         Map<String, Optional<Partition>> delegateResult = delegate.getPartitionsByNames(metastoreContext, table, partitionNamesToQuery.build());
         resultBuilder.putAll(delegateResult);
 
-        cacheLastDataCommitTimes(delegateResult, databaseName, tableName);
+        cacheLastDataCommitTimes(delegateResult, table.getDatabaseName(), table.getTableName());
 
         return resultBuilder.build();
     }

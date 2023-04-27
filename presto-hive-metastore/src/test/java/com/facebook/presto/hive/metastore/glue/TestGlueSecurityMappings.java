@@ -70,7 +70,7 @@ public class TestGlueSecurityMappings
         public MetastoreContext getMetastoreContext()
         {
             return new MetastoreContext(
-                    new ConnectorIdentity(user, Optional.empty(), Optional.empty(), Collections.emptyMap(), Collections.emptyMap()),
+                    new ConnectorIdentity(user, Optional.empty(), Optional.empty(), Collections.emptyMap(), Collections.emptyMap(), Optional.empty(), Optional.empty()),
                     PRESTO_QUERY_ID_NAME, Optional.empty(), HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
         }
     }
