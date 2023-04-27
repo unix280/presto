@@ -196,17 +196,17 @@ class RelationPlanner
         context.incrementLeafNodes(session);
         PlanNode root = new TableScanNode(getSourceLocation(node.getLocation()), idAllocator.getNextId(), handle, outputVariables, columns.build(), tableConstraints, TupleDomain.all(), TupleDomain.all());
         RelationPlan tableScan = new RelationPlan(root, scope, outputVariables);
-        tableScan = addRowFilters(node, tableScan);
-        tableScan = addColumnMasks(node, tableScan);
+        tableScan = addRowFilters(node, tableScan, context);
+        tableScan = addColumnMasks(node, tableScan, context);
         return tableScan;
     }
 
-    private RelationPlan addRowFilters(Table node, RelationPlan plan)
+    private RelationPlan addRowFilters(Table node, RelationPlan plan, SqlPlannerContext context)
     {
         PlanBuilder planBuilder = initializePlanBuilder(plan);
 
         for (Expression filter : analysis.getRowFilters(node)) {
-            planBuilder = subqueryPlanner.handleSubqueries(planBuilder, filter, filter);
+            planBuilder = subqueryPlanner.handleSubqueries(planBuilder, filter, filter, context);
 
             planBuilder = planBuilder.withNewRoot(new FilterNode(
                     getSourceLocation(node.getLocation()),
@@ -218,7 +218,7 @@ class RelationPlanner
         return new RelationPlan(planBuilder.getRoot(), plan.getScope(), plan.getFieldMappings());
     }
 
-    private RelationPlan addColumnMasks(Table table, RelationPlan plan)
+    private RelationPlan addColumnMasks(Table table, RelationPlan plan, SqlPlannerContext context)
     {
         Map<String, List<Expression>> columnMasks = analysis.getColumnMasks(table);
 
@@ -234,7 +234,7 @@ class RelationPlanner
             Field field = plan.getDescriptor().getFieldByIndex(i);
 
             for (Expression mask : columnMasks.getOrDefault(field.getName().get(), ImmutableList.of())) {
-                planBuilder = subqueryPlanner.handleSubqueries(planBuilder, mask, mask);
+                planBuilder = subqueryPlanner.handleSubqueries(planBuilder, mask, mask, context);
 
                 Map<VariableReferenceExpression, RowExpression> assignments = new LinkedHashMap<>();
                 for (VariableReferenceExpression variableReferenceExpression : root.getOutputVariables()) {
