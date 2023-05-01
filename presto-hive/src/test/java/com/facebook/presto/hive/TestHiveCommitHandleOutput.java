@@ -319,6 +319,12 @@ public class TestHiveCommitHandleOutput
         }
 
         @Override
+        public boolean isImpersonationEnabled()
+        {
+            return false;
+        }
+
+        @Override
         public void dropTable(MetastoreContext metastoreContext, String databaseName, String tableName, boolean deleteData)
         {
             String tableKey = createTableKey(databaseName, tableName);
