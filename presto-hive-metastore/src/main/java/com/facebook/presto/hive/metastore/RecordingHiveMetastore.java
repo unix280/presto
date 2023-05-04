@@ -17,6 +17,7 @@ import com.facebook.airlift.json.JsonObjectMapperProvider;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.ForRecordingHiveMetastore;
+import com.facebook.presto.hive.HiveTableHandle;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.authentication.MetastoreContext;
@@ -66,7 +67,7 @@ public class RecordingHiveMetastore
     private volatile Optional<Set<String>> allRoles = Optional.empty();
 
     private final Cache<String, Optional<Database>> databaseCache;
-    private final Cache<HiveTableName, Optional<Table>> tableCache;
+    private final Cache<HiveTableHandle, Optional<Table>> tableCache;
     private final Cache<HiveTableName, List<TableConstraint<String>>> tableConstraintsCache;
     private final Cache<String, Set<ColumnStatisticType>> supportedColumnStatisticsCache;
     private final Cache<HiveTableName, PartitionStatistics> tableStatisticsCache;
@@ -209,7 +210,13 @@ public class RecordingHiveMetastore
     @Override
     public Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
-        return loadValue(tableCache, hiveTableName(databaseName, tableName), () -> delegate.getTable(metastoreContext, databaseName, tableName));
+        return getTable(metastoreContext, new HiveTableHandle(databaseName, tableName));
+    }
+
+    @Override
+    public Optional<Table> getTable(MetastoreContext metastoreContext, HiveTableHandle hiveTableHandle)
+    {
+        return loadValue(tableCache, hiveTableHandle, () -> delegate.getTable(metastoreContext, hiveTableHandle));
     }
 
     public List<TableConstraint<String>> getTableConstraints(MetastoreContext metastoreContext, String databaseName, String tableName)
@@ -524,7 +531,7 @@ public class RecordingHiveMetastore
         private final Optional<List<String>> allDatabases;
         private final Optional<Set<String>> allRoles;
         private final List<Pair<String, Optional<Database>>> databases;
-        private final List<Pair<HiveTableName, Optional<Table>>> tables;
+        private final List<Pair<HiveTableHandle, Optional<Table>>> tables;
         private final List<Pair<HiveTableName, List<TableConstraint<String>>>> tableConstraints;
         private final List<Pair<String, Set<ColumnStatisticType>>> supportedColumnStatistics;
         private final List<Pair<HiveTableName, PartitionStatistics>> tableStatistics;
@@ -543,7 +550,7 @@ public class RecordingHiveMetastore
                 @JsonProperty("allDatabases") Optional<List<String>> allDatabases,
                 @JsonProperty("allRoles") Optional<Set<String>> allRoles,
                 @JsonProperty("databases") List<Pair<String, Optional<Database>>> databases,
-                @JsonProperty("tables") List<Pair<HiveTableName, Optional<Table>>> tables,
+                @JsonProperty("tables") List<Pair<HiveTableHandle, Optional<Table>>> tables,
                 @JsonProperty("tableConstraints") List<Pair<HiveTableName, List<TableConstraint<String>>>> tableConstraints,
                 @JsonProperty("supportedColumnStatistics") List<Pair<String, Set<ColumnStatisticType>>> supportedColumnStatistics,
                 @JsonProperty("tableStatistics") List<Pair<HiveTableName, PartitionStatistics>> tableStatistics,
@@ -594,7 +601,7 @@ public class RecordingHiveMetastore
         }
 
         @JsonProperty
-        public List<Pair<HiveTableName, Optional<Table>>> getTables()
+        public List<Pair<HiveTableHandle, Optional<Table>>> getTables()
         {
             return tables;
         }

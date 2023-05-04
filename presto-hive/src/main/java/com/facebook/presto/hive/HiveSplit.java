@@ -37,17 +37,12 @@ import java.util.Set;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY_BY_SPLIT;
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public class HiveSplit
         implements ConnectorSplit
 {
-    private final String path;
-    private final long start;
-    private final long length;
-    private final long fileSize;
-    private final long fileModifiedTime;
+    private final HiveFileSplit fileSplit;
     private final Storage storage;
     private final List<HivePartitionKey> partitionKeys;
     private final List<HostAddress> addresses;
@@ -61,23 +56,17 @@ public class HiveSplit
     private final TableToPartitionMapping tableToPartitionMapping;
     private final Optional<BucketConversion> bucketConversion;
     private final boolean s3SelectPushdownEnabled;
-    private final Optional<byte[]> extraFileInfo;
     private final CacheQuotaRequirement cacheQuotaRequirement;
     private final Optional<EncryptionInformation> encryptionInformation;
-    private final Map<String, String> customSplitInfo;
     private final Set<ColumnHandle> redundantColumnDomains;
     private final SplitWeight splitWeight;
 
     @JsonCreator
     public HiveSplit(
+            @JsonProperty("fileSplit") HiveFileSplit fileSplit,
             @JsonProperty("database") String database,
             @JsonProperty("table") String table,
             @JsonProperty("partitionName") String partitionName,
-            @JsonProperty("path") String path,
-            @JsonProperty("start") long start,
-            @JsonProperty("length") long length,
-            @JsonProperty("fileSize") long fileSize,
-            @JsonProperty("fileModifiedTime") long fileModifiedTime,
             @JsonProperty("storage") Storage storage,
             @JsonProperty("partitionKeys") List<HivePartitionKey> partitionKeys,
             @JsonProperty("addresses") List<HostAddress> addresses,
@@ -88,21 +77,15 @@ public class HiveSplit
             @JsonProperty("tableToPartitionMapping") TableToPartitionMapping tableToPartitionMapping,
             @JsonProperty("bucketConversion") Optional<BucketConversion> bucketConversion,
             @JsonProperty("s3SelectPushdownEnabled") boolean s3SelectPushdownEnabled,
-            @JsonProperty("extraFileInfo") Optional<byte[]> extraFileInfo,
             @JsonProperty("cacheQuota") CacheQuotaRequirement cacheQuotaRequirement,
             @JsonProperty("encryptionMetadata") Optional<EncryptionInformation> encryptionInformation,
-            @JsonProperty("customSplitInfo") Map<String, String> customSplitInfo,
             @JsonProperty("redundantColumnDomains") Set<ColumnHandle> redundantColumnDomains,
             @JsonProperty("splitWeight") SplitWeight splitWeight)
     {
-        checkArgument(start >= 0, "start must be positive");
-        checkArgument(length >= 0, "length must be positive");
-        checkArgument(fileSize >= 0, "fileSize must be positive");
-        checkArgument(fileModifiedTime >= 0, "modificationTime must be positive");
+        requireNonNull(fileSplit, "fileSplit is null");
         requireNonNull(database, "database is null");
         requireNonNull(table, "table is null");
         requireNonNull(partitionName, "partitionName is null");
-        requireNonNull(path, "path is null");
         requireNonNull(storage, "storage is null");
         requireNonNull(partitionKeys, "partitionKeys is null");
         requireNonNull(addresses, "addresses is null");
@@ -111,19 +94,14 @@ public class HiveSplit
         requireNonNull(nodeSelectionStrategy, "nodeSelectionStrategy is null");
         requireNonNull(tableToPartitionMapping, "tableToPartitionMapping is null");
         requireNonNull(bucketConversion, "bucketConversion is null");
-        requireNonNull(extraFileInfo, "extraFileInfo is null");
         requireNonNull(cacheQuotaRequirement, "cacheQuotaRequirement is null");
         requireNonNull(encryptionInformation, "encryptionMetadata is null");
         requireNonNull(redundantColumnDomains, "redundantColumnDomains is null");
 
+        this.fileSplit = fileSplit;
         this.database = database;
         this.table = table;
         this.partitionName = partitionName;
-        this.path = path;
-        this.start = start;
-        this.length = length;
-        this.fileSize = fileSize;
-        this.fileModifiedTime = fileModifiedTime;
         this.storage = storage;
         this.partitionKeys = ImmutableList.copyOf(partitionKeys);
         this.addresses = ImmutableList.copyOf(addresses);
@@ -134,12 +112,16 @@ public class HiveSplit
         this.tableToPartitionMapping = tableToPartitionMapping;
         this.bucketConversion = bucketConversion;
         this.s3SelectPushdownEnabled = s3SelectPushdownEnabled;
-        this.extraFileInfo = extraFileInfo;
         this.cacheQuotaRequirement = cacheQuotaRequirement;
         this.encryptionInformation = encryptionInformation;
-        this.customSplitInfo = ImmutableMap.copyOf(requireNonNull(customSplitInfo, "customSplitInfo is null"));
         this.redundantColumnDomains = ImmutableSet.copyOf(redundantColumnDomains);
         this.splitWeight = requireNonNull(splitWeight, "splitWeight is null");
+    }
+
+    @JsonProperty
+    public HiveFileSplit getFileSplit()
+    {
+        return fileSplit;
     }
 
     @JsonProperty
@@ -158,36 +140,6 @@ public class HiveSplit
     public String getPartitionName()
     {
         return partitionName;
-    }
-
-    @JsonProperty
-    public String getPath()
-    {
-        return path;
-    }
-
-    @JsonProperty
-    public long getStart()
-    {
-        return start;
-    }
-
-    @JsonProperty
-    public long getLength()
-    {
-        return length;
-    }
-
-    @JsonProperty
-    public long getFileSize()
-    {
-        return fileSize;
-    }
-
-    @JsonProperty
-    public long getFileModifiedTime()
-    {
-        return fileModifiedTime;
     }
 
     @JsonProperty
@@ -213,9 +165,9 @@ public class HiveSplit
     {
         switch (getNodeSelectionStrategy()) {
             case SOFT_AFFINITY:
-                return nodeProvider.get(path, 2);
+                return nodeProvider.get(fileSplit.getPath(), 2);
             case SOFT_AFFINITY_BY_SPLIT:
-                return nodeProvider.get(path, 2, start, fileSize);
+                return nodeProvider.get(fileSplit.getPath(), 2, fileSplit.getStart(), fileSplit.getFileSize());
             default:
                 return addresses;
         }
@@ -265,12 +217,6 @@ public class HiveSplit
     }
 
     @JsonProperty
-    public Optional<byte[]> getExtraFileInfo()
-    {
-        return extraFileInfo;
-    }
-
-    @JsonProperty
     public CacheQuotaRequirement getCacheQuotaRequirement()
     {
         return cacheQuotaRequirement;
@@ -280,12 +226,6 @@ public class HiveSplit
     public Optional<EncryptionInformation> getEncryptionInformation()
     {
         return encryptionInformation;
-    }
-
-    @JsonProperty
-    public Map<String, String> getCustomSplitInfo()
-    {
-        return customSplitInfo;
     }
 
     @JsonProperty
@@ -305,11 +245,11 @@ public class HiveSplit
     public Object getInfo()
     {
         return ImmutableMap.builder()
-                .put("path", path)
-                .put("start", start)
-                .put("length", length)
-                .put("fileSize", fileSize)
-                .put("fileModifiedTime", fileModifiedTime)
+                .put("path", fileSplit.getPath())
+                .put("start", fileSplit.getStart())
+                .put("length", fileSplit.getLength())
+                .put("fileSize", fileSplit.getFileSize())
+                .put("fileModifiedTime", fileSplit.getFileModifiedTime())
                 .put("hosts", addresses)
                 .put("database", database)
                 .put("table", table)
@@ -324,11 +264,11 @@ public class HiveSplit
     public Map<String, String> getInfoMap()
     {
         return ImmutableMap.<String, String>builder()
-                .put("path", path)
-                .put("start", Long.toString(start))
-                .put("length", Long.toString(length))
-                .put("fileSize", Long.toString(fileSize))
-                .put("fileModifiedTime", Long.toString(fileModifiedTime))
+                .put("path", fileSplit.getPath())
+                .put("start", Long.toString(fileSplit.getStart()))
+                .put("length", Long.toString(fileSplit.getLength()))
+                .put("fileSize", Long.toString(fileSplit.getFileSize()))
+                .put("fileModifiedTime", Long.toString(fileSplit.getFileModifiedTime()))
                 .put("hosts", addresses.toString())
                 .put("database", database)
                 .put("table", table)
@@ -343,26 +283,26 @@ public class HiveSplit
     public Object getSplitIdentifier()
     {
         return ImmutableMap.builder()
-                .put("path", path)
-                .put("start", start)
-                .put("length", length)
+                .put("path", fileSplit.getPath())
+                .put("start", fileSplit.getStart())
+                .put("length", fileSplit.getLength())
                 .build();
     }
 
     @Override
     public OptionalLong getSplitSizeInBytes()
     {
-        return OptionalLong.of(getLength());
+        return OptionalLong.of(fileSplit.getLength());
     }
 
     @Override
     public String toString()
     {
         return toStringHelper(this)
-                .addValue(path)
-                .addValue(start)
-                .addValue(length)
-                .addValue(fileSize)
+                .addValue(fileSplit.getPath())
+                .addValue(fileSplit.getStart())
+                .addValue(fileSplit.getLength())
+                .addValue(fileSplit.getFileSize())
                 .addValue(s3SelectPushdownEnabled)
                 .addValue(cacheQuotaRequirement)
                 .toString();

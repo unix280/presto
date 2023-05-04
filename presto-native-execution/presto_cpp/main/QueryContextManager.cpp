@@ -29,8 +29,9 @@ DEFINE_int32(
 namespace facebook::presto {
 namespace {
 static std::shared_ptr<folly::CPUThreadPoolExecutor>& executor() {
-  static auto executor =
-      std::make_shared<folly::CPUThreadPoolExecutor>(FLAGS_num_query_threads);
+  static auto executor = std::make_shared<folly::CPUThreadPoolExecutor>(
+      FLAGS_num_query_threads,
+      std::make_shared<folly::NamedThreadFactory>("Driver"));
   return executor;
 }
 
@@ -40,8 +41,7 @@ std::shared_ptr<folly::IOThreadPoolExecutor> spillExecutor() {
     return nullptr;
   }
   static auto executor = std::make_shared<folly::IOThreadPoolExecutor>(
-      numSpillThreads,
-      std::make_shared<folly::NamedThreadFactory>("SpillerExec"));
+      numSpillThreads, std::make_shared<folly::NamedThreadFactory>("Spiller"));
   return executor;
 }
 } // namespace
@@ -83,22 +83,18 @@ std::shared_ptr<core::QueryCtx> QueryContextManager::findOrCreateQueryCtx(
         {entry.first, std::make_shared<core::MemConfig>(entry.second)});
   }
 
-  int64_t maxUserMemoryPerNode =
+  const int64_t maxQueryMemoryPerNode =
       getMaxMemoryPerNode(kQueryMaxMemoryPerNode, kDefaultMaxMemoryPerNode);
-  int64_t maxSystemMemoryPerNode = kDefaultMaxMemoryPerNode;
-  int64_t maxTotalMemoryPerNode = getMaxMemoryPerNode(
-      kQueryMaxTotalMemoryPerNode, kDefaultMaxMemoryPerNode);
-
-  auto pool = memory::getProcessDefaultMemoryManager().getRoot().addScopedChild(
-      "query_root");
-  pool->setMemoryUsageTracker(velox::memory::MemoryUsageTracker::create(
-      maxUserMemoryPerNode, maxSystemMemoryPerNode, maxTotalMemoryPerNode));
+  auto pool =
+      memory::getProcessDefaultMemoryManager().getRoot().addChild("query_root");
+  pool->setMemoryUsageTracker(
+      velox::memory::MemoryUsageTracker::create(maxQueryMemoryPerNode));
 
   auto queryCtx = std::make_shared<core::QueryCtx>(
-      executor(),
+      executor().get(),
       config,
       connectorConfigs,
-      memory::MappedMemory::getInstance(),
+      memory::MemoryAllocator::getInstance(),
       std::move(pool),
       spillExecutor(),
       queryId);

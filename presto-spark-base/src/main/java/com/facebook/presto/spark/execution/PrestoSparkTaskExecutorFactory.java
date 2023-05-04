@@ -19,6 +19,7 @@ import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.stats.TestingGcMonitor;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.block.BlockEncodingManager;
+import com.facebook.presto.common.block.BlockEncodingSerde;
 import com.facebook.presto.common.io.DataOutput;
 import com.facebook.presto.event.SplitMonitor;
 import com.facebook.presto.execution.ExecutionFailureInfo;
@@ -67,6 +68,7 @@ import com.facebook.presto.spark.execution.PrestoSparkPageOutputOperator.PrestoS
 import com.facebook.presto.spark.execution.PrestoSparkRowBatch.RowTupleSupplier;
 import com.facebook.presto.spark.execution.PrestoSparkRowOutputOperator.PreDeterminedPartitionFunction;
 import com.facebook.presto.spark.execution.PrestoSparkRowOutputOperator.PrestoSparkRowOutputFactory;
+import com.facebook.presto.spark.execution.operator.NativeExecutionOperator;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.memory.MemoryPoolId;
 import com.facebook.presto.spi.page.PageDataOutput;
@@ -199,6 +201,9 @@ public class PrestoSparkTaskExecutorFactory
 
     private final AtomicBoolean memoryRevokePending = new AtomicBoolean();
     private final AtomicBoolean memoryRevokeRequestInProgress = new AtomicBoolean();
+    private final BlockEncodingSerde blockEncodingSerde;
+    private final NativeExecutionProcessFactory processFactory;
+    private final NativeExecutionTaskFactory taskFactory;
 
     @Inject
     public PrestoSparkTaskExecutorFactory(
@@ -223,7 +228,10 @@ public class PrestoSparkTaskExecutorFactory
             NodeSpillConfig nodeSpillConfig,
             TempStorageManager tempStorageManager,
             PrestoSparkBroadcastTableCacheManager prestoSparkBroadcastTableCacheManager,
-            PrestoSparkConfig prestoSparkConfig)
+            PrestoSparkConfig prestoSparkConfig,
+            BlockEncodingSerde blockEncodingSerde,
+            NativeExecutionProcessFactory processFactory,
+            NativeExecutionTaskFactory taskFactory)
     {
         this(
                 sessionPropertyManager,
@@ -251,7 +259,10 @@ public class PrestoSparkTaskExecutorFactory
                 requireNonNull(taskManagerConfig, "taskManagerConfig is null").isTaskAllocationTrackingEnabled(),
                 tempStorageManager,
                 requireNonNull(prestoSparkConfig, "prestoSparkConfig is null").getStorageBasedBroadcastJoinStorage(),
-                prestoSparkBroadcastTableCacheManager);
+                prestoSparkBroadcastTableCacheManager,
+                blockEncodingSerde,
+                processFactory,
+                taskFactory);
     }
 
     public PrestoSparkTaskExecutorFactory(
@@ -280,7 +291,10 @@ public class PrestoSparkTaskExecutorFactory
             boolean allocationTrackingEnabled,
             TempStorageManager tempStorageManager,
             String storageBasedBroadcastJoinStorage,
-            PrestoSparkBroadcastTableCacheManager prestoSparkBroadcastTableCacheManager)
+            PrestoSparkBroadcastTableCacheManager prestoSparkBroadcastTableCacheManager,
+            BlockEncodingSerde blockEncodingSerde,
+            NativeExecutionProcessFactory processFactory,
+            NativeExecutionTaskFactory taskFactory)
     {
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.blockEncodingManager = requireNonNull(blockEncodingManager, "blockEncodingManager is null");
@@ -309,6 +323,9 @@ public class PrestoSparkTaskExecutorFactory
         this.tempStorageManager = requireNonNull(tempStorageManager, "tempStorageManager is null");
         this.storageBasedBroadcastJoinStorage = requireNonNull(storageBasedBroadcastJoinStorage, "storageBasedBroadcastJoinStorage is null");
         this.prestoSparkBroadcastTableCacheManager = requireNonNull(prestoSparkBroadcastTableCacheManager, "prestoSparkBroadcastTableCacheManager is null");
+        this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
+        this.processFactory = requireNonNull(processFactory, "processFactory is null");
+        this.taskFactory = requireNonNull(taskFactory, "taskFactory is null");
     }
 
     @Override
@@ -584,7 +601,8 @@ public class PrestoSparkTaskExecutorFactory
                         prestoSparkBroadcastTableCacheManager,
                         stageId),
                 taskDescriptor.getTableWriteInfo(),
-                true);
+                true,
+                ImmutableList.of(new NativeExecutionOperator.NativeExecutionOperatorTranslator(session, fragment, blockEncodingSerde, processFactory, taskFactory)));
 
         taskStateMachine.addStateChangeListener(state -> {
             if (state.isDone()) {
@@ -1093,7 +1111,7 @@ public class PrestoSparkTaskExecutorFactory
                     PageDataOutput pageDataOutput = new PageDataOutput(page.getSerializedPage());
                     long writtenSize = pageDataOutput.size();
 
-                    if ((writeBufferSizeInBytes - bufferedBytes) < writtenSize) {
+                    if ((writeBufferSizeInBytes - bufferedBytes) < writtenSize && !bufferedPages.isEmpty()) {
                         tempDataSink.write(bufferedPages);
                         bufferedPages.clear();
                         bufferedBytes = 0;

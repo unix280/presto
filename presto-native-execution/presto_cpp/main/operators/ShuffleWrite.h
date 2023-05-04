@@ -1,6 +1,4 @@
 /*
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -25,10 +23,12 @@ class ShuffleWriteNode : public velox::core::PlanNode {
  public:
   ShuffleWriteNode(
       const velox::core::PlanNodeId& id,
-      ShuffleInterface* shuffle,
+      const std::string& shuffleName,
+      const std::string& serializedShuffleWriteInfo,
       velox::core::PlanNodePtr source)
       : velox::core::PlanNode(id),
-        shuffle_{shuffle},
+        shuffleName_{shuffleName},
+        serializedShuffleWriteInfo_(serializedShuffleWriteInfo),
         sources_{std::move(source)} {}
 
   const velox::RowTypePtr& outputType() const override {
@@ -39,8 +39,12 @@ class ShuffleWriteNode : public velox::core::PlanNode {
     return sources_;
   }
 
-  ShuffleInterface* shuffle() const {
-    return shuffle_;
+  const std::string& shuffleName() const {
+    return shuffleName_;
+  }
+
+  const std::string& serializedShuffleWriteInfo() const {
+    return serializedShuffleWriteInfo_;
   }
 
   std::string_view name() const override {
@@ -50,8 +54,8 @@ class ShuffleWriteNode : public velox::core::PlanNode {
  private:
   void addDetails(std::stringstream& stream) const override {}
 
-  ShuffleInterface* shuffle_;
-
+  const std::string shuffleName_;
+  const std::string serializedShuffleWriteInfo_;
   const std::vector<velox::core::PlanNodePtr> sources_;
 };
 

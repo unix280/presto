@@ -50,7 +50,6 @@ import java.util.Set;
 import java.util.stream.IntStream;
 
 import static com.facebook.presto.SystemSessionProperties.ENABLE_INTERMEDIATE_AGGREGATIONS;
-import static com.facebook.presto.SystemSessionProperties.HASH_BASED_DISTINCT_LIMIT_ENABLED;
 import static com.facebook.presto.SystemSessionProperties.KEY_BASED_SAMPLING_ENABLED;
 import static com.facebook.presto.SystemSessionProperties.KEY_BASED_SAMPLING_FUNCTION;
 import static com.facebook.presto.SystemSessionProperties.KEY_BASED_SAMPLING_PERCENTAGE;
@@ -979,15 +978,6 @@ public abstract class AbstractTestQueries
     }
 
     @Test
-    public void testDistinctLimitWithHashBasedDistinctLimitEnabled()
-    {
-        Session session = Session.builder(getSession())
-                .setSystemProperty(HASH_BASED_DISTINCT_LIMIT_ENABLED, "true")
-                .build();
-        testDistinctLimitInternal(session);
-    }
-
-    @Test
     public void testDistinctLimit()
     {
         testDistinctLimitInternal(getSession());
@@ -1783,6 +1773,20 @@ public abstract class AbstractTestQueries
                 "   SELECT a, row_number() OVER (PARTITION BY a) rn\n" +
                 "   FROM (VALUES (1), (1), (1), (2), (2), (3)) t (a)) t " +
                 "WHERE rn = 0");
+    }
+
+    @Test
+    public void testMinMaxN()
+    {
+        assertQuery("" +
+                "SELECT x FROM (" +
+                "SELECT min(orderkey, 3) t FROM orders" +
+                ") CROSS JOIN UNNEST(t) AS a(x)",
+                "VALUES 1, 2, 3");
+
+        assertQuery(
+                "SELECT orderkey, min(orderkey, 3) over() AS t FROM orders",
+                "SELECT orderkey, ARRAY[cast(1 as bigint), cast(2 as bigint), cast(3 as bigint)] t FROM orders");
     }
 
     @Test
@@ -4882,6 +4886,19 @@ public abstract class AbstractTestQueries
     }
 
     @Test
+    public void testGroupByWithConstants()
+    {
+        assertQuery("SELECT * FROM (SELECT regionkey, col, count(*) FROM (SELECT regionkey, 'bla' as col FROM nation) GROUP BY regionkey, col)");
+        assertQuery("select 'blah', * from (select regionkey, count(*) FROM nation GROUP BY regionkey)");
+        assertQuery("SELECT * FROM (SELECT col, count(*) FROM (SELECT 'bla' as col FROM nation) GROUP BY col)");
+        assertQuery("SELECT cnt FROM (SELECT col, count(*) as cnt FROM (SELECT 'bla' as col from nation) GROUP BY col)");
+        assertQuery("SELECT MIN(10), 1 as col1 GROUP BY 2");
+        assertQuery("SELECT col, 'bla' as const_col, count(*) FROM (SELECT 1 as col) GROUP BY 1,2");
+        assertQuery("SELECT 'bla' as const_col, count(*) FROM (SELECT 1 as col LIMIT 0) GROUP BY 1");
+        assertQuery("SELECT AVG(x) FROM (SELECT 1 AS x, orderstatus FROM orders) GROUP BY x, orderstatus");
+    }
+
+    @Test
     public void testAccessControl()
     {
         assertAccessDenied("INSERT INTO orders SELECT * FROM orders", "Cannot insert into table .*.orders.*", privilege("orders", INSERT_TABLE));
@@ -6142,7 +6159,9 @@ public abstract class AbstractTestQueries
                 "   approx_percentile(totalprice, 2, 0.5)," +
                 "   approx_percentile(totalprice, 2, 0.8)," +
                 "   approx_percentile(totalprice, 2, 0.4, 0.001)," +
-                "   approx_percentile(totalprice, 2, 0.7, 0.001)\n" +
+                "   approx_percentile(totalprice, 2, 0.7, 0.001)," +
+                "   approx_percentile(orderkey, 0.9)," +
+                "   approx_percentile(orderkey, 0.8+0.1)\n" +
                 "FROM orders\n" +
                 "GROUP BY orderstatus");
 
@@ -6158,6 +6177,8 @@ public abstract class AbstractTestQueries
             Double totalPrice08Weighted = (Double) row.getField(8);
             Double totalPrice04WeightedAccuracy = (Double) row.getField(9);
             Double totalPrice07WeightedAccuracy = (Double) row.getField(10);
+            Long orderKey09v1 = ((Number) row.getField(11)).longValue();
+            Long orderKey09v2 = ((Number) row.getField(12)).longValue();
 
             List<Long> orderKeys = Ordering.natural().sortedCopy(orderKeyByStatus.get(status));
             List<Double> totalPrices = Ordering.natural().sortedCopy(totalPriceByStatus.get(status));
@@ -6192,6 +6213,12 @@ public abstract class AbstractTestQueries
 
             assertTrue(totalPrice07WeightedAccuracy >= totalPrices.get((int) (0.69 * totalPrices.size())));
             assertTrue(totalPrice07WeightedAccuracy <= totalPrices.get((int) (0.71 * totalPrices.size())));
+
+            assertTrue(orderKey09v1 >= orderKeys.get((int) (0.89 * orderKeys.size())));
+            assertTrue(orderKey09v1 <= orderKeys.get((int) (0.91 * orderKeys.size())));
+
+            assertTrue(orderKey09v2 >= orderKeys.get((int) (0.89 * orderKeys.size())));
+            assertTrue(orderKey09v2 <= orderKeys.get((int) (0.91 * orderKeys.size())));
         }
     }
 
@@ -6222,5 +6249,11 @@ public abstract class AbstractTestQueries
         assertQuery("select m[1], m[3] from (select map_subset(map(array[1,2,3,4], array['a', 'b', 'c', 'd']), array[1,3,10]) m)", "select 'a', 'c'");
         assertQuery("select cardinality(map_subset(map(array[1,2,3,4], array['a', 'b', 'c', 'd']), array[10,20]))", "select 0");
         assertQuery("select cardinality(map_subset(map(), array[10,20]))", "select 0");
+    }
+
+    @Test
+    public void testMultiMapFromEntriesWihTransform()
+    {
+        assertQuerySucceeds("select multimap_from_entries(x) from (select zip(array[orderkey], array[array[custkey, custkey]]) x from (select 1 orderkey, 1 custkey))");
     }
 }

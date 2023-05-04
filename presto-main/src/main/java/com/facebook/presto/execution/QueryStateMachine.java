@@ -482,6 +482,7 @@ public class QueryStateMachine
                 addedSessionFunctions,
                 removedSessionFunctions,
                 Optional.ofNullable(planStatsAndCosts.get()).orElseGet(StatsAndCosts::empty),
+                session.getOptimizerInformationCollector().getOptimizationInfo(),
                 Optional.ofNullable(planCanonicalInfo.get()).orElseGet(ImmutableList::of));
     }
 
@@ -1004,6 +1005,10 @@ public class QueryStateMachine
         return queryInfo;
     }
 
+    /**
+     * Remove large objects from the query info object graph, e.g : plan, stats, stage summaries, failed attempts
+     * Used when pruning expired queries from the state machine
+     */
     public void pruneQueryInfo()
     {
         Optional<QueryInfo> finalInfo = finalQueryInfo.get();
@@ -1057,6 +1062,7 @@ public class QueryStateMachine
                 queryInfo.getAddedSessionFunctions(),
                 queryInfo.getRemovedSessionFunctions(),
                 StatsAndCosts.empty(),
+                queryInfo.getOptimizerInformation(),
                 ImmutableList.of());
         finalQueryInfo.compareAndSet(finalInfo, Optional.of(prunedQueryInfo));
     }

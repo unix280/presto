@@ -11,11 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <folly/Uri.h>
 #include "folly/init/Init.h"
+#include "presto_cpp/external/json/json.hpp"
+#include "presto_cpp/main/operators/LocalPersistentShuffle.h"
 #include "presto_cpp/main/operators/PartitionAndSerialize.h"
 #include "presto_cpp/main/operators/ShuffleWrite.h"
-#include "presto_cpp/main/operators/TestingPersistentShuffle.h"
 #include "presto_cpp/main/operators/UnsafeRowExchangeSource.h"
+#include "velox/connectors/hive/HivePartitionFunction.h"
 #include "velox/exec/Exchange.h"
 #include "velox/exec/tests/utils/OperatorTestBase.h"
 #include "velox/exec/tests/utils/PlanBuilder.h"
@@ -32,21 +35,43 @@ namespace facebook::presto::operators::test {
 
 namespace {
 
-class TestShuffle : public ShuffleInterface {
+struct TestShuffleInfo {
+  uint32_t numPartitions;
+  uint32_t maxBytesPerPartition;
+
+  static TestShuffleInfo deserializeShuffleInfo(const std::string& info) {
+    auto jsonReadInfo = nlohmann::json::parse(info);
+    TestShuffleInfo shuffleInfo;
+    jsonReadInfo.at("numPartitions").get_to(shuffleInfo.numPartitions);
+    jsonReadInfo.at("maxBytesPerPartition")
+        .get_to(shuffleInfo.maxBytesPerPartition);
+    return shuffleInfo;
+  }
+};
+
+class TestShuffleWriter : public ShuffleWriter {
  public:
-  TestShuffle(
+  TestShuffleWriter(
       memory::MemoryPool* pool,
       uint32_t numPartitions,
       uint32_t maxBytesPerPartition)
-      : pool_{pool},
-        numPartitions_{numPartitions},
-        maxBytesPerPartition_{maxBytesPerPartition},
-        inProgressSizes_(numPartitions, 0) {
+      : pool_(pool),
+        numPartitions_(numPartitions),
+        maxBytesPerPartition_(maxBytesPerPartition),
+        inProgressSizes_(numPartitions, 0),
+        readyPartitions_(
+            std::make_shared<std::vector<std::vector<BufferPtr>>>()) {
     inProgressPartitions_.resize(numPartitions_);
-    readyPartitions_.resize(numPartitions_);
+    readyPartitions_->resize(numPartitions_);
   }
 
-  void collect(int32_t partition, std::string_view data) {
+  void initialize(velox::memory::MemoryPool* pool) {
+    if (pool_ == nullptr) {
+      pool_ = pool;
+    }
+  }
+
+  void collect(int32_t partition, std::string_view data) override {
     auto& buffer = inProgressPartitions_[partition];
 
     // Check if there is enough space in the buffer.
@@ -54,13 +79,15 @@ class TestShuffle : public ShuffleInterface {
         inProgressSizes_[partition] + data.size() + sizeof(size_t) >=
             maxBytesPerPartition_) {
       buffer->setSize(inProgressSizes_[partition]);
-      readyPartitions_[partition].emplace_back(std::move(buffer));
+      (*readyPartitions_)[partition].emplace_back(std::move(buffer));
       inProgressPartitions_[partition].reset();
     }
 
     // Allocate buffer if needed.
-    if (!buffer) {
+    if (buffer == nullptr) {
       buffer = AlignedBuffer::allocate<char>(maxBytesPerPartition_, pool_);
+      assert(buffer != nullptr);
+      inProgressPartitions_[partition] = buffer;
       inProgressSizes_[partition] = 0;
     }
 
@@ -71,108 +98,226 @@ class TestShuffle : public ShuffleInterface {
     *(size_t*)(rawBuffer + offset) = data.size();
 
     offset += sizeof(size_t);
-    memcpy(rawBuffer + offset, data.data(), data.size());
+    ::memcpy(rawBuffer + offset, data.data(), data.size());
 
     inProgressSizes_[partition] += sizeof(size_t) + data.size();
   }
 
-  void noMoreData(bool success) {
+  void noMoreData(bool success) override {
     VELOX_CHECK(success, "Unexpected error")
+    // Flush in-progress buffers.
     for (auto i = 0; i < numPartitions_; ++i) {
       if (inProgressSizes_[i] > 0) {
         auto& buffer = inProgressPartitions_[i];
         buffer->setSize(inProgressSizes_[i]);
-        readyPartitions_[i].emplace_back(std::move(buffer));
+        (*readyPartitions_)[i].emplace_back(std::move(buffer));
         inProgressPartitions_[i].reset();
       }
     }
-    readyForRead_ = true;
   }
 
-  bool hasNext(int32_t partition) const {
-    return !readyPartitions_[partition].empty();
+  std::shared_ptr<std::vector<std::vector<BufferPtr>>>& readyPartitions() {
+    return readyPartitions_;
   }
 
-  BufferPtr next(int32_t partition, bool success) {
-    VELOX_CHECK(success, "Unexpected error")
-    VELOX_CHECK(!readyPartitions_[partition].empty());
-
-    auto buffer = readyPartitions_[partition].back();
-    readyPartitions_[partition].pop_back();
-    return buffer;
+  static void reset() {
+    getInstance().reset();
   }
 
-  bool readyForRead() const {
-    return readyForRead_;
+  /// Maintains a single shuffle write interface for testing purpose.
+  static std::shared_ptr<TestShuffleWriter>& getInstance() {
+    static std::shared_ptr<TestShuffleWriter> instance_;
+    return instance_;
+  }
+
+  static std::shared_ptr<TestShuffleWriter> createWriter(
+      const std::string& serializedShuffleInfo,
+      velox::memory::MemoryPool* FOLLY_NONNULL pool) {
+    std::shared_ptr<TestShuffleWriter>& instance = getInstance();
+    if (instance) {
+      return instance;
+    }
+    TestShuffleInfo writeInfo =
+        TestShuffleInfo::deserializeShuffleInfo(serializedShuffleInfo);
+    // We need only one instance for the shuffle since it's in-memory.
+    instance = std::make_shared<TestShuffleWriter>(
+        pool, writeInfo.numPartitions, writeInfo.maxBytesPerPartition);
+    return instance;
   }
 
  private:
-  memory::MemoryPool* pool_;
-  bool readyForRead_ = false;
+  memory::MemoryPool* pool_{nullptr};
   const uint32_t numPartitions_;
   const uint32_t maxBytesPerPartition_;
+
+  /// Indexed by partition number. Each element represents currently being
+  /// accumulated buffer by shuffler for a certain partition. Internal layout:
+  /// | row-size | ..row-payload.. | row-size | ..row-payload.. | ..
   std::vector<BufferPtr> inProgressPartitions_;
+
+  /// Tracks the total size of each in-progress partition in
+  /// inProgressPartitions_
   std::vector<size_t> inProgressSizes_;
-  std::vector<std::vector<BufferPtr>> readyPartitions_;
+  std::shared_ptr<std::vector<std::vector<BufferPtr>>> readyPartitions_;
 };
 
-void registerExchangeSource(ShuffleInterface* shuffle) {
+class TestShuffleReader : public ShuffleReader {
+ public:
+  TestShuffleReader(
+      const int32_t partition,
+      const std::shared_ptr<std::vector<std::vector<BufferPtr>>>&
+          readyPartitions)
+      : partition_(partition), readyPartitions_(readyPartitions) {}
+
+  bool hasNext() {
+    return !(*readyPartitions_)[partition_].empty();
+  }
+
+  BufferPtr next(bool success) {
+    VELOX_CHECK(success, "Unexpected error")
+    VELOX_CHECK(!(*readyPartitions_)[partition_].empty());
+
+    auto buffer = (*readyPartitions_)[partition_].back();
+    (*readyPartitions_)[partition_].pop_back();
+    return buffer;
+  }
+
+ private:
+  int32_t partition_;
+  const std::shared_ptr<std::vector<std::vector<BufferPtr>>>& readyPartitions_;
+};
+
+class TestShuffleFactory : public ShuffleInterfaceFactory {
+ public:
+  static constexpr std::string_view kShuffleName = "test-shuffle";
+
+  std::shared_ptr<ShuffleReader> createReader(
+      const std::string& /* serializedShuffleInfo */,
+      const int partition,
+      velox::memory::MemoryPool* FOLLY_NONNULL pool) override {
+    return std::make_shared<TestShuffleReader>(
+        partition, TestShuffleWriter::getInstance()->readyPartitions());
+  }
+
+  std::shared_ptr<ShuffleWriter> createWriter(
+      const std::string& serializedShuffleInfo,
+      velox::memory::MemoryPool* FOLLY_NONNULL pool) override {
+    return TestShuffleWriter::createWriter(serializedShuffleInfo, pool);
+  }
+};
+
+void registerExchangeSource(const std::string& shuffleName) {
+  exec::ExchangeSource::factories().clear();
   exec::ExchangeSource::registerFactory(
-      [shuffle](
+      [shuffleName](
           const std::string& taskId,
           int destination,
           std::shared_ptr<exec::ExchangeQueue> queue,
           memory::MemoryPool* FOLLY_NONNULL pool)
           -> std::unique_ptr<exec::ExchangeSource> {
-        if (strncmp(taskId.c_str(), "spark://", 8) == 0) {
-          return std::make_unique<UnsafeRowExchangeSource>(
-              taskId, destination, std::move(queue), shuffle, pool);
+        if (strncmp(taskId.c_str(), "batch://", 8) == 0) {
+          auto uri = folly::Uri(taskId);
+          for (auto& pair : uri.getQueryParams()) {
+            if (pair.first == "shuffleInfo") {
+              return std::make_unique<UnsafeRowExchangeSource>(
+                  taskId,
+                  destination,
+                  std::move(queue),
+                  ShuffleInterfaceFactory::factory(shuffleName)
+                      ->createReader(pair.second, destination, pool),
+                  pool);
+            }
+          }
+          VELOX_USER_FAIL(
+              "No shuffle read info provided in taskId. taskId: {}", taskId);
         }
         return nullptr;
       });
 }
 
-auto addPartitionAndSerializeNode(int numPartitions) {
+auto addPartitionAndSerializeNode(uint32_t numPartitions) {
   return [numPartitions](
              core::PlanNodeId nodeId,
              core::PlanNodePtr source) -> core::PlanNodePtr {
-    auto outputType = ROW({"p", "d"}, {INTEGER(), VARBINARY()});
-
     std::vector<core::TypedExprPtr> keys;
     keys.push_back(
         std::make_shared<core::FieldAccessTypedExpr>(INTEGER(), "c0"));
-
+    auto outputType = source->outputType();
     return std::make_shared<PartitionAndSerializeNode>(
-        nodeId, keys, numPartitions, outputType, std::move(source));
+        nodeId,
+        keys,
+        numPartitions,
+        ROW({"p", "d"}, {INTEGER(), VARBINARY()}),
+        std::move(source),
+        [outputType, keys](int numPartitions) {
+          auto keyChannels = exec::toChannels(outputType, keys);
+          return std::make_unique<connector::hive::HivePartitionFunction>(
+              numPartitions, std::vector<int>(numPartitions), keyChannels);
+        });
   };
 }
 
-auto addShuffleWriteNode(ShuffleInterface* shuffle) {
-  return [shuffle](
+auto addShuffleWriteNode(
+    const std::string& shuffleName,
+    const std::string& serializedWriteInfo) {
+  return [&shuffleName, &serializedWriteInfo](
              core::PlanNodeId nodeId,
              core::PlanNodePtr source) -> core::PlanNodePtr {
     return std::make_shared<ShuffleWriteNode>(
-        nodeId, shuffle, std::move(source));
+        nodeId, shuffleName, serializedWriteInfo, std::move(source));
   };
 }
 } // namespace
 
 class UnsafeRowShuffleTest : public exec::test::OperatorTestBase {
+ public:
+  static constexpr std::string_view kTestShuffleInfoFormat =
+      "{{\n"
+      "  \"numPartitions\": {},\n"
+      "  \"maxBytesPerPartition\": {}\n"
+      "}}";
+
+  static constexpr std::string_view kLocalShuffleInfoFormat =
+      "{{\n"
+      "  \"rootPath\": \"{}\",\n"
+      "  \"numPartitions\": {}\n"
+      "}}";
+
  protected:
+  void SetUp() override {
+    exec::test::OperatorTestBase::SetUp();
+    ShuffleInterfaceFactory::registerFactory(
+        std::string(TestShuffleFactory::kShuffleName),
+        std::make_unique<TestShuffleFactory>());
+    ShuffleInterfaceFactory::registerFactory(
+        std::string(LocalPersistentShuffleFactory::kShuffleName),
+        std::make_unique<LocalPersistentShuffleFactory>());
+    exec::Operator::registerOperator(
+        std::make_unique<PartitionAndSerializeTranslator>());
+    exec::Operator::registerOperator(
+        std::make_unique<ShuffleWriteTranslator>());
+  }
+
   void registerVectorSerde() override {
     serializer::spark::UnsafeRowVectorSerde::registerVectorSerde();
   }
 
-  static std::string makeTaskId(const std::string& prefix, int num) {
-    return fmt::format("spark://{}-{}", prefix, num);
+  static std::string makeTaskId(
+      const std::string& prefix,
+      int num,
+      const std::string& shuffleInfo = "") {
+    auto url = fmt::format("batch://{}-{}", prefix, num);
+    if (shuffleInfo.empty()) {
+      return url;
+    }
+    return url + "?shuffleInfo=" + shuffleInfo;
   }
 
   std::shared_ptr<exec::Task> makeTask(
       const std::string& taskId,
       core::PlanNodePtr planNode,
       int destination) {
-    auto queryCtx =
-        core::QueryCtx::createForTest(std::make_shared<core::MemConfig>());
+    auto queryCtx = std::make_shared<core::QueryCtx>(executor_.get());
     core::PlanFragment planFragment{planNode};
     return std::make_shared<exec::Task>(
         taskId, std::move(planFragment), destination, std::move(queryCtx));
@@ -249,7 +394,9 @@ class UnsafeRowShuffleTest : public exec::test::OperatorTestBase {
   }
 
   void runShuffleTest(
-      ShuffleInterface* shuffle,
+      const std::string& shuffleName,
+      const std::string& serializedShuffleWriteInfo,
+      const std::string& serializedShuffleReadInfo,
       size_t numPartitions,
       size_t numMapDrivers,
       const std::vector<RowVectorPtr>& data) {
@@ -258,10 +405,6 @@ class UnsafeRowShuffleTest : public exec::test::OperatorTestBase {
         std::make_unique<PartitionAndSerializeTranslator>());
     exec::Operator::registerOperator(
         std::make_unique<ShuffleWriteTranslator>());
-
-    // Make sure all previously registered exchange factory are gone.
-    velox::exec::ExchangeSource::factories().clear();
-    registerExchangeSource(shuffle);
 
     // Flatten the inputs to avoid issues assertEqualResults referred here:
     // https://github.com/facebookincubator/velox/issues/2859
@@ -273,21 +416,21 @@ class UnsafeRowShuffleTest : public exec::test::OperatorTestBase {
       flattenInputs.push_back(vectorMaker_.flatten<RowVector>(input));
     }
 
-    auto leafPlan = exec::test::PlanBuilder()
-                        .values(flattenInputs, true)
-                        .addNode(addPartitionAndSerializeNode(numPartitions))
-                        .localPartition({})
-                        .addNode(addShuffleWriteNode(shuffle))
-                        .planNode();
+    auto writerPlan = exec::test::PlanBuilder()
+                          .values(flattenInputs, true)
+                          .addNode(addPartitionAndSerializeNode(numPartitions))
+                          .localPartition({})
+                          .addNode(addShuffleWriteNode(
+                              shuffleName, serializedShuffleWriteInfo))
+                          .planNode();
 
-    auto leafTaskId = makeTaskId("leaf", 0);
-    auto leafTask = makeTask(leafTaskId, leafPlan, 0);
-    exec::Task::start(leafTask, numMapDrivers);
+    auto writerTaskId = makeTaskId("leaf", 0);
+    auto writerTask = makeTask(writerTaskId, writerPlan, 0);
+    exec::Task::start(writerTask, numMapDrivers);
 
-    ASSERT_TRUE(exec::test::waitForTaskCompletion(leafTask.get()));
-    ASSERT_TRUE(shuffle->readyForRead());
+    ASSERT_TRUE(exec::test::waitForTaskCompletion(writerTask.get(), 3'000'000));
 
-    // Need to repeat the input for each map driver.
+    // NOTE: each map driver processes the input once.
     std::vector<RowVectorPtr> expectedOutputVectors;
     for (auto& input : flattenInputs) {
       for (int i = 0; i < numMapDrivers; i++) {
@@ -312,10 +455,11 @@ class UnsafeRowShuffleTest : public exec::test::OperatorTestBase {
         if (noMoreSplits) {
           return;
         }
-        addRemoteSplits(task, {leafTaskId});
+        addRemoteSplits(
+            task, {makeTaskId("read", 0, serializedShuffleReadInfo)});
         noMoreSplits = true;
       });
-      ASSERT_FALSE(shuffle->hasNext(i)) << i;
+
       for (auto& resultVector : results) {
         auto vector = copyResultVector(resultVector);
         outputVectors.push_back(vector);
@@ -323,25 +467,28 @@ class UnsafeRowShuffleTest : public exec::test::OperatorTestBase {
     }
     velox::exec::test::assertEqualResults(expectedOutputVectors, outputVectors);
   }
+
+  void cleanupDirectory(const std::string& rootPath) {
+    auto fileSystem = velox::filesystems::getFileSystem(rootPath, nullptr);
+    auto files = fileSystem->list(rootPath);
+    for (auto& file : files) {
+      fileSystem->remove(file);
+    }
+  }
 };
 
 TEST_F(UnsafeRowShuffleTest, operators) {
-  exec::Operator::registerOperator(
-      std::make_unique<PartitionAndSerializeTranslator>());
-  exec::Operator::registerOperator(std::make_unique<ShuffleWriteTranslator>());
-
-  TestShuffle shuffle(pool(), 4, 1 << 20 /* 1MB */);
-
   auto data = makeRowVector({
       makeFlatVector<int32_t>({1, 2, 3, 4}),
       makeFlatVector<int64_t>({10, 20, 30, 40}),
   });
-
+  auto info = fmt::format(kTestShuffleInfoFormat, 4, 1 << 20 /* 1MB */);
   auto plan = exec::test::PlanBuilder()
                   .values({data}, true)
                   .addNode(addPartitionAndSerializeNode(4))
                   .localPartition({})
-                  .addNode(addShuffleWriteNode(&shuffle))
+                  .addNode(addShuffleWriteNode(
+                      std::string(TestShuffleFactory::kShuffleName), info))
                   .planNode();
 
   exec::test::CursorParameters params;
@@ -351,38 +498,102 @@ TEST_F(UnsafeRowShuffleTest, operators) {
   auto [taskCursor, serializedResults] =
       readCursor(params, [](auto /*task*/) {});
   ASSERT_EQ(serializedResults.size(), 0);
+  TestShuffleWriter::reset();
 }
 
 TEST_F(UnsafeRowShuffleTest, endToEnd) {
   size_t numPartitions = 5;
   size_t numMapDrivers = 2;
 
-  TestShuffle shuffle(pool(), numPartitions, 1 << 20 /* 1MB */);
   auto data = vectorMaker_.rowVector({
       makeFlatVector<int32_t>({1, 2, 3, 4, 5, 6}),
       makeFlatVector<int64_t>({10, 20, 30, 40, 50, 60}),
   });
-  runShuffleTest(&shuffle, numPartitions, numMapDrivers, {data});
+
+  // Make sure all previously registered exchange factory are gone.
+  velox::exec::ExchangeSource::factories().clear();
+  const std::string kShuffleInfo =
+      fmt::format(kTestShuffleInfoFormat, numPartitions, 1 << 20);
+  TestShuffleWriter::createWriter(kShuffleInfo, pool());
+  registerExchangeSource(std::string(TestShuffleFactory::kShuffleName));
+  runShuffleTest(
+      std::string(TestShuffleFactory::kShuffleName),
+      kShuffleInfo,
+      kShuffleInfo,
+      numPartitions,
+      numMapDrivers,
+      {data});
+  TestShuffleWriter::reset();
+}
+
+TEST_F(UnsafeRowShuffleTest, persistentShuffleDeser) {
+  std::string serializedInfo =
+      "{\n"
+      "  \"rootPath\": \"abc\",\n"
+      "  \"numPartitions\": 11\n"
+      "}";
+  LocalShuffleInfo shuffleInfo = LocalShuffleInfo::deserialize(serializedInfo);
+  EXPECT_EQ(shuffleInfo.rootPath, "abc");
+  EXPECT_EQ(shuffleInfo.numPartitions, 11);
+
+  serializedInfo =
+      "{\n"
+      "  \"rootPath\": \"efg\",\n"
+      "  \"numPartitions\": 12\n"
+      "}";
+  shuffleInfo = LocalShuffleInfo::deserialize(serializedInfo);
+  EXPECT_EQ(shuffleInfo.rootPath, "efg");
+  EXPECT_EQ(shuffleInfo.numPartitions, 12);
+
+  std::string badSerializedInfo =
+      "{\n"
+      "  \"rootpath\": \"efg\",\n"
+      "  \"numpartitions\": 12\n"
+      "}";
+  EXPECT_THROW(
+      LocalShuffleInfo::deserialize(badSerializedInfo),
+      nlohmann::detail::out_of_range);
+
+  badSerializedInfo =
+      "{\n"
+      "  \"rootPath\": \"abc\",\n"
+      "  \"numPartitions\": \"hey-wrong-type\"\n"
+      "}";
+  EXPECT_THROW(
+      LocalShuffleInfo::deserialize(badSerializedInfo),
+      nlohmann::detail::type_error);
 }
 
 TEST_F(UnsafeRowShuffleTest, persistentShuffle) {
-  size_t numPartitions = 5;
-  size_t numMapDrivers = 2;
+  uint32_t numPartitions = 5;
+  uint32_t numMapDrivers = 2;
 
   // Create a local file system storage based shuffle.
   velox::filesystems::registerLocalFileSystem();
   auto rootDirectory = velox::exec::test::TempDirectoryPath::create();
   auto rootPath = rootDirectory->path;
 
-  // Initialize persistent shuffle.
-  TestingPersistentShuffle shuffle(1 << 20 /* 1MB */);
-  shuffle.initialize(pool(), numPartitions, rootPath);
-
   auto data = vectorMaker_.rowVector({
       makeFlatVector<int32_t>({1, 2, 3, 4, 5, 6}),
       makeFlatVector<int64_t>({10, 20, 30, 40, 50, 60}),
   });
-  runShuffleTest(&shuffle, numPartitions, numMapDrivers, {data});
+
+  // Make sure all previously registered exchange factory are gone.
+  velox::exec::ExchangeSource::factories().clear();
+  const std::string kShuffleInfo =
+      fmt::format(kLocalShuffleInfoFormat, rootPath, numPartitions);
+  const std::string kShuffleName =
+      std::string(LocalPersistentShuffleFactory::kShuffleName);
+  registerExchangeSource(
+      std::string(LocalPersistentShuffleFactory::kShuffleName));
+  runShuffleTest(
+      std::string(LocalPersistentShuffleFactory::kShuffleName),
+      kShuffleInfo,
+      kShuffleInfo,
+      numPartitions,
+      numMapDrivers,
+      {data});
+  cleanupDirectory(rootPath);
 }
 
 TEST_F(UnsafeRowShuffleTest, persistentShuffleFuzz) {
@@ -435,10 +646,9 @@ TEST_F(UnsafeRowShuffleTest, persistentShuffleFuzz) {
   velox::filesystems::registerLocalFileSystem();
   auto rootDirectory = velox::exec::test::TempDirectoryPath::create();
   auto rootPath = rootDirectory->path;
-  auto shuffle = TestingPersistentShuffle::instance();
+  const std::string shuffleInfo =
+      fmt::format(kLocalShuffleInfoFormat, rootPath, numPartitions);
   for (int it = 0; it < numIterations; it++) {
-    shuffle->initialize(pool(), numPartitions, rootPath);
-
     auto seed = folly::Random::rand32();
     VectorFuzzer fuzzer(opts, pool_.get(), seed);
     std::vector<RowVectorPtr> inputVectors;
@@ -447,7 +657,17 @@ TEST_F(UnsafeRowShuffleTest, persistentShuffleFuzz) {
       auto input = fuzzer.fuzzRow(rowType);
       inputVectors.push_back(input);
     }
-    runShuffleTest(shuffle, numPartitions, numMapDrivers, inputVectors);
+    velox::exec::ExchangeSource::factories().clear();
+    registerExchangeSource(
+        std::string(LocalPersistentShuffleFactory::kShuffleName));
+    runShuffleTest(
+        std::string(LocalPersistentShuffleFactory::kShuffleName),
+        shuffleInfo,
+        shuffleInfo,
+        numPartitions,
+        numMapDrivers,
+        inputVectors);
+    cleanupDirectory(rootPath);
   }
 }
 
@@ -468,7 +688,7 @@ TEST_F(UnsafeRowShuffleTest, partitionAndSerializeOperator) {
 
   auto [taskCursor, serializedResults] =
       readCursor(params, [](auto /*task*/) {});
-  ASSERT_EQ(serializedResults.size(), 2);
+  EXPECT_EQ(serializedResults.size(), 2);
 
   for (auto& serializedResult : serializedResults) {
     // Verify that serialized data can be deserialized successfully into the
@@ -488,7 +708,9 @@ TEST_F(UnsafeRowShuffleTest, shuffleWriterToString) {
                   .values({data}, true)
                   .addNode(addPartitionAndSerializeNode(4))
                   .localPartition({})
-                  .addNode(addShuffleWriteNode(nullptr))
+                  .addNode(addShuffleWriteNode(
+                      std::string(TestShuffleFactory::kShuffleName),
+                      fmt::format(kTestShuffleInfoFormat, 10, 10)))
                   .planNode();
 
   ASSERT_EQ(
@@ -523,6 +745,30 @@ TEST_F(UnsafeRowShuffleTest, partitionAndSerializeToString) {
       "-- PartitionAndSerialize[(c0) 4] -> p:INTEGER, d:VARBINARY\n"
       "  -- Values[1000 rows in 1 vectors] -> c0:INTEGER, c1:BIGINT\n");
   ASSERT_EQ(plan->toString(false, false), "-- PartitionAndSerialize\n");
+}
+
+class DummyShuffleInterfaceFactory : public ShuffleInterfaceFactory {
+ public:
+  std::shared_ptr<ShuffleReader> createReader(
+      const std::string& serializedShuffleInfo,
+      const int32_t partition,
+      velox::memory::MemoryPool* pool) override {
+    return nullptr;
+  }
+  std::shared_ptr<ShuffleWriter> createWriter(
+      const std::string& serializedShuffleInfo,
+      velox::memory::MemoryPool* pool) override {
+    return nullptr;
+  }
+};
+
+TEST_F(UnsafeRowShuffleTest, shuffleInterfaceRegistration) {
+  const std::string kShuffleName = "dummy-shuffle";
+  EXPECT_TRUE(ShuffleInterfaceFactory::registerFactory(
+      kShuffleName, std::make_unique<DummyShuffleInterfaceFactory>()));
+  EXPECT_NO_THROW(ShuffleInterfaceFactory::factory(kShuffleName));
+  EXPECT_FALSE(ShuffleInterfaceFactory::registerFactory(
+      kShuffleName, std::make_unique<DummyShuffleInterfaceFactory>()));
 }
 } // namespace facebook::presto::operators::test
 

@@ -133,7 +133,6 @@ import java.util.function.Supplier;
 
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
 import static com.facebook.presto.hive.metastore.MetastoreOperationResult.EMPTY_RESULT;
-import static com.facebook.presto.hive.metastore.MetastoreUtil.convertPredicateToParts;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.createDirectory;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.deleteDirectoryRecursively;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getHiveBasicStatistics;
@@ -173,7 +172,24 @@ public class GlueHiveMetastore
     private static final String PUBLIC_ROLE_NAME = "public";
     private static final String DEFAULT_METASTORE_USER = "presto";
     private static final String WILDCARD_EXPRESSION = "";
+
+    // This is the total number of partitions allowed to process in a big batch chunk which splits multiple smaller batch of partitions allowed by BATCH_CREATE_PARTITION_MAX_PAGE_SIZE
+    // Here's an example diagram on how async batches are handled for Create Partition:
+    // |--------BATCH_CREATE_PARTITION_MAX_PAGE_SIZE------------| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // | p0, p1, p2 .....................................   p99 |
+    // |--------------------------------------------------------|
+    // | p0, p1, p2 .....................................   p99 |
+    // |--------------------------------------------------------|
+    // BATCH_PARTITION_COMMIT_TOTAL_SIZE / BATCH_CREATE_PARTITION_MAX_PAGE_SIZE ..... (10k/100=100 batches)
+    // |--------------------------------------------------------|++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // | p0, p1, p2 .....................................   p99 |
+    // |--------------------------------------------------------|
+    // | p0, p1, p2 .....................................   p99 |
+    // |--------------------------------------------------------|.......... (100 batches)
+    // |--------------------------------------------------------|++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    private static final int BATCH_PARTITION_COMMIT_TOTAL_SIZE = 10000;
     private static final int BATCH_GET_PARTITION_MAX_PAGE_SIZE = 1000;
+    // this is the total number of partitions allowed per batch that glue metastore can process to create partitions
     private static final int BATCH_CREATE_PARTITION_MAX_PAGE_SIZE = 100;
     private static final int BATCH_UPDATE_PARTITION_MAX_PAGE_SIZE = 100;
     private static final int AWS_GLUE_GET_PARTITIONS_MAX_RESULTS = 1000;
@@ -280,6 +296,14 @@ public class GlueHiveMetastore
     public GlueMetastoreStats getStats()
     {
         return stats;
+    }
+
+    // For Glue metastore there's an upper bound limit on 100 partitions per batch.
+    // Here's the reference: https://docs.aws.amazon.com/glue/latest/webapi/API_BatchCreatePartition.html
+    @Override
+    public int getPartitionCommitBatchSize()
+    {
+        return BATCH_PARTITION_COMMIT_TOTAL_SIZE;
     }
 
     @Override
@@ -840,8 +864,7 @@ public class GlueHiveMetastore
             Map<Column, Domain> partitionPredicates)
     {
         Table table = getTableOrElseThrow(metastoreContext, databaseName, tableName);
-        List<String> parts = convertPredicateToParts(partitionPredicates);
-        String expression = buildGlueExpression(table.getPartitionColumns(), parts);
+        String expression = buildGlueExpression(partitionPredicates);
         List<Partition> partitions = getPartitions(metastoreContext, expression, table);
         return buildPartitionNames(table.getPartitionColumns(), partitions);
     }

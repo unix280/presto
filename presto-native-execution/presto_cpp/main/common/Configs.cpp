@@ -86,6 +86,11 @@ int32_t SystemConfig::numSpillThreads() const {
   return opt.hasValue() ? opt.value() : std::thread::hardware_concurrency();
 }
 
+std::string SystemConfig::spillerSpillPath() const {
+  auto opt = optionalProperty<std::string>(std::string(kSpillerSpillPath));
+  return opt.hasValue() ? opt.value() : "";
+}
+
 int32_t SystemConfig::shutdownOnsetSec() const {
   auto opt = optionalProperty<int32_t>(std::string(kShutdownOnsetSec));
   return opt.hasValue() ? opt.value() : kShutdownOnsetSecDefault;
@@ -101,9 +106,20 @@ uint64_t SystemConfig::asyncCacheSsdGb() const {
   return opt.hasValue() ? opt.value() : kAsyncCacheSsdGbDefault;
 }
 
+uint64_t SystemConfig::localShuffleMaxPartitionBytes() const {
+  auto opt =
+      optionalProperty<uint32_t>(std::string(kLocalShuffleMaxPartitionBytes));
+  return opt.hasValue() ? opt.value() : kLocalShuffleMaxPartitionBytesDefault;
+}
+
 std::string SystemConfig::asyncCacheSsdPath() const {
   auto opt = optionalProperty<std::string>(std::string(kAsyncCacheSsdPath));
   return opt.hasValue() ? opt.value() : std::string(kAsyncCacheSsdPathDefault);
+}
+
+std::string SystemConfig::shuffleName() const {
+  auto opt = optionalProperty<std::string>(std::string(kShuffleName));
+  return opt.hasValue() ? opt.value() : std::string(kShuffleNameDefault);
 }
 
 bool SystemConfig::enableSerializedPageChecksum() const {

@@ -21,7 +21,6 @@ import com.facebook.presto.common.type.StandardTypes;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeManager;
 import com.facebook.presto.common.type.TypeSignature;
-import com.facebook.presto.common.type.VarcharType;
 import com.facebook.presto.plugin.jdbc.BaseJdbcClient;
 import com.facebook.presto.plugin.jdbc.BaseJdbcConfig;
 import com.facebook.presto.plugin.jdbc.BooleanReadFunction;
@@ -69,12 +68,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.esri.core.geometry.ogc.OGCGeometry.fromBinary;
+import static com.facebook.presto.common.type.UuidType.prestoUuidToJavaUuid;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
-import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
-import static com.facebook.presto.common.type.VarcharType.createVarcharType;
 import static com.facebook.presto.geospatial.GeometryUtils.wktFromJtsGeometry;
 import static com.facebook.presto.geospatial.serde.EsriGeometrySerde.serialize;
 import static com.facebook.presto.geospatial.serde.JtsGeometrySerde.deserialize;
@@ -84,7 +83,6 @@ import static com.facebook.presto.plugin.jdbc.ColumnMapping.objectMapping;
 import static com.facebook.presto.plugin.jdbc.ColumnMapping.sliceMapping;
 import static com.facebook.presto.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static com.facebook.presto.plugin.jdbc.StandardColumnMappings.varbinaryWriteFunction;
-import static com.facebook.presto.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
 import static com.facebook.presto.plugin.jdbc.WriteMapping.objectMapping;
 import static com.facebook.presto.plugin.jdbc.WriteMapping.sliceMapping;
 import static com.facebook.presto.plugin.postgresql.PostgreSqlConfig.ArrayMapping.AS_ARRAY;
@@ -99,6 +97,7 @@ import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMEN
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.slice.Slices.wrappedBuffer;
+import static io.airlift.slice.Slices.wrappedLongArray;
 import static java.lang.String.format;
 import static java.sql.DatabaseMetaData.columnNoNulls;
 import static java.util.Objects.requireNonNull;
@@ -112,12 +111,14 @@ public class PostgreSqlClient
     private static final int ARRAY_RESULT_SET_VALUE_COLUMN = 2;
     protected final Type jsonType;
     private static final String DUPLICATE_TABLE_SQLSTATE = "42P07";
+    private final Type uuidType;
 
     @Inject
     public PostgreSqlClient(JdbcConnectorId connectorId, BaseJdbcConfig config, TypeManager typeManager)
     {
         super(connectorId, config, "\"", new DriverConnectionFactory(new Driver(), config));
         this.jsonType = typeManager.getType(new TypeSignature(StandardTypes.JSON));
+        this.uuidType = typeManager.getType(new TypeSignature(StandardTypes.UUID));
     }
 
     @Override
@@ -221,6 +222,10 @@ public class PostgreSqlClient
             return objectMapping(elementDataType + "[]", arrayWriteFunction(session, elementType, getArrayElementPgTypeName(session, this, elementType)));
         }
 
+        if (type.equals(uuidType)) {
+            return WriteMapping.sliceMapping("uuid", uuidWriteFunction());
+        }
+
         return super.toWriteMapping(session, type);
     }
 
@@ -232,10 +237,7 @@ public class PostgreSqlClient
 
         switch (typeName) {
             case "uuid":
-                if (columnSize > VarcharType.MAX_LENGTH) {
-                    return Optional.of(varcharColumnMapping(createUnboundedVarcharType()));
-                }
-                return Optional.of(varcharColumnMapping(createVarcharType(columnSize)));
+                return Optional.of(uuidColumnMapping());
             case "geometry":
             case "geography":
                 return Optional.of(geometryColumnMapping());
@@ -490,5 +492,23 @@ public class PostgreSqlClient
         }
         geometry.setSpatialReference(null);
         return serialize(geometry);
+    }
+
+    private static SliceWriteFunction uuidWriteFunction()
+    {
+        return (statement, index, value) -> statement.setObject(index, prestoUuidToJavaUuid(value), Types.OTHER);
+    }
+
+    private ColumnMapping uuidColumnMapping()
+    {
+        return ColumnMapping.sliceMapping(
+                uuidType,
+                (resultSet, columnIndex) -> uuidSlice((UUID) resultSet.getObject(columnIndex)),
+                uuidWriteFunction());
+    }
+
+    private static Slice uuidSlice(UUID uuid)
+    {
+        return wrappedLongArray(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
     }
 }

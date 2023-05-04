@@ -84,6 +84,8 @@ class SystemConfig : public ConfigBase {
   static constexpr std::string_view kHttpExecThreads{"http_exec_threads"};
   static constexpr std::string_view kNumIoThreads{"num-io-threads"};
   static constexpr std::string_view kNumSpillThreads{"num-spill-threads"};
+  static constexpr std::string_view kSpillerSpillPath =
+      "experimental.spiller-spill-path";
   static constexpr std::string_view kShutdownOnsetSec{"shutdown-onset-sec"};
   static constexpr std::string_view kSystemMemoryGb{"system-memory-gb"};
   static constexpr std::string_view kAsyncCacheSsdGb{"async-cache-ssd-gb"};
@@ -97,6 +99,9 @@ class SystemConfig : public ConfigBase {
       "enable_velox_task_logging"};
   static constexpr std::string_view kEnableVeloxExprSetLogging{
       "enable_velox_expression_logging"};
+  static constexpr std::string_view kLocalShuffleMaxPartitionBytes{
+      "shuffle.local.max-partition-bytes"};
+  static constexpr std::string_view kShuffleName{"shuffle.name"};
   // Most server nodes today (May 2022) have at least 16 cores.
   // Setting the default maximum drivers per task to this value will
   // provide a better off-shelf experience.
@@ -107,9 +112,11 @@ class SystemConfig : public ConfigBase {
   static constexpr int32_t kShutdownOnsetSecDefault = 10;
   static constexpr int32_t kSystemMemoryGbDefault = 40;
   static constexpr int32_t kMmapArenaCapacityRatioDefault = 10;
+  static constexpr uint64_t kLocalShuffleMaxPartitionBytesDefault = 1 << 15;
   static constexpr uint64_t kAsyncCacheSsdGbDefault = 0;
   static constexpr std::string_view kAsyncCacheSsdPathDefault{
       "/mnt/flash/async_cache."};
+  static constexpr std::string_view kShuffleNameDefault{""};
   static constexpr bool kEnableSerializedPageChecksumDefault = true;
   static constexpr bool kEnableVeloxTaskLoggingDefault = false;
   static constexpr bool kEnableVeloxExprSetLoggingDefault = false;
@@ -133,13 +140,19 @@ class SystemConfig : public ConfigBase {
 
   int32_t numSpillThreads() const;
 
+  std::string spillerSpillPath() const;
+
   int32_t shutdownOnsetSec() const;
 
   int32_t systemMemoryGb() const;
 
   uint64_t asyncCacheSsdGb() const;
 
+  uint64_t localShuffleMaxPartitionBytes() const;
+
   std::string asyncCacheSsdPath() const;
+
+  std::string shuffleName() const;
 
   bool enableSerializedPageChecksum() const;
 

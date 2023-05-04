@@ -23,21 +23,11 @@
 #include "velox/vector/ComplexVector.h"
 #include "velox/vector/FlatVector.h"
 #include "presto_cpp/main/types/TypeSignatureTypeConverter.h"
+#include "presto_cpp/main/operators/PartitionAndSerialize.h"
+#include "presto_cpp/main/operators/ShuffleWrite.h"
 // clang-format on
 
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
 #include <folly/container/F14Set.h>
-
-#if __has_include("filesystem")
-#include <filesystem>
-namespace fs = std::filesystem;
-#else
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#endif
 
 using namespace facebook::velox;
 
@@ -79,6 +69,11 @@ RowTypePtr toRowType(
   return ROW(std::move(names), std::move(types));
 }
 
+template <typename T>
+std::string toJsonString(const T& value) {
+  return ((json)value).dump();
+}
+
 connector::hive::HiveColumnHandle::ColumnType toHiveColumnType(
     protocol::ColumnType type) {
   switch (type) {
@@ -89,7 +84,8 @@ connector::hive::HiveColumnHandle::ColumnType toHiveColumnType(
     case protocol::ColumnType::SYNTHESIZED:
       return connector::hive::HiveColumnHandle::ColumnType::kSynthesized;
     default:
-      throw std::invalid_argument("Unknown Hive column type");
+      VELOX_UNSUPPORTED(
+          "Unsupported Hive column type: {}.", toJsonString(type));
   }
 }
 
@@ -109,7 +105,48 @@ std::shared_ptr<connector::ColumnHandle> toColumnHandle(
         tpchColumn->columnName);
   }
 
-  throw std::invalid_argument("Unknown column handle type: " + column->_type);
+  VELOX_UNSUPPORTED(
+      "Unsupported column handle type: {}.", toJsonString(column->_type));
+}
+
+connector::hive::LocationHandle::TableType toTableType(
+    protocol::TableType tableType) {
+  switch (tableType) {
+    case protocol::TableType::NEW:
+      return connector::hive::LocationHandle::TableType::kNew;
+    case protocol::TableType::EXISTING:
+      return connector::hive::LocationHandle::TableType::kExisting;
+    case protocol::TableType::TEMPORARY:
+      return connector::hive::LocationHandle::TableType::kTemporary;
+    default:
+      VELOX_UNSUPPORTED("Unsupported table type: {}.", toJsonString(tableType));
+  }
+}
+
+connector::hive::LocationHandle::WriteMode toWriteMode(
+    protocol::WriteMode writeMode) {
+  switch (writeMode) {
+    case protocol::WriteMode::STAGE_AND_MOVE_TO_TARGET_DIRECTORY:
+      return connector::hive::LocationHandle::WriteMode::
+          kStageAndMoveToTargetDirectory;
+    case protocol::WriteMode::DIRECT_TO_TARGET_NEW_DIRECTORY:
+      return connector::hive::LocationHandle::WriteMode::
+          kDirectToTargetNewDirectory;
+    case protocol::WriteMode::DIRECT_TO_TARGET_EXISTING_DIRECTORY:
+      return connector::hive::LocationHandle::WriteMode::
+          kDirectToTargetExistingDirectory;
+    default:
+      VELOX_UNSUPPORTED("Unsupported write mode: {}.", toJsonString(writeMode));
+  }
+}
+
+std::shared_ptr<connector::hive::LocationHandle> toLocationHandle(
+    const protocol::LocationHandle& locationHandle) {
+  return std::make_shared<connector::hive::LocationHandle>(
+      locationHandle.targetPath,
+      locationHandle.writePath,
+      toTableType(locationHandle.tableType),
+      toWriteMode(locationHandle.writeMode));
 }
 
 int64_t toInt64(
@@ -499,79 +536,101 @@ std::unique_ptr<common::Filter> toFilter(
     const protocol::Domain& domain,
     const VeloxExprConverter& exprConverter) {
   auto nullAllowed = domain.nullAllowed;
-  auto sortedRangeSet =
-      std::dynamic_pointer_cast<protocol::SortedRangeSet>(domain.values);
-  VELOX_CHECK(sortedRangeSet, "Unsupported ValueSet type");
-  auto type = stringToType(sortedRangeSet->type);
-  auto ranges = sortedRangeSet->ranges;
+  if (auto sortedRangeSet =
+          std::dynamic_pointer_cast<protocol::SortedRangeSet>(domain.values)) {
+    auto type = stringToType(sortedRangeSet->type);
+    auto ranges = sortedRangeSet->ranges;
 
-  if (ranges.empty()) {
-    VELOX_CHECK(nullAllowed, "Unexpected always-false filter");
-    return std::make_unique<common::IsNull>();
-  }
-
-  if (ranges.size() == 1) {
-    // 'is not null' arrives as unbounded range with 'nulls not allowed'.
-    // We catch this case and create 'is not null' filter instead of the range
-    // filter.
-    const auto& range = ranges[0];
-    bool lowExclusive = range.low.bound == protocol::Bound::ABOVE;
-    bool lowUnbounded = range.low.valueBlock == nullptr && lowExclusive;
-    bool highExclusive = range.high.bound == protocol::Bound::BELOW;
-    bool highUnbounded = range.high.valueBlock == nullptr && highExclusive;
-    if (lowUnbounded && highUnbounded && !nullAllowed) {
-      return std::make_unique<common::IsNotNull>();
+    if (ranges.empty()) {
+      VELOX_CHECK(nullAllowed, "Unexpected always-false filter");
+      return std::make_unique<common::IsNull>();
     }
 
-    return toFilter(type, ranges[0], nullAllowed, exprConverter);
-  }
-
-  if (type->kind() == TypeKind::BIGINT || type->kind() == TypeKind::INTEGER ||
-      type->kind() == TypeKind::SMALLINT || type->kind() == TypeKind::TINYINT) {
-    std::vector<std::unique_ptr<common::BigintRange>> bigintFilters;
-    bigintFilters.reserve(ranges.size());
-    for (const auto& range : ranges) {
-      bigintFilters.emplace_back(
-          bigintRangeToFilter(range, nullAllowed, exprConverter, type));
-    }
-    return combineIntegerRanges(bigintFilters, nullAllowed);
-  }
-
-  if (type->kind() == TypeKind::VARCHAR) {
-    std::vector<std::unique_ptr<common::BytesRange>> bytesFilters;
-    bytesFilters.reserve(ranges.size());
-    for (const auto& range : ranges) {
-      bytesFilters.emplace_back(
-          varcharRangeToFilter(range, nullAllowed, exprConverter, type));
-    }
-    return combineBytesRanges(bytesFilters, nullAllowed);
-  }
-
-  if (type->kind() == TypeKind::BOOLEAN) {
-    VELOX_CHECK_EQ(ranges.size(), 2, "Multi bool ranges size can only be 2.");
-    std::unique_ptr<common::Filter> boolFilter;
-    for (const auto& range : ranges) {
-      auto filter = boolRangeToFilter(range, nullAllowed, exprConverter, type);
-      if (filter->kind() == common::FilterKind::kAlwaysFalse or
-          filter->kind() == common::FilterKind::kIsNull) {
-        continue;
+    if (ranges.size() == 1) {
+      // 'is not null' arrives as unbounded range with 'nulls not allowed'.
+      // We catch this case and create 'is not null' filter instead of the range
+      // filter.
+      const auto& range = ranges[0];
+      bool lowExclusive = range.low.bound == protocol::Bound::ABOVE;
+      bool lowUnbounded = range.low.valueBlock == nullptr && lowExclusive;
+      bool highExclusive = range.high.bound == protocol::Bound::BELOW;
+      bool highUnbounded = range.high.valueBlock == nullptr && highExclusive;
+      if (lowUnbounded && highUnbounded && !nullAllowed) {
+        return std::make_unique<common::IsNotNull>();
       }
-      VELOX_CHECK_NULL(boolFilter);
-      boolFilter = std::move(filter);
+
+      return toFilter(type, ranges[0], nullAllowed, exprConverter);
     }
 
-    VELOX_CHECK_NOT_NULL(boolFilter);
-    return boolFilter;
-  }
+    if (type->kind() == TypeKind::BIGINT || type->kind() == TypeKind::INTEGER ||
+        type->kind() == TypeKind::SMALLINT ||
+        type->kind() == TypeKind::TINYINT) {
+      std::vector<std::unique_ptr<common::BigintRange>> bigintFilters;
+      bigintFilters.reserve(ranges.size());
+      for (const auto& range : ranges) {
+        bigintFilters.emplace_back(
+            bigintRangeToFilter(range, nullAllowed, exprConverter, type));
+      }
+      return combineIntegerRanges(bigintFilters, nullAllowed);
+    }
 
-  std::vector<std::unique_ptr<common::Filter>> filters;
-  filters.reserve(ranges.size());
-  for (const auto& range : ranges) {
-    filters.emplace_back(toFilter(type, range, nullAllowed, exprConverter));
-  }
+    if (type->kind() == TypeKind::VARCHAR) {
+      std::vector<std::unique_ptr<common::BytesRange>> bytesFilters;
+      bytesFilters.reserve(ranges.size());
+      for (const auto& range : ranges) {
+        bytesFilters.emplace_back(
+            varcharRangeToFilter(range, nullAllowed, exprConverter, type));
+      }
+      return combineBytesRanges(bytesFilters, nullAllowed);
+    }
 
-  return std::make_unique<common::MultiRange>(
-      std::move(filters), nullAllowed, false);
+    if (type->kind() == TypeKind::BOOLEAN) {
+      VELOX_CHECK_EQ(ranges.size(), 2, "Multi bool ranges size can only be 2.");
+      std::unique_ptr<common::Filter> boolFilter;
+      for (const auto& range : ranges) {
+        auto filter =
+            boolRangeToFilter(range, nullAllowed, exprConverter, type);
+        if (filter->kind() == common::FilterKind::kAlwaysFalse or
+            filter->kind() == common::FilterKind::kIsNull) {
+          continue;
+        }
+        VELOX_CHECK_NULL(boolFilter);
+        boolFilter = std::move(filter);
+      }
+
+      VELOX_CHECK_NOT_NULL(boolFilter);
+      return boolFilter;
+    }
+
+    std::vector<std::unique_ptr<common::Filter>> filters;
+    filters.reserve(ranges.size());
+    for (const auto& range : ranges) {
+      filters.emplace_back(toFilter(type, range, nullAllowed, exprConverter));
+    }
+
+    return std::make_unique<common::MultiRange>(
+        std::move(filters), nullAllowed, false);
+  } else if (
+      auto equatableValueSet =
+          std::dynamic_pointer_cast<protocol::EquatableValueSet>(
+              domain.values)) {
+    if (equatableValueSet->entries.empty()) {
+      if (nullAllowed) {
+        return std::make_unique<common::IsNull>();
+      } else {
+        return std::make_unique<common::IsNotNull>();
+      }
+    }
+    VELOX_UNSUPPORTED(
+        "EquatableValueSet (with non-empty entries) to Velox filter conversion is not supported yet.");
+  } else if (
+      auto allOrNoneValueSet =
+          std::dynamic_pointer_cast<protocol::AllOrNoneValueSet>(
+              domain.values)) {
+    VELOX_UNSUPPORTED(
+        "AllOrNoneValueSet to Velox filter conversion is not supported yet.");
+  }
+  VELOX_UNSUPPORTED("Unsupported filter found.");
 }
 
 std::shared_ptr<connector::ConnectorTableHandle> toConnectorTableHandle(
@@ -637,7 +696,8 @@ std::shared_ptr<connector::ConnectorTableHandle> toConnectorTableHandle(
         tpch::fromTableName(tpchLayout->table.tableName),
         tpchLayout->table.scaleFactor);
   }
-  throw std::invalid_argument("Unsupported TableHandle type");
+  VELOX_UNSUPPORTED(
+      "Unsupported TableHandle type: {}.", toJsonString(tableHandle));
 }
 
 std::vector<core::TypedExprPtr> getProjections(
@@ -668,7 +728,7 @@ void setCellFromVariantByKind<TypeKind::VARBINARY>(
     const VectorPtr& /*column*/,
     vector_size_t /*row*/,
     const velox::variant& value) {
-  throw std::invalid_argument("Return of VARBINARY data is not supported");
+  VELOX_UNSUPPORTED("Return of VARBINARY data is not supported.");
 }
 
 template <>
@@ -721,7 +781,7 @@ core::SortOrder toVeloxSortOrder(const protocol::SortOrder& sortOrder) {
     case protocol::SortOrder::DESC_NULLS_LAST:
       return core::SortOrder(false, false);
     default:
-      throw std::invalid_argument("Unknown sort order");
+      VELOX_UNSUPPORTED("Unsupported sort order: {}.", sortOrder);
   }
 }
 
@@ -880,11 +940,6 @@ PartitionedOutputChannels toChannels(
     }
   }
   return output;
-}
-
-template <typename T>
-std::string toJsonString(const T& value) {
-  return ((json)value).dump();
 }
 
 core::LocalPartitionNode::Type toLocalExchangeType(
@@ -1086,17 +1141,11 @@ core::PlanNodePtr VeloxQueryPlanConverter::toVeloxQueryPlan(
           node->source)) {
     std::optional<core::JoinType> joinType = std::nullopt;
     if (equal(node->predicate, semiJoin->semiJoinOutput)) {
-      joinType = core::JoinType::kLeftSemi;
+      joinType = core::JoinType::kLeftSemiFilter;
     } else if (auto notCall = isNot(node->predicate)) {
       if (equal(notCall->arguments[0], semiJoin->semiJoinOutput)) {
-        joinType = core::JoinType::kNullAwareAnti;
+        joinType = core::JoinType::kAnti;
       }
-    }
-
-    if (!joinType.has_value()) {
-      VELOX_UNSUPPORTED(
-          "Unsupported Filter over SemiJoin: {}",
-          toJsonString(node->predicate));
     }
 
     std::vector<core::FieldAccessTypedExprPtr> leftKeys = {
@@ -1111,10 +1160,27 @@ core::PlanNodePtr VeloxQueryPlanConverter::toVeloxQueryPlan(
     const auto& leftNames = left->outputType()->names();
     const auto& leftTypes = left->outputType()->children();
 
-    std::vector<std::string> names;
-    names.reserve(leftNames.size() + 1);
-    std::copy(leftNames.begin(), leftNames.end(), std::back_inserter(names));
-    names.emplace_back(semiJoin->semiJoinOutput.name);
+    auto names = leftNames;
+    names.push_back(semiJoin->semiJoinOutput.name);
+
+    if (!joinType.has_value()) {
+      auto types = leftTypes;
+      types.push_back(BOOLEAN());
+
+      return std::make_shared<core::FilterNode>(
+          node->id,
+          exprConverter_.toVeloxExpr(node->predicate),
+          std::make_shared<core::HashJoinNode>(
+              semiJoin->id,
+              core::JoinType::kLeftSemiProject,
+              false,
+              leftKeys,
+              rightKeys,
+              nullptr, // filter
+              left,
+              right,
+              ROW(std::move(names), std::move(types))));
+    }
 
     std::vector<core::TypedExprPtr> projections;
     projections.reserve(leftNames.size() + 1);
@@ -1122,7 +1188,8 @@ core::PlanNodePtr VeloxQueryPlanConverter::toVeloxQueryPlan(
       projections.emplace_back(std::make_shared<core::FieldAccessTypedExpr>(
           leftTypes[i], leftNames[i]));
     }
-    const bool constantValue = joinType.value() == core::JoinType::kLeftSemi;
+    const bool constantValue =
+        joinType.value() == core::JoinType::kLeftSemiFilter;
     projections.emplace_back(
         std::make_shared<core::ConstantTypedExpr>(constantValue));
 
@@ -1133,6 +1200,7 @@ core::PlanNodePtr VeloxQueryPlanConverter::toVeloxQueryPlan(
         std::make_shared<core::HashJoinNode>(
             semiJoin->id,
             joinType.value(),
+            joinType == core::JoinType::kAnti ? true : false,
             leftKeys,
             rightKeys,
             nullptr, // filter
@@ -1454,16 +1522,17 @@ VeloxQueryPlanConverter::toVeloxQueryPlan(
     groupingSets.emplace_back(std::move(groupingKeys));
   }
 
-  std::map<std::string, core::FieldAccessTypedExprPtr> outputGroupingKeyNames;
+  std::vector<core::GroupIdNode::GroupingKeyInfo> groupingKeys;
+  groupingKeys.reserve(node->groupingColumns.size());
   for (const auto& [output, input] : node->groupingColumns) {
-    outputGroupingKeyNames.emplace(
-        output.name, exprConverter_.toVeloxExpr(input));
+    groupingKeys.emplace_back(core::GroupIdNode::GroupingKeyInfo{
+        output.name, exprConverter_.toVeloxExpr(input)});
   }
 
   return std::make_shared<core::GroupIdNode>(
       node->id,
       std::move(groupingSets),
-      std::move(outputGroupingKeyNames),
+      std::move(groupingKeys),
       toVeloxExprs(node->aggregationArguments),
       node->groupIdVariable.name,
       toVeloxQueryPlan(node->source, tableWriteInfo, taskId));
@@ -1538,6 +1607,7 @@ core::PlanNodePtr VeloxQueryPlanConverter::toVeloxQueryPlan(
   return std::make_shared<core::HashJoinNode>(
       node->id,
       joinType,
+      false,
       leftKeys,
       rightKeys,
       node->filter ? exprConverter_.toVeloxExpr(*node->filter) : nullptr,
@@ -1632,24 +1702,51 @@ VeloxQueryPlanConverter::toVeloxQueryPlan(
     const std::shared_ptr<const protocol::TableWriterNode>& node,
     const std::shared_ptr<protocol::TableWriteInfo>& tableWriteInfo,
     const protocol::TaskId& taskId) {
-  auto outputTableHandle = std::dynamic_pointer_cast<protocol::CreateHandle>(
-                               tableWriteInfo->writerTarget)
-                               ->handle;
+  std::string connectorId;
+  std::vector<std::shared_ptr<const connector::hive::HiveColumnHandle>>
+      inputColumns;
+  std::shared_ptr<connector::ConnectorInsertTableHandle> hiveTableHandle;
+  if (auto createHandle = std::dynamic_pointer_cast<protocol::CreateHandle>(
+          tableWriteInfo->writerTarget)) {
+    connectorId = createHandle->handle.connectorId;
 
-  auto hiveOutputTableHandle =
-      std::dynamic_pointer_cast<protocol::HiveOutputTableHandle>(
-          outputTableHandle.connectorHandle);
+    auto hiveOutputTableHandle =
+        std::dynamic_pointer_cast<protocol::HiveOutputTableHandle>(
+            createHandle->handle.connectorHandle);
 
-  auto uuid = boost::uuids::random_generator()();
-  auto fileName = boost::uuids::to_string(uuid);
+    for (const auto& columnHandle : hiveOutputTableHandle->inputColumns) {
+      inputColumns.emplace_back(
+          std::dynamic_pointer_cast<connector::hive::HiveColumnHandle>(
+              toColumnHandle(&columnHandle)));
+    }
 
-  auto filePath =
-      fs::path(hiveOutputTableHandle->locationHandle.writePath) / fileName;
+    hiveTableHandle = std::make_shared<connector::hive::HiveInsertTableHandle>(
+        inputColumns, toLocationHandle(hiveOutputTableHandle->locationHandle));
+  } else if (
+      auto insertHandle = std::dynamic_pointer_cast<protocol::InsertHandle>(
+          tableWriteInfo->writerTarget)) {
+    connectorId = insertHandle->handle.connectorId;
 
-  auto hiveTableHandle =
-      std::make_shared<velox::connector::hive::HiveInsertTableHandle>(filePath);
-  auto insertTableHandle = std::make_shared<core::InsertTableHandle>(
-      outputTableHandle.connectorId, hiveTableHandle);
+    auto hiveInsertTableHandle =
+        std::dynamic_pointer_cast<protocol::HiveInsertTableHandle>(
+            insertHandle->handle.connectorHandle);
+
+    for (const auto& columnHandle : hiveInsertTableHandle->inputColumns) {
+      inputColumns.emplace_back(
+          std::dynamic_pointer_cast<connector::hive::HiveColumnHandle>(
+              toColumnHandle(&columnHandle)));
+    }
+
+    hiveTableHandle = std::make_shared<connector::hive::HiveInsertTableHandle>(
+        inputColumns, toLocationHandle(hiveInsertTableHandle->locationHandle));
+  } else {
+    VELOX_UNSUPPORTED(
+        "Unsupported table writer handle: {}",
+        toJsonString(tableWriteInfo->writerTarget));
+  }
+
+  auto insertTableHandle =
+      std::make_shared<core::InsertTableHandle>(connectorId, hiveTableHandle);
 
   auto outputType = toRowType(
       {node->rowCountVariable,
@@ -1662,6 +1759,7 @@ VeloxQueryPlanConverter::toVeloxQueryPlan(
       node->columnNames,
       insertTableHandle,
       outputType,
+      connector::WriteProtocol::CommitStrategy::kNoCommit,
       toVeloxQueryPlan(node->source, tableWriteInfo, taskId));
 }
 
@@ -1757,12 +1855,14 @@ VeloxQueryPlanConverter::toVeloxQueryPlan(
 
   std::vector<core::FieldAccessTypedExprPtr> sortFields;
   std::vector<core::SortOrder> sortOrders;
-  auto nodeSpecOrdering = node->specification.orderingScheme->orderBy;
-  sortFields.reserve(nodeSpecOrdering.size());
-  sortOrders.reserve(nodeSpecOrdering.size());
-  for (const auto& spec : nodeSpecOrdering) {
-    sortFields.emplace_back(exprConverter_.toVeloxExpr(spec.variable));
-    sortOrders.emplace_back(toVeloxSortOrder(spec.sortOrder));
+  if (node->specification.orderingScheme) {
+    auto nodeSpecOrdering = node->specification.orderingScheme->orderBy;
+    sortFields.reserve(nodeSpecOrdering.size());
+    sortOrders.reserve(nodeSpecOrdering.size());
+    for (const auto& spec : nodeSpecOrdering) {
+      sortFields.emplace_back(exprConverter_.toVeloxExpr(spec.variable));
+      sortOrders.emplace_back(toVeloxSortOrder(spec.sortOrder));
+    }
   }
 
   std::vector<std::string> windowNames;
@@ -2054,4 +2154,66 @@ core::PlanFragment VeloxQueryPlanConverter::toVeloxQueryPlan(
         toJsonString(partitioningHandle));
   }
 }
+
+velox::core::PlanFragment VeloxQueryPlanConverter::toBatchVeloxQueryPlan(
+    const protocol::PlanFragment& fragment,
+    const std::shared_ptr<protocol::TableWriteInfo>& tableWriteInfo,
+    const protocol::TaskId& taskId,
+    const std::string& shuffleName,
+    std::shared_ptr<std::string>&& serializedShuffleWriteInfo) {
+  auto planFragment = toVeloxQueryPlan(fragment, tableWriteInfo, taskId);
+
+  // If the serializedShuffleWriteInfo is not nullptr, it means this fragment
+  // ends with a shuffle stage. We convert the PartitionedOutputNode to a
+  // chain of following nodes:
+  // (1) A PartitionAndSerializeNode.
+  // (2) A "gather" LocalPartitionNode that gathers results from multiple
+  //     threads to one thread.
+  // (3) A ShuffleWriteNode.
+  // To be noted, whether the last node of the plan is PartitionedOutputNode
+  // can't guarantee the query has shuffle stage, for example a plan with
+  // TableWriteNode can also have PartitionedOutputNode to distribute the
+  // metadata to coordinator.
+  if (serializedShuffleWriteInfo == nullptr) {
+    return planFragment;
+  }
+  auto partitionedOutputNode =
+      std::dynamic_pointer_cast<const core::PartitionedOutputNode>(
+          planFragment.planNode);
+  VELOX_CHECK(
+      partitionedOutputNode != nullptr, "PartitionedOutputNode is required");
+  if (partitionedOutputNode->isBroadcast()) {
+    VELOX_UNSUPPORTED(
+        "Broadcast partitioned output node in batch is currently not "
+        "supported.");
+  }
+  auto partitionAndSerializeNode = std::make_shared<
+      operators::PartitionAndSerializeNode>(
+      "shuffle-partition-serialize",
+      partitionedOutputNode->keys(),
+      partitionedOutputNode->numPartitions(),
+      ROW({std::string(operators::PartitionAndSerializeNode::
+                           kPartitionColumnNameDefault),
+           std::string(
+               operators::PartitionAndSerializeNode::kDataColumnNameDefault)},
+          {INTEGER(), VARBINARY()}),
+      partitionedOutputNode->sources().back(),
+      partitionedOutputNode->partitionFunctionFactory());
+
+  auto localPartitionNode = std::make_shared<core::LocalPartitionNode>(
+      "shuffle-gather",
+      core::LocalPartitionNode::Type::kGather,
+      nullptr,
+      std::vector<core::PlanNodePtr>{partitionAndSerializeNode});
+
+  auto shuffleWriteNode = std::make_shared<operators::ShuffleWriteNode>(
+      "root",
+      shuffleName,
+      std::move(*serializedShuffleWriteInfo),
+      std::move(localPartitionNode));
+
+  planFragment.planNode = shuffleWriteNode;
+  return planFragment;
+}
+
 } // namespace facebook::presto

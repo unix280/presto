@@ -44,8 +44,8 @@ import com.facebook.presto.split.CloseableSplitSourceProvider;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Analyzer;
+import com.facebook.presto.sql.analyzer.BuiltInQueryPreparer.BuiltInPreparedQuery;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
-import com.facebook.presto.sql.analyzer.QueryPreparer.PreparedQuery;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.InputExtractor;
 import com.facebook.presto.sql.planner.LogicalPlanner;
@@ -136,7 +136,7 @@ public class SqlQueryExecution
     private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
 
     private SqlQueryExecution(
-            PreparedQuery preparedQuery,
+            BuiltInPreparedQuery preparedQuery,
             QueryStateMachine stateMachine,
             String slug,
             int retryCount,
@@ -255,6 +255,11 @@ public class SqlQueryExecution
         stateMachine.setMemoryPool(poolId);
     }
 
+    /**
+     * If query has not started executing, return 0
+     * If the query is executing, gets the size of the current user memory consumed by the query
+     * If the query has finished executing, gets the value of the final query info's {@link QueryStats#getUserMemoryReservation()}
+     */
     @Override
     public DataSize getUserMemoryReservation()
     {
@@ -272,6 +277,9 @@ public class SqlQueryExecution
         return succinctBytes(scheduler.getUserMemoryReservation());
     }
 
+    /**
+     * Gets the current total memory reserved for this query
+     */
     @Override
     public DataSize getTotalMemoryReservation()
     {
@@ -289,12 +297,19 @@ public class SqlQueryExecution
         return succinctBytes(scheduler.getTotalMemoryReservation());
     }
 
+    /**
+     * Gets the timestamp this query was registered for execution with the query state machine
+     */
     @Override
     public DateTime getCreateTime()
     {
         return stateMachine.getCreateTime();
     }
 
+    /**
+     * For a query that has started executing, returns the timestamp when this query started executing
+     * Otherwise returns a {@link Optional#empty()}
+     */
     @Override
     public Optional<DateTime> getExecutionStartTime()
     {
@@ -307,12 +322,19 @@ public class SqlQueryExecution
         return stateMachine.getLastHeartbeat();
     }
 
+    /**
+     * For a query that has finished execution, returns the timestamp when this query stopped executing
+     * Otherwise returns a {@link Optional#empty()}
+     */
     @Override
     public Optional<DateTime> getEndTime()
     {
         return stateMachine.getEndTime();
     }
 
+    /**
+     * Gets the total cputime spent in executing the query
+     */
     @Override
     public Duration getTotalCpuTime()
     {
@@ -377,12 +399,20 @@ public class SqlQueryExecution
                 .orElseGet(() -> stateMachine.getBasicQueryInfo(Optional.ofNullable(queryScheduler.get()).map(SqlQuerySchedulerInterface::getBasicStageStats)));
     }
 
+    /**
+     * Gets the number of tasks associated with this query that are still running
+     */
     @Override
     public int getRunningTaskCount()
     {
         return stateMachine.getCurrentRunningTaskCount();
     }
 
+    /**
+     * Start the execution of the query. At a high level steps are :
+     * 1. Build the logical and physical execution plan of the query
+     * 2. Start the query execution by calling {@link SqlQuerySchedulerInterface#start()}
+     */
     @Override
     public void start()
     {
@@ -401,8 +431,8 @@ public class SqlQueryExecution
                         Thread.currentThread(),
                         timeoutThreadExecutor,
                         getQueryAnalyzerTimeout(getSession()))) {
-                    // analyze query
-                    plan = analyzeQuery();
+                    // create logical plan for the query
+                    plan = createLogicalPlan();
                 }
 
                 metadata.beginQuery(getSession(), plan.getConnectors());
@@ -430,6 +460,10 @@ public class SqlQueryExecution
         }
     }
 
+    /**
+     * Adds a listener to be notified about {@link QueryState} changes
+     * @param stateChangeListener The state change listener
+     */
     @Override
     public void addStateChangeListener(StateChangeListener<QueryState> stateChangeListener)
     {
@@ -464,50 +498,45 @@ public class SqlQueryExecution
         stateMachine.addQueryInfoStateChangeListener(stateChangeListener);
     }
 
-    private PlanRoot analyzeQuery()
+    private PlanRoot createLogicalPlan()
     {
         try {
-            return doAnalyzeQuery();
+            // time analysis phase
+            stateMachine.beginAnalysis();
+
+            // plan query
+            LogicalPlanner logicalPlanner = new LogicalPlanner(false, stateMachine.getSession(), planOptimizers, idAllocator, metadata, sqlParser, statsCalculator, costCalculator, stateMachine.getWarningCollector(), planChecker);
+            Plan plan = getSession().getRuntimeStats().profileNanos(
+                    LOGICAL_PLANNER_TIME_NANOS,
+                    () -> logicalPlanner.plan(analysis));
+            queryPlan.set(plan);
+            stateMachine.setPlanStatsAndCosts(plan.getStatsAndCosts());
+            stateMachine.setPlanCanonicalInfo(getCanonicalInfo(getSession(), plan.getRoot(), planCanonicalInfoProvider));
+
+            // extract inputs
+            List<Input> inputs = new InputExtractor(metadata, stateMachine.getSession()).extractInputs(plan.getRoot());
+            stateMachine.setInputs(inputs);
+
+            // extract output
+            Optional<Output> output = new OutputExtractor().extractOutput(plan.getRoot());
+            stateMachine.setOutput(output);
+
+            // fragment the plan
+            // the variableAllocator is finally passed to SqlQueryScheduler for runtime cost-based optimizations
+            variableAllocator.set(new PlanVariableAllocator(plan.getTypes().allVariables()));
+            SubPlan fragmentedPlan = getSession().getRuntimeStats().profileNanos(
+                    FRAGMENT_PLAN_TIME_NANOS,
+                    () -> planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, idAllocator, variableAllocator.get(), stateMachine.getWarningCollector()));
+
+            // record analysis time
+            stateMachine.endAnalysis();
+
+            boolean explainAnalyze = analysis.getStatement() instanceof Explain && ((Explain) analysis.getStatement()).isAnalyze();
+            return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
         }
         catch (StackOverflowError e) {
             throw new PrestoException(NOT_SUPPORTED, "statement is too large (stack overflow during analysis)", e);
         }
-    }
-
-    private PlanRoot doAnalyzeQuery()
-    {
-        // time analysis phase
-        stateMachine.beginAnalysis();
-
-        // plan query
-        LogicalPlanner logicalPlanner = new LogicalPlanner(false, stateMachine.getSession(), planOptimizers, idAllocator, metadata, sqlParser, statsCalculator, costCalculator, stateMachine.getWarningCollector(), planChecker);
-        Plan plan = getSession().getRuntimeStats().profileNanos(
-                LOGICAL_PLANNER_TIME_NANOS,
-                () -> logicalPlanner.plan(analysis));
-        queryPlan.set(plan);
-        stateMachine.setPlanStatsAndCosts(plan.getStatsAndCosts());
-        stateMachine.setPlanCanonicalInfo(getCanonicalInfo(getSession(), plan.getRoot(), planCanonicalInfoProvider));
-
-        // extract inputs
-        List<Input> inputs = new InputExtractor(metadata, stateMachine.getSession()).extractInputs(plan.getRoot());
-        stateMachine.setInputs(inputs);
-
-        // extract output
-        Optional<Output> output = new OutputExtractor().extractOutput(plan.getRoot());
-        stateMachine.setOutput(output);
-
-        // fragment the plan
-        // the variableAllocator is finally passed to SqlQueryScheduler for runtime cost-based optimizations
-        variableAllocator.set(new PlanVariableAllocator(plan.getTypes().allVariables()));
-        SubPlan fragmentedPlan = getSession().getRuntimeStats().profileNanos(
-                FRAGMENT_PLAN_TIME_NANOS,
-                () -> planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, idAllocator, variableAllocator.get(), stateMachine.getWarningCollector()));
-
-        // record analysis time
-        stateMachine.endAnalysis();
-
-        boolean explainAnalyze = analysis.getStatement() instanceof Explain && ((Explain) analysis.getStatement()).isAnalyze();
-        return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
     }
 
     private static Set<ConnectorId> extractConnectors(Analysis analysis)
@@ -616,12 +645,20 @@ public class SqlQueryExecution
         }
     }
 
+    /**
+     * Try to cancel the execution of the query.
+     * TODO : Add more details on how cancellation request is propagated to tasks, connectors etc
+     */
     @Override
     public void cancelQuery()
     {
         stateMachine.transitionToCanceled();
     }
 
+    /**
+     * Try to cancel the execution of a specific stage
+     * @param stageId id of the stage to cancel
+     */
     @Override
     public void cancelStage(StageId stageId)
     {
@@ -635,6 +672,10 @@ public class SqlQueryExecution
         }
     }
 
+    /**
+     * Fail the execution of the query with a specific cause
+     * @param cause The cause for failing the query execution
+     */
     @Override
     public void fail(Throwable cause)
     {
@@ -649,24 +690,39 @@ public class SqlQueryExecution
         stateMachine.updateQueryInfo(Optional.ofNullable(scheduler).map(SqlQuerySchedulerInterface::getStageInfo));
     }
 
+    /**
+     * Checks if the query is done executing
+     */
     @Override
     public boolean isDone()
     {
         return getState().isDone();
     }
 
+    /**
+     * Register a listener to be notified about new {@link QueryOutputInfo} buffers created as tasks execute in this query
+     * @param listener the listener
+     */
     @Override
     public void addOutputInfoListener(Consumer<QueryOutputInfo> listener)
     {
         stateMachine.addOutputInfoListener(listener);
     }
 
+    /**
+     * Gets a future that completes when the current query state has changed
+     *
+     * @param currentState The current query state. If the query state is not equal to this state, the future returned will already be completed
+     */
     @Override
     public ListenableFuture<QueryState> getStateChange(QueryState currentState)
     {
         return stateMachine.getStateChange(currentState);
     }
 
+    /**
+     * Record a heartbeat with the query state machine
+     */
     @Override
     public void recordHeartbeat()
     {
@@ -685,6 +741,10 @@ public class SqlQueryExecution
         return stateMachine.getQueryId();
     }
 
+    /**
+     * If the query is still executing, build and return a {@link QueryInfo} of the current query state
+     * If the query has finished executing, return the final {@link QueryInfo} stored in the query state machine
+     */
     @Override
     public QueryInfo getQueryInfo()
     {
@@ -704,6 +764,9 @@ public class SqlQueryExecution
         return stateMachine.getQueryState();
     }
 
+    /**
+     * Gets the logical query plan
+     */
     @Override
     public Plan getQueryPlan()
     {
@@ -831,7 +894,7 @@ public class SqlQueryExecution
 
         @Override
         public QueryExecution createQueryExecution(
-                PreparedQuery preparedQuery,
+                BuiltInPreparedQuery preparedQuery,
                 QueryStateMachine stateMachine,
                 String slug,
                 int retryCount,

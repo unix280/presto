@@ -25,6 +25,7 @@ import com.facebook.presto.matching.Match;
 import com.facebook.presto.matching.Matcher;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.eventlistener.PlanOptimizerInformation;
 import com.facebook.presto.spi.plan.LogicalPropertiesProvider;
 import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
@@ -35,6 +36,7 @@ import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.Duration;
 
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -121,9 +123,11 @@ public class IterativeOptimizer
         CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(memo), session);
         Context context = new Context(memo, lookup, idAllocator, variableAllocator, System.nanoTime(), timeout.toMillis(), session, warningCollector, costProvider, statsProvider);
         boolean planChanged = exploreGroup(memo.getRootGroup(), context, matcher);
+        context.collectOptimizerInformation();
         if (!planChanged) {
             return plan;
         }
+
         return memo.extract();
     }
 
@@ -181,6 +185,7 @@ public class IterativeOptimizer
                         }
                     }
                     node = context.memo.replace(group, transformedNode, rule.getClass().getName());
+                    context.addRulesTriggered(rule.getClass().getSimpleName());
 
                     done = false;
                     progress = true;
@@ -286,6 +291,12 @@ public class IterativeOptimizer
             {
                 return context.warningCollector;
             }
+
+            @Override
+            public Optional<LogicalPropertiesProvider> getLogicalPropertiesProvider()
+            {
+                return logicalPropertiesProvider;
+            }
         };
     }
 
@@ -301,6 +312,7 @@ public class IterativeOptimizer
         private final WarningCollector warningCollector;
         private final CostProvider costProvider;
         private final StatsProvider statsProvider;
+        private final Set<String> rulesTriggered;
 
         public Context(
                 Memo memo,
@@ -326,6 +338,7 @@ public class IterativeOptimizer
             this.warningCollector = warningCollector;
             this.costProvider = costProvider;
             this.statsProvider = statsProvider;
+            this.rulesTriggered = new HashSet<>();
         }
 
         public void checkTimeoutNotExhausted()
@@ -333,6 +346,16 @@ public class IterativeOptimizer
             if ((NANOSECONDS.toMillis(System.nanoTime() - startTimeInNanos)) >= timeoutInMilliseconds) {
                 throw new PrestoException(OPTIMIZER_TIMEOUT, format("The optimizer exhausted the time limit of %d ms", timeoutInMilliseconds));
             }
+        }
+
+        public void addRulesTriggered(String rule)
+        {
+            rulesTriggered.add(rule);
+        }
+
+        public void collectOptimizerInformation()
+        {
+            rulesTriggered.forEach(x -> session.getOptimizerInformationCollector().addInformation(new PlanOptimizerInformation(x, true, Optional.empty())));
         }
     }
 }

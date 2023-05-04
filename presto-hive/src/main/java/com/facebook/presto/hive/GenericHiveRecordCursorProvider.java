@@ -29,7 +29,6 @@ import javax.inject.Inject;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -52,21 +51,18 @@ public class GenericHiveRecordCursorProvider
     public Optional<RecordCursor> createRecordCursor(
             Configuration configuration,
             ConnectorSession session,
-            Path path,
-            long start,
-            long length,
-            long fileSize,
+            HiveFileSplit fileSplit,
             Properties schema,
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
             TypeManager typeManager,
-            boolean s3SelectPushdownEnabled,
-            Map<String, String> customSplitInfo)
+            boolean s3SelectPushdownEnabled)
     {
         // make sure the FileSystem is created with the proper Configuration object
+        Path path = new Path(fileSplit.getPath());
         try {
-            if (!customSplitInfo.isEmpty() && isHudiRealtimeSplit(customSplitInfo)) {
+            if (!fileSplit.getCustomSplitInfo().isEmpty() && isHudiRealtimeSplit(fileSplit.getCustomSplitInfo())) {
                 if (configuration instanceof HiveCachingHdfsConfiguration.CachingJobConf) {
                     configuration = ((HiveCachingHdfsConfiguration.CachingJobConf) configuration).getConfig();
                 }
@@ -83,13 +79,13 @@ public class GenericHiveRecordCursorProvider
         Configuration actualConfiguration = configuration;
 
         RecordReader<?, ?> recordReader = hdfsEnvironment.doAs(session.getUser(),
-                () -> HiveUtil.createRecordReader(actualConfiguration, path, start, length, schema, columns, customSplitInfo));
+                () -> HiveUtil.createRecordReader(actualConfiguration, path, fileSplit.getStart(), fileSplit.getLength(), schema, columns, fileSplit.getCustomSplitInfo()));
         return hdfsEnvironment.doAs(session.getUser(),
                 () -> Optional.of(new GenericHiveRecordCursor<>(
                         actualConfiguration,
                         path,
                         genericRecordReader(recordReader),
-                        length,
+                        fileSplit.getLength(),
                         schema,
                         columns,
                         hiveStorageTimeZone,

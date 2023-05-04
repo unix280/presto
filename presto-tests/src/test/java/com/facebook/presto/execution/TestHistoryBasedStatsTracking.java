@@ -79,21 +79,6 @@ public class TestHistoryBasedStatsTracking
     }
 
     @Test
-    public void testStrategyTracking()
-    {
-        // CBO Statistics
-        assertPlan(
-                "SELECT * FROM nation where substr(name, 1, 1) = 'A'",
-                anyTree(node(FilterNode.class, any()).withOutputRowCount(Double.NaN)));
-
-        // HBO Statistics
-        executeAndTrackHistory("SELECT *, 1 FROM nation where substr(name, 1, 1) = 'A'");
-        assertPlan(
-                "SELECT *, 2 FROM nation where substr(name, 1, 1) = 'A'",
-                anyTree(node(ProjectNode.class, anyTree(any())).withOutputRowCount(2)));
-    }
-
-    @Test
     public void testHistoryBasedStatsCalculator()
     {
         // CBO Statistics
@@ -105,7 +90,7 @@ public class TestHistoryBasedStatsTracking
         executeAndTrackHistory("SELECT * FROM nation where substr(name, 1, 1) = 'A'");
         assertPlan(
                 "SELECT * FROM nation where substr(name, 1, 1) = 'A'",
-                anyTree(node(FilterNode.class, any()).withOutputRowCount(2)));
+                anyTree(node(FilterNode.class, any()).withOutputRowCount(2).withOutputSize(199)));
 
         // CBO Statistics
         assertPlan(
@@ -119,11 +104,11 @@ public class TestHistoryBasedStatsTracking
         executeAndTrackHistory("SELECT max(nationkey) FROM nation where name < 'D' group by regionkey");
         assertPlan(
                 "SELECT max(nationkey) FROM nation where name < 'D' group by regionkey",
-                anyTree(node(ProjectNode.class, node(FilterNode.class, any())).withOutputRowCount(5)));
+                anyTree(node(ProjectNode.class, node(FilterNode.class, any())).withOutputRowCount(5).withOutputSize(90)));
 
         assertPlan(
                 "SELECT max(nationkey) FROM nation where name < 'D' group by regionkey",
-                anyTree(node(AggregationNode.class, node(ExchangeNode.class, anyTree(any()))).withOutputRowCount(3)));
+                anyTree(node(AggregationNode.class, node(ExchangeNode.class, anyTree(any()))).withOutputRowCount(3).withOutputSize(54)));
     }
 
     @Test
@@ -151,6 +136,34 @@ public class TestHistoryBasedStatsTracking
     }
 
     @Test
+    public void testUnionMultiple()
+    {
+        assertPlan(
+                "SELECT * FROM nation where substr(name, 1, 1) = 'A' UNION ALL " +
+                        "SELECT * FROM nation where substr(name, 1, 1) = 'B' UNION ALL " +
+                        "SELECT * FROM nation where substr(name, 1, 1) = 'C'",
+                anyTree(node(ExchangeNode.class, anyTree(any()), anyTree(any()), anyTree(any())).withOutputRowCount(Double.NaN)));
+
+        executeAndTrackHistory("SELECT * FROM nation where substr(name, 1, 1) = 'A' UNION ALL " +
+                "SELECT * FROM nation where substr(name, 1, 1) = 'B' UNION ALL " +
+                "SELECT * FROM nation where substr(name, 1, 1) = 'C'");
+        assertPlan(
+                "SELECT * FROM nation where substr(name, 1, 1) = 'B' UNION ALL " +
+                        "SELECT * FROM nation where substr(name, 1, 1) = 'C' UNION ALL " +
+                        "SELECT * FROM nation where substr(name, 1, 1) = 'A'",
+                anyTree(node(ExchangeNode.class, anyTree(any()), anyTree(any()), anyTree(any())).withOutputRowCount(5)));
+
+        assertPlan(
+                "SELECT nationkey FROM nation where substr(name, 1, 1) = 'A' UNION ALL SELECT nationkey FROM customer where nationkey < 10",
+                anyTree(node(ExchangeNode.class, anyTree(any()), anyTree(any())).withOutputRowCount(Double.NaN)));
+
+        executeAndTrackHistory("SELECT nationkey FROM nation where substr(name, 1, 1) = 'A' UNION ALL SELECT nationkey FROM customer  where nationkey < 10");
+        assertPlan(
+                " SELECT nationkey FROM customer where nationkey < 10 UNION ALL SELECT nationkey FROM nation where substr(name, 1, 1) = 'A'",
+                anyTree(node(ExchangeNode.class, anyTree(any()), anyTree(any())).withOutputRowCount(601)));
+    }
+
+    @Test
     public void testJoin()
     {
         assertPlan(
@@ -167,6 +180,10 @@ public class TestHistoryBasedStatsTracking
         assertPlan(
                 "SELECT N.name, O.totalprice, C.name FROM orders O, customer C, nation N WHERE N.nationkey = C.nationkey and C.custkey = O.custkey and year(O.orderdate) = 1995 AND substr(N.name, 1, 1) >= 'C'",
                 anyTree(node(JoinNode.class, anyTree(anyTree(any()), anyTree(any())), anyTree(any())).withOutputRowCount(1915)));
+        // Check that output size doesn't include hash variables
+        assertPlan(
+                "SELECT N.name, O.totalprice, C.name FROM orders O, customer C, nation N WHERE N.nationkey = C.nationkey and C.custkey = O.custkey and year(O.orderdate) = 1995 AND substr(N.name, 1, 1) >= 'C'",
+                anyTree(anyTree(anyTree(any()), anyTree(any())), anyTree(node(ProjectNode.class, anyTree(any())).withOutputRowCount(22).withOutputSize(661 - 22 * 8))));
     }
 
     @Test
@@ -176,7 +193,12 @@ public class TestHistoryBasedStatsTracking
                 "SELECT * FROM nation where substr(name, 1, 1) = 'A'",
                 anyTree(node(FilterNode.class, any()).withOutputRowCount(Double.NaN)));
 
-        executeAndTrackHistory("SELECT * FROM nation where substr(name, 1, 1) = 'A' LIMIT 1");
+        // Limit nodes may cause workers to break early and not log statistics.
+        // This happens in some runs, so running it a few times should make it likely that some run succeeded in storing
+        // stats.
+        for (int i = 0; i < 10; ++i) {
+            executeAndTrackHistory("SELECT * FROM nation where substr(name, 1, 1) = 'A' LIMIT 1");
+        }
         // Don't track stats of filter node when limit is not present
         assertPlan(
                 "SELECT * FROM nation where substr(name, 1, 1) = 'A'",

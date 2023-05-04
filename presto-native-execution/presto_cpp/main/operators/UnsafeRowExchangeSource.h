@@ -1,6 +1,4 @@
 /*
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,8 +26,8 @@ class UnsafeRowExchangeSource : public velox::exec::ExchangeSource {
       const std::string& taskId,
       int destination,
       std::shared_ptr<velox::exec::ExchangeQueue> queue,
-      ShuffleInterface* shuffle,
-      velox::memory::MemoryPool* pool)
+      const std::shared_ptr<ShuffleReader>& shuffle,
+      velox::memory::MemoryPool* FOLLY_NONNULL pool)
       : ExchangeSource(taskId, destination, queue, pool), shuffle_(shuffle) {}
 
   bool shouldRequestLocked() override {
@@ -40,7 +38,15 @@ class UnsafeRowExchangeSource : public velox::exec::ExchangeSource {
 
   void close() override {}
 
+  /// url needs to follow below format:
+  /// batch://<taskid>?shuffleInfo=<serialized-shuffle-info>
+  static std::unique_ptr<velox::exec::ExchangeSource> createExchangeSource(
+      const std::string& url,
+      int32_t destination,
+      std::shared_ptr<velox::exec::ExchangeQueue> queue,
+      velox::memory::MemoryPool* FOLLY_NONNULL pool);
+
  private:
-  ShuffleInterface* shuffle_;
+  const std::shared_ptr<ShuffleReader> shuffle_;
 };
 } // namespace facebook::presto::operators

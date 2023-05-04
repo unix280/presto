@@ -26,13 +26,13 @@ import com.facebook.presto.resourcemanager.DistributedClusterStatsResource;
 import com.facebook.presto.resourcemanager.DistributedQueryInfoResource;
 import com.facebook.presto.resourcemanager.DistributedQueryResource;
 import com.facebook.presto.resourcemanager.DistributedResourceGroupInfoResource;
+import com.facebook.presto.resourcemanager.DistributedTaskInfoResource;
 import com.facebook.presto.resourcemanager.ForResourceManager;
 import com.facebook.presto.resourcemanager.RaftConfig;
 import com.facebook.presto.resourcemanager.RatisServer;
 import com.facebook.presto.resourcemanager.ResourceManagerClusterStateProvider;
 import com.facebook.presto.resourcemanager.ResourceManagerProxy;
 import com.facebook.presto.resourcemanager.ResourceManagerServer;
-import com.facebook.presto.sql.analyzer.QueryPreparer;
 import com.facebook.presto.transaction.NoOpTransactionManager;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.inject.Binder;
@@ -80,7 +80,7 @@ public class ResourceManagerModule
         binder.bind(QueryManager.class).to(NoOpQueryManager.class).in(Scopes.SINGLETON);
         jaxrsBinder(binder).bind(DistributedResourceGroupInfoResource.class);
         binder.bind(QueryIdGenerator.class).in(Scopes.SINGLETON);
-        binder.bind(QueryPreparer.class).in(Scopes.SINGLETON);
+
         binder.bind(SessionSupplier.class).to(QuerySessionSupplier.class).in(Scopes.SINGLETON);
 
         binder.bind(ResourceGroupManager.class).to(NoOpResourceGroupManager.class);
@@ -102,6 +102,7 @@ public class ResourceManagerModule
         jaxrsBinder(binder).bind(DistributedQueryResource.class);
         jaxrsBinder(binder).bind(DistributedQueryInfoResource.class);
         jaxrsBinder(binder).bind(DistributedClusterStatsResource.class);
+        jaxrsBinder(binder).bind(DistributedTaskInfoResource.class);
 
         httpClientBinder(binder).bindHttpClient("resourceManager", ForResourceManager.class);
         binder.bind(ResourceManagerProxy.class).in(Scopes.SINGLETON);

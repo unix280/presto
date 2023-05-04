@@ -38,6 +38,7 @@ import com.facebook.presto.cost.CostCalculatorUsingExchanges;
 import com.facebook.presto.cost.CostCalculatorWithEstimatedExchanges;
 import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.FilterStatsCalculator;
+import com.facebook.presto.cost.FragmentStatsProvider;
 import com.facebook.presto.cost.HistoryBasedOptimizationConfig;
 import com.facebook.presto.cost.HistoryBasedPlanStatisticsManager;
 import com.facebook.presto.cost.ScalarStatsCalculator;
@@ -102,7 +103,6 @@ import com.facebook.presto.metadata.SchemaPropertyManager;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.metadata.Split;
 import com.facebook.presto.metadata.TablePropertyManager;
-import com.facebook.presto.metadata.ViewDefinition;
 import com.facebook.presto.operator.Driver;
 import com.facebook.presto.operator.DriverContext;
 import com.facebook.presto.operator.DriverFactory;
@@ -127,6 +127,7 @@ import com.facebook.presto.spi.PageIndexerFactory;
 import com.facebook.presto.spi.PageSorter;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.analyzer.AnalyzerOptions;
 import com.facebook.presto.spi.connector.ConnectorFactory;
 import com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy;
 import com.facebook.presto.spi.eventlistener.EventListener;
@@ -149,11 +150,13 @@ import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.split.SplitSource;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Analyzer;
-import com.facebook.presto.sql.analyzer.AnalyzerOptions;
+import com.facebook.presto.sql.analyzer.AnalyzerProviderManager;
+import com.facebook.presto.sql.analyzer.BuiltInAnalyzerProvider;
+import com.facebook.presto.sql.analyzer.BuiltInQueryPreparer;
+import com.facebook.presto.sql.analyzer.BuiltInQueryPreparer.BuiltInPreparedQuery;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
-import com.facebook.presto.sql.analyzer.QueryPreparer;
-import com.facebook.presto.sql.analyzer.QueryPreparer.PreparedQuery;
+import com.facebook.presto.sql.analyzer.ViewDefinition;
 import com.facebook.presto.sql.gen.ExpressionCompiler;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler;
@@ -201,6 +204,7 @@ import com.facebook.presto.sql.tree.StartTransaction;
 import com.facebook.presto.sql.tree.Statement;
 import com.facebook.presto.sql.tree.TruncateTable;
 import com.facebook.presto.testing.PageConsumerOperator.PageConsumerOutputFactory;
+import com.facebook.presto.tracing.TracerProviderManager;
 import com.facebook.presto.tracing.TracingConfig;
 import com.facebook.presto.transaction.InMemoryTransactionManager;
 import com.facebook.presto.transaction.TransactionManager;
@@ -317,6 +321,7 @@ public class LocalQueryRunner
     private final boolean alwaysRevokeMemory;
     private final NodeSpillConfig nodeSpillConfig;
     private final NodeSchedulerConfig nodeSchedulerConfig;
+    private final FragmentStatsProvider fragmentStatsProvider;
     private boolean printPlan;
 
     private final PlanChecker distributedPlanChecker;
@@ -423,7 +428,8 @@ public class LocalQueryRunner
         this.scalarStatsCalculator = new ScalarStatsCalculator(metadata);
         this.filterStatsCalculator = new FilterStatsCalculator(metadata, scalarStatsCalculator, statsNormalizer);
         this.historyBasedPlanStatisticsManager = new HistoryBasedPlanStatisticsManager(objectMapper, new SessionPropertyManager(), metadata, new HistoryBasedOptimizationConfig());
-        this.statsCalculator = createNewStatsCalculator(metadata, scalarStatsCalculator, statsNormalizer, filterStatsCalculator, historyBasedPlanStatisticsManager);
+        this.fragmentStatsProvider = new FragmentStatsProvider();
+        this.statsCalculator = createNewStatsCalculator(metadata, scalarStatsCalculator, statsNormalizer, filterStatsCalculator, historyBasedPlanStatisticsManager, fragmentStatsProvider);
         this.taskCountEstimator = new TaskCountEstimator(() -> nodeCountForStats);
         this.costCalculator = new CostCalculatorUsingExchanges(taskCountEstimator);
         this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, taskCountEstimator);
@@ -476,6 +482,7 @@ public class LocalQueryRunner
                 connectorManager,
                 metadata,
                 new NoOpResourceGroupManager(),
+                new AnalyzerProviderManager(new BuiltInAnalyzerProvider(new BuiltInQueryPreparer(sqlParser))),
                 accessControl,
                 new PasswordAuthenticatorManager(),
                 new EventListenerManager(),
@@ -485,7 +492,8 @@ public class LocalQueryRunner
                 new SessionPropertyDefaults(nodeInfo),
                 new ThrowingNodeTtlFetcherManager(),
                 new ThrowingClusterTtlProviderManager(),
-                historyBasedPlanStatisticsManager);
+                historyBasedPlanStatisticsManager,
+                new TracerProviderManager(new TracingConfig()));
 
         connectorManager.addConnectorFactory(globalSystemConnectorFactory, globalSystemConnectorFactory.getClass()::getClassLoader);
         connectorManager.createConnection(GlobalSystemConnector.NAME, GlobalSystemConnector.NAME, ImmutableMap.of());
@@ -619,6 +627,11 @@ public class LocalQueryRunner
     public SplitManager getSplitManager()
     {
         return splitManager;
+    }
+
+    public FragmentStatsProvider getFragmentStatsProvider()
+    {
+        return fragmentStatsProvider;
     }
 
     @Override
@@ -841,7 +854,7 @@ public class LocalQueryRunner
     private List<Driver> createDrivers(Session session, Plan plan, OutputFactory outputFactory, TaskContext taskContext)
     {
         if (printPlan) {
-            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata.getFunctionAndTypeManager(), plan.getStatsAndCosts(), session, 0, false));
+            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), plan.getStatsAndCosts(), metadata.getFunctionAndTypeManager(), session, 0, false));
         }
 
         SubPlan subplan = createSubPlans(session, plan, true);
@@ -890,7 +903,8 @@ public class LocalQueryRunner
                 Optional.empty(),
                 new UnsupportedRemoteSourceFactory(),
                 createTableWriteInfo(streamingSubPlan, metadata, session),
-                false);
+                false,
+                ImmutableList.of());
 
         // generate sources
         List<TaskSource> sources = new ArrayList<>();
@@ -991,7 +1005,7 @@ public class LocalQueryRunner
     public Plan createPlan(Session session, @Language("SQL") String sql, LogicalPlanner.Stage stage, boolean forceSingleNode, WarningCollector warningCollector)
     {
         AnalyzerOptions analyzerOptions = createAnalyzerOptions(session, warningCollector);
-        PreparedQuery preparedQuery = new QueryPreparer(sqlParser).prepareQuery(analyzerOptions, sql, session.getPreparedStatements(), warningCollector);
+        BuiltInPreparedQuery preparedQuery = new BuiltInQueryPreparer(sqlParser).prepareQuery(analyzerOptions, sql, session.getPreparedStatements(), warningCollector);
 
         assertFormattedSql(sqlParser, createParsingOptions(session), preparedQuery.getStatement());
 
@@ -1027,7 +1041,7 @@ public class LocalQueryRunner
     public Plan createPlan(Session session, @Language("SQL") String sql, List<PlanOptimizer> optimizers, LogicalPlanner.Stage stage, WarningCollector warningCollector)
     {
         AnalyzerOptions analyzerOptions = createAnalyzerOptions(session, warningCollector);
-        PreparedQuery preparedQuery = new QueryPreparer(sqlParser).prepareQuery(analyzerOptions, sql, session.getPreparedStatements(), warningCollector);
+        BuiltInPreparedQuery preparedQuery = new BuiltInQueryPreparer(sqlParser).prepareQuery(analyzerOptions, sql, session.getPreparedStatements(), warningCollector);
         assertFormattedSql(sqlParser, createParsingOptions(session), preparedQuery.getStatement());
 
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();

@@ -16,6 +16,7 @@ package com.facebook.presto.sql.planner;
 import com.facebook.presto.common.plan.PlanCanonicalizationStrategy;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorId;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.plan.AggregationNode;
 import com.facebook.presto.spi.plan.AggregationNode.Aggregation;
@@ -33,6 +34,7 @@ import com.facebook.presto.spi.plan.UnionNode;
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
+import com.facebook.presto.sql.planner.optimizations.PlanNodeSearcher;
 import com.facebook.presto.sql.planner.plan.GroupIdNode;
 import com.facebook.presto.sql.planner.plan.InternalPlanVisitor;
 import com.facebook.presto.sql.planner.plan.JoinNode;
@@ -42,11 +44,13 @@ import com.facebook.presto.sql.planner.plan.TableWriterNode;
 import com.facebook.presto.sql.planner.plan.UnnestNode;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 
@@ -60,6 +64,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.common.function.OperatorType.EQUAL;
 import static com.facebook.presto.common.plan.PlanCanonicalizationStrategy.DEFAULT;
@@ -67,6 +72,7 @@ import static com.facebook.presto.common.plan.PlanCanonicalizationStrategy.REMOV
 import static com.facebook.presto.common.type.IntegerType.INTEGER;
 import static com.facebook.presto.expressions.CanonicalRowExpressionRewriter.canonicalizeRowExpression;
 import static com.facebook.presto.expressions.LogicalRowExpressions.extractConjuncts;
+import static com.facebook.presto.spi.StandardErrorCode.PLAN_SERIALIZATION_ERROR;
 import static com.facebook.presto.sql.planner.CanonicalPartitioningScheme.getCanonicalPartitioningScheme;
 import static com.facebook.presto.sql.planner.CanonicalTableScanNode.CanonicalTableHandle.getCanonicalTableHandle;
 import static com.facebook.presto.sql.planner.RowExpressionVariableInliner.inlineVariables;
@@ -133,7 +139,7 @@ public class CanonicalPlanGenerator
             return Optional.empty();
         }
 
-        PlanNode result = new StatsEquivalentPlanNodeWithLimit(planNodeidAllocator.getNextId(), plan.get(), (LimitNode) limit.get());
+        PlanNode result = new StatsEquivalentPlanNodeWithLimit(plan.get().getId(), plan.get(), (LimitNode) limit.get());
         context.addPlan(node, new CanonicalPlan(result, strategy));
         return Optional.of(result);
     }
@@ -211,7 +217,7 @@ public class CanonicalPlanGenerator
         }
 
         PlanNode result = new LimitNode(Optional.empty(), planNodeidAllocator.getNextId(), source.get(), node.getCount(), node.getStep());
-        context.addPlan(node, new CanonicalPlan(result, strategy));
+        context.addLimitNodePlan(node, new CanonicalPlan(result, strategy));
         return Optional.of(result);
     }
 
@@ -243,7 +249,7 @@ public class CanonicalPlanGenerator
                     allFilters.add(filter);
                 });
             }
-            top.getSources().forEach(source -> {
+            for (PlanNode source : top.getSources()) {
                 if (source instanceof JoinNode
                         && ((JoinNode) source).getType().equals(node.getType())
                         && shouldMergeJoinNodes(node.getType())) {
@@ -252,20 +258,16 @@ public class CanonicalPlanGenerator
                 else {
                     sources.add(source);
                 }
-            });
+            }
         }
 
         // Sort sources if all are INNER, or full outer join of 2 nodes
         if (shouldMergeJoinNodes(node.getType()) || (node.getType().equals(JoinNode.Type.FULL) && sources.size() == 2)) {
-            Map<PlanNode, String> sourceKeys = new IdentityHashMap<>();
-            for (PlanNode source : sources) {
-                Optional<CanonicalPlan> canonicalSource = generateCanonicalPlan(source, strategy, objectMapper);
-                if (!canonicalSource.isPresent()) {
-                    return Optional.empty();
-                }
-                sourceKeys.put(source, canonicalSource.get().toString(objectMapper));
+            Optional<List<Integer>> sourceIndexes = orderSources(sources);
+            if (!sourceIndexes.isPresent()) {
+                return Optional.empty();
             }
-            sources.sort(comparing(sourceKeys::get));
+            sources = sourceIndexes.get().stream().map(sources::get).collect(toImmutableList());
         }
 
         ImmutableList.Builder<PlanNode> newSources = ImmutableList.builder();
@@ -282,7 +284,7 @@ public class CanonicalPlanGenerator
                 .collect(toCollection(LinkedHashSet::new));
         Set<RowExpression> newFilters = allFilters.build().stream()
                 .map(filter -> inlineAndCanonicalize(context.getExpressions(), filter))
-                .sorted(comparing(RowExpression::toString))
+                .sorted(comparing(this::writeValueAsString))
                 .collect(toCollection(LinkedHashSet::new));
         List<VariableReferenceExpression> outputVariables = node.getOutputVariables().stream()
                 .map(variable -> inlineAndCanonicalize(context.getExpressions(), variable))
@@ -307,34 +309,26 @@ public class CanonicalPlanGenerator
             return Optional.empty();
         }
 
-        // We want to order sources in a consistent manner. Variable names and plan node ids can mess with that because of
-        // our stateful canonicalization using `variableAllocator` and `planNodeIdAllocator`.
-        // So, we first try to canonicalize each source independently. They may have conflicting variable names, but we only use it
-        // to decide order, and then canonicalize them properly again.
-        // This can lead to O(n * h) time complexity, where n is number of plan nodes, and h is height of plan tree. This
-        // is at par with other pieces like hashing each plan node.
-        Multimap<String, Integer> sourceToPosition = TreeMultimap.create();
-        for (int i = 0; i < node.getSources().size(); ++i) {
-            PlanNode source = node.getSources().get(i);
-            Optional<CanonicalPlan> canonicalSource = generateCanonicalPlan(source, strategy, objectMapper);
-            if (!canonicalSource.isPresent()) {
-                return Optional.empty();
-            }
-            sourceToPosition.put(canonicalSource.get().toString(objectMapper), i);
+        Optional<List<Integer>> sourceIndexes = orderSources(node.getSources());
+        if (!sourceIndexes.isPresent()) {
+            return Optional.empty();
         }
 
-        ImmutableList.Builder<PlanNode> sources = ImmutableList.builder();
+        ImmutableList.Builder<PlanNode> canonicalSources = ImmutableList.builder();
         ImmutableList.Builder<VariableReferenceExpression> outputVariables = ImmutableList.builder();
         ImmutableMap.Builder<VariableReferenceExpression, List<VariableReferenceExpression>> outputsToInputs = ImmutableMap.builder();
 
-        sourceToPosition.forEach((ignored, index) -> {
-            PlanNode canonicalSource = node.getSources().get(index).accept(this, context).get();
-            sources.add(canonicalSource);
-        });
+        for (Integer sourceIndex : sourceIndexes.get()) {
+            Optional<PlanNode> canonicalSource = node.getSources().get(sourceIndex).accept(this, context);
+            if (!canonicalSource.isPresent()) {
+                return Optional.empty();
+            }
+            canonicalSources.add(canonicalSource.get());
+        }
 
         node.getVariableMapping().forEach((outputVariable, sourceVariables) -> {
             ImmutableList.Builder<VariableReferenceExpression> newSourceVariablesBuilder = ImmutableList.builder();
-            sourceToPosition.forEach((ignored, index) -> {
+            sourceIndexes.get().forEach(index -> {
                 newSourceVariablesBuilder.add(inlineAndCanonicalize(context.getExpressions(), sourceVariables.get(index)));
             });
             ImmutableList<VariableReferenceExpression> newSourceVariables = newSourceVariablesBuilder.build();
@@ -347,7 +341,7 @@ public class CanonicalPlanGenerator
         PlanNode result = new UnionNode(
                 Optional.empty(),
                 planNodeidAllocator.getNextId(),
-                sources.build(),
+                canonicalSources.build(),
                 outputVariables.build().stream().sorted().collect(toImmutableList()),
                 ImmutableSortedMap.copyOf(outputsToInputs.build()));
 
@@ -369,7 +363,7 @@ public class CanonicalPlanGenerator
 
         List<RowExpressionReference> rowExpressionReferences = node.getOutputVariables().stream()
                 .map(variable -> new RowExpressionReference(inlineAndCanonicalize(context.getExpressions(), variable, strategy == REMOVE_SAFE_CONSTANTS), variable))
-                .sorted(comparing(rowExpressionReference -> rowExpressionReference.getRowExpression().toString()))
+                .sorted(comparing(rowExpressionReference -> writeValueAsString(rowExpressionReference.getRowExpression())))
                 .collect(toImmutableList());
 
         ImmutableMap.Builder<VariableReferenceExpression, RowExpression> assignments = ImmutableMap.builder();
@@ -405,7 +399,7 @@ public class CanonicalPlanGenerator
         //   4. Record mapping from original variable reference to the new one
         List<AggregationReference> aggregationReferences = node.getAggregations().entrySet().stream()
                 .map(entry -> new AggregationReference(getCanonicalAggregation(entry.getValue(), context.getExpressions()), entry.getKey()))
-                .sorted(comparing(aggregationReference -> aggregationReference.getAggregation().getCall().toString()))
+                .sorted(comparing(aggregationReference -> writeValueAsString(aggregationReference.getAggregation().getCall())))
                 .collect(toImmutableList());
         ImmutableMap.Builder<VariableReferenceExpression, Aggregation> aggregations = ImmutableMap.builder();
         for (AggregationReference aggregationReference : aggregationReferences) {
@@ -575,7 +569,7 @@ public class CanonicalPlanGenerator
 
         List<RowExpressionReference> rowExpressionReferences = node.getAssignments().entrySet().stream()
                 .map(entry -> new RowExpressionReference(inlineAndCanonicalize(context.getExpressions(), entry.getValue(), strategy == REMOVE_SAFE_CONSTANTS), entry.getKey()))
-                .sorted(comparing(rowExpressionReference -> rowExpressionReference.getRowExpression().toString()))
+                .sorted(comparing(rowExpressionReference -> writeValueAsString(rowExpressionReference.getRowExpression())))
                 .collect(toImmutableList());
         ImmutableMap.Builder<VariableReferenceExpression, RowExpression> assignments = ImmutableMap.builder();
         for (RowExpressionReference rowExpressionReference : rowExpressionReferences) {
@@ -593,6 +587,56 @@ public class CanonicalPlanGenerator
 
         context.addPlan(node, new CanonicalPlan(canonicalPlan, strategy));
         return Optional.of(canonicalPlan);
+    }
+
+    // Variable names and plan node ids can change with what order we process nodes because of our
+    // stateful canonicalization using `variableAllocator` and `planNodeIdAllocator`.
+    // We want to order sources in a consistent manner, because the order matters when hashing plan.
+    // Returns a list of indices in input sources array, with a canonical order.
+    private Optional<List<Integer>> orderSources(List<PlanNode> sources)
+    {
+        // Try heuristic where we sort sources by the tables they scan.
+        Optional<List<Integer>> sourcesByTables = orderSourcesByTables(sources);
+        if (sourcesByTables.isPresent()) {
+            return sourcesByTables;
+        }
+
+        // We canonicalize each source independently, and use its representation to order sources.
+        Multimap<String, Integer> sourceToPosition = TreeMultimap.create();
+        for (int i = 0; i < sources.size(); ++i) {
+            Optional<CanonicalPlan> canonicalSource = generateCanonicalPlan(sources.get(i), strategy, objectMapper);
+            if (!canonicalSource.isPresent()) {
+                return Optional.empty();
+            }
+            sourceToPosition.put(canonicalSource.get().toString(objectMapper), i);
+        }
+        return Optional.of(sourceToPosition.values().stream().collect(toImmutableList()));
+    }
+
+    // Order sources by list of tables they use. If any 2 sources are using the same set of tables, we give up
+    // and return Optional.empty().
+    // Returns a list of indices in input sources array, with a canonical order
+    private Optional<List<Integer>> orderSourcesByTables(List<PlanNode> sources)
+    {
+        Multimap<String, Integer> sourceToPosition = TreeMultimap.create();
+        for (int i = 0; i < sources.size(); ++i) {
+            List<String> tables = new ArrayList<>();
+
+            PlanNodeSearcher.searchFrom(sources.get(i))
+                    .where(node -> node instanceof TableScanNode)
+                    .findAll()
+                    .forEach(node -> tables.add(((TableScanNode) node).getTable().getConnectorHandle().toString()));
+            sourceToPosition.put(tables.stream().sorted().collect(Collectors.joining(",")), i);
+        }
+        String lastIdentifier = ",";
+        for (Map.Entry<String, Integer> entry : sourceToPosition.entries()) {
+            String identifier = entry.getKey();
+            if (lastIdentifier.equals(identifier)) {
+                return Optional.empty();
+            }
+            lastIdentifier = identifier;
+        }
+        return Optional.of(sourceToPosition.values().stream().collect(toImmutableList()));
     }
 
     private static class CanonicalWriterTarget
@@ -721,6 +765,16 @@ public class CanonicalPlanGenerator
         return newVariable;
     }
 
+    private String writeValueAsString(RowExpression rowExpression)
+    {
+        try {
+            return objectMapper.writeValueAsString(rowExpression);
+        }
+        catch (JsonProcessingException e) {
+            throw new PrestoException(PLAN_SERIALIZATION_ERROR, "Cannot serialize plan to JSON", e);
+        }
+    }
+
     private static JoinNode.EquiJoinClause canonicalize(JoinNode.EquiJoinClause criteria, Context context)
     {
         VariableReferenceExpression left = inlineAndCanonicalize(context.getExpressions(), criteria.getLeft());
@@ -812,7 +866,59 @@ public class CanonicalPlanGenerator
             expressions.put(from, to);
         }
 
-        public void addPlan(PlanNode plan, CanonicalPlan canonicalPlan)
+        private void addLimitNodePlan(LimitNode plan, CanonicalPlan canonicalPlan)
+        {
+            if (!plan.getStatsEquivalentPlanNode().isPresent()) {
+                addPlanInternal(plan, canonicalPlan);
+                return;
+            }
+            // When limits are involved, we can only know canonicalized plans after topmost limit has been canonicalized.
+            // Once we are at topmost limit, we cache canonicalized plans for all sub-plans.
+            PlanNode statsEquivalentPlanNode = plan.getStatsEquivalentPlanNode().get();
+            StatsEquivalentPlanNodeWithLimit statsEquivalentPlanNodeWithLimit = (StatsEquivalentPlanNodeWithLimit) statsEquivalentPlanNode;
+            if (childrenCount(statsEquivalentPlanNodeWithLimit.getLimit()) != childrenCount(statsEquivalentPlanNodeWithLimit.getPlan())) {
+                addPlanInternal(plan, canonicalPlan);
+                return;
+            }
+            forTree(PlanNode::getSources)
+                    .depthFirstPreOrder(plan)
+                    .forEach(child -> {
+                        CanonicalPlan childCanonicalPlan = child == plan ? canonicalPlan : canonicalPlans.get(child);
+                        if (childCanonicalPlan == null || !child.getStatsEquivalentPlanNode().isPresent()) {
+                            return;
+                        }
+                        // Only save canonicalized plans for stats equivalent plan nodes.
+                        canonicalPlans.remove(child);
+                        inputTables.remove(child);
+                        addPlanInternal(
+                                child.getStatsEquivalentPlanNode().get(),
+                                new CanonicalPlan(
+                                        new StatsEquivalentPlanNodeWithLimit(childCanonicalPlan.getPlan().getId(), childCanonicalPlan.getPlan(), (LimitNode) canonicalPlan.getPlan()),
+                                        canonicalPlan.getStrategy()));
+                    });
+        }
+
+        private void addPlan(PlanNode plan, CanonicalPlan canonicalPlan)
+        {
+            if (!plan.getStatsEquivalentPlanNode().isPresent()) {
+                addPlanInternal(plan, canonicalPlan);
+                return;
+            }
+            PlanNode statsEquivalentPlanNode = plan.getStatsEquivalentPlanNode().get();
+            if (childrenCount(plan) == childrenCount(statsEquivalentPlanNode)) {
+                addPlanInternal(statsEquivalentPlanNode, canonicalPlan);
+            }
+            else {
+                addPlanInternal(plan, canonicalPlan);
+            }
+        }
+
+        private int childrenCount(PlanNode root)
+        {
+            return Iterables.size(forTree(PlanNode::getSources).depthFirstPreOrder(root));
+        }
+
+        private void addPlanInternal(PlanNode plan, CanonicalPlan canonicalPlan)
         {
             ImmutableList.Builder<TableScanNode> inputs = ImmutableList.builder();
             canonicalPlans.put(plan, canonicalPlan);

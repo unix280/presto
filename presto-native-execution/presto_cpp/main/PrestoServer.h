@@ -19,7 +19,8 @@
 #include <velox/exec/Task.h>
 #include <velox/expression/Expr.h>
 #include "presto_cpp/main/CPUMon.h"
-#include "velox/common/memory/MappedMemory.h"
+#include "velox/common/caching/AsyncDataCache.h"
+#include "velox/common/memory/MemoryAllocator.h"
 #if __has_include("filesystem")
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -82,10 +83,14 @@ class PrestoServer {
 
   virtual std::shared_ptr<velox::exec::ExprSetListener> getExprSetListener();
 
-  void initializeAsyncCache();
-
   virtual std::vector<std::string> registerConnectors(
       const fs::path& configDirectoryPath);
+
+  virtual void registerShuffleInterfaceFactories();
+
+  virtual void registerFileSystems();
+
+  void initializeAsyncCache();
 
  protected:
   virtual std::shared_ptr<velox::connector::Connector> connectorWithCache(
@@ -110,7 +115,7 @@ class PrestoServer {
   std::unique_ptr<folly::IOThreadPoolExecutor> connectorIoExecutor_;
 
   // Instance of AsyncDataCache used for all large allocations.
-  std::shared_ptr<velox::memory::MappedMemory> mappedMemory_;
+  std::shared_ptr<velox::memory::MemoryAllocator> allocator_;
 
   std::unique_ptr<http::HttpServer> httpServer_;
   std::unique_ptr<SignalHandler> signalHandler_;

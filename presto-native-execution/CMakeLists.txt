@@ -156,6 +156,10 @@ find_library(WANGLE wangle)
 
 find_library(RE2 re2)
 
+find_package(wangle CONFIG)
+find_package(FBThrift)
+include_directories(SYSTEM ${FBTHRIFT_INCLUDE_DIR})
+
 set(PROXYGEN_LIBRARIES ${PROXYGEN_HTTP_SERVER} ${PROXYGEN} ${WANGLE} ${FIZZ})
 find_path(PROXYGEN_DIR NAMES include/proxygen)
 set(PROXYGEN_INCLUDE_DIR "${PROXYGEN_DIR}/include/proxygen")
@@ -165,6 +169,7 @@ include_directories(.)
 include_directories(velox)
 include_directories(velox/velox/external/xxhash)
 include_directories(${VELOX_ROOT})
+include_directories(${CMAKE_BINARY_DIR})
 
 add_subdirectory(velox)
 

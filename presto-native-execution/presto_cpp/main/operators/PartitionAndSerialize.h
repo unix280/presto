@@ -1,6 +1,4 @@
 /*
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,25 +18,36 @@
 
 namespace facebook::presto::operators {
 
+/// Partitions the input row based on partition function and serializes the
+/// entire row.
 class PartitionAndSerializeNode : public velox::core::PlanNode {
  public:
+  static constexpr std::string_view kPartitionColumnNameDefault = "partition";
+  static constexpr std::string_view kDataColumnNameDefault = "data";
+
   PartitionAndSerializeNode(
       const velox::core::PlanNodeId& id,
       std::vector<velox::core::TypedExprPtr> keys,
-      int numPartitions,
+      uint32_t numPartitions,
       velox::RowTypePtr outputType,
-      velox::core::PlanNodePtr source)
+      velox::core::PlanNodePtr source,
+      velox::core::PartitionFunctionFactory partitionFunctionFactory)
       : velox::core::PlanNode(id),
-        keys_{std::move(keys)},
-        numPartitions_{numPartitions},
+        keys_(std::move(keys)),
+        numPartitions_(numPartitions),
         outputType_{std::move(outputType)},
-        sources_{std::move(source)} {
+        sources_({std::move(source)}),
+        partitionFunctionFactory_(std::move(partitionFunctionFactory)) {
+    // Only verify output types are correct. Note column names are not enforced
+    // in the following check.
     VELOX_USER_CHECK(
         velox::ROW(
             {"partition", "data"}, {velox::INTEGER(), velox::VARBINARY()})
             ->equivalent(*outputType_));
-    VELOX_USER_CHECK(!keys_.empty(), "Empty keys for hive hash");
-
+    VELOX_USER_CHECK(!keys_.empty(), "Empty partition keys");
+    VELOX_USER_CHECK_NOT_NULL(
+        partitionFunctionFactory_,
+        "Partition function factory cannot be null.");
   }
 
   const velox::RowTypePtr& outputType() const override {
@@ -53,8 +62,13 @@ class PartitionAndSerializeNode : public velox::core::PlanNode {
     return keys_;
   }
 
-  int numPartitions() const {
+  uint32_t numPartitions() const {
     return numPartitions_;
+  }
+
+  const velox::core::PartitionFunctionFactory& partitionFunctionFactory()
+      const {
+    return partitionFunctionFactory_;
   }
 
   std::string_view name() const override {
@@ -65,9 +79,10 @@ class PartitionAndSerializeNode : public velox::core::PlanNode {
   void addDetails(std::stringstream& stream) const override;
 
   const std::vector<velox::core::TypedExprPtr> keys_;
-  const int numPartitions_;
+  const uint32_t numPartitions_;
   const velox::RowTypePtr outputType_;
   const std::vector<velox::core::PlanNodePtr> sources_;
+  const velox::core::PartitionFunctionFactory partitionFunctionFactory_;
 };
 
 class PartitionAndSerializeTranslator

@@ -3,7 +3,7 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>com.facebook.presto</groupId>
-        <version>0.278</version>
+        <version>0.279</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -63,6 +63,11 @@
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-common</artifactId>
             <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-plugin-toolkit</artifactId>
         </dependency>
 
         <dependency>

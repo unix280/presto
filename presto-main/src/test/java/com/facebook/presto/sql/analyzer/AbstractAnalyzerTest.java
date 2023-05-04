@@ -32,7 +32,6 @@ import com.facebook.presto.metadata.CatalogManager;
 import com.facebook.presto.metadata.InMemoryNodeManager;
 import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.metadata.ViewDefinition;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.security.AllowAllAccessControl;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -420,7 +419,7 @@ public class AbstractAnalyzerTest
 
             if (location.isPresent()) {
                 NodeLocation expected = location.get();
-                NodeLocation actual = e.getNode().getLocation().get();
+                NodeLocation actual = e.getLocation().get();
 
                 if (expected.getLineNumber() != actual.getLineNumber() || expected.getColumnNumber() != actual.getColumnNumber()) {
                     fail(format(

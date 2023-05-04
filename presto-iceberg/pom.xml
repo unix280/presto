@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.278</version>
+        <version>0.279</version>
     </parent>
     <artifactId>presto-iceberg</artifactId>
     <description>Presto - Iceberg Connector</description>
@@ -12,8 +12,8 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <dep.iceberg.version>0.14.1</dep.iceberg.version>
-        <dep.nessie.version>0.43.0</dep.nessie.version>
+        <dep.iceberg.version>1.1.0</dep.iceberg.version>
+        <dep.nessie.version>0.44.0</dep.nessie.version>
     </properties>
 
     <repositories>

@@ -934,6 +934,15 @@ public class TestHiveFileFormats
                 .map(column -> new Column(column.getName(), HiveType.valueOf(column.getType()), Optional.empty(), Optional.empty()))
                 .collect(toImmutableList());
 
+        HiveFileSplit hiveFileSplit = new HiveFileSplit(
+                split.getPath().toString(),
+                split.getStart(),
+                split.getLength(),
+                split.getLength(),
+                Instant.now().toEpochMilli(),
+                Optional.empty(),
+                ImmutableMap.of());
+
         Configuration configuration = new Configuration();
         configuration.set("io.compression.codecs", LzoCodec.class.getName() + "," + LzopCodec.class.getName());
         Optional<ConnectorPageSource> pageSource = HivePageSourceProvider.createHivePageSource(
@@ -941,12 +950,8 @@ public class TestHiveFileFormats
                 ImmutableSet.of(),
                 configuration,
                 session,
-                split.getPath(),
+                hiveFileSplit,
                 OptionalInt.empty(),
-                split.getStart(),
-                split.getLength(),
-                split.getLength(),
-                Instant.now().toEpochMilli(),
                 new Storage(
                         StorageFormat.create(storageFormat.getSerDe(), storageFormat.getInputFormat(), storageFormat.getOutputFormat()),
                         "location",
@@ -972,8 +977,7 @@ public class TestHiveFileFormats
                 TRUE_CONSTANT,
                 false,
                 ROW_EXPRESSION_SERVICE,
-                Optional.empty(),
-                ImmutableMap.of());
+                Optional.empty());
 
         RecordCursor cursor = ((RecordPageSource) pageSource.get()).getCursor();
 
@@ -1001,17 +1005,22 @@ public class TestHiveFileFormats
 
         List<HiveColumnHandle> columnHandles = getColumnHandles(testColumns);
 
+        HiveFileSplit hiveFileSplit = new HiveFileSplit(
+                split.getPath().toString(),
+                split.getStart(),
+                split.getLength(),
+                split.getLength(),
+                Instant.now().toEpochMilli(),
+                Optional.empty(),
+                ImmutableMap.of());
+
         Optional<ConnectorPageSource> pageSource = HivePageSourceProvider.createHivePageSource(
                 ImmutableSet.of(),
                 ImmutableSet.of(sourceFactory),
                 new Configuration(),
                 session,
-                split.getPath(),
+                hiveFileSplit,
                 OptionalInt.empty(),
-                split.getStart(),
-                split.getLength(),
-                split.getLength(),
-                Instant.now().toEpochMilli(),
                 new Storage(
                         StorageFormat.create(storageFormat.getSerDe(), storageFormat.getInputFormat(), storageFormat.getOutputFormat()),
                         "location",
@@ -1037,8 +1046,7 @@ public class TestHiveFileFormats
                 TRUE_CONSTANT,
                 false,
                 ROW_EXPRESSION_SERVICE,
-                Optional.empty(),
-                ImmutableMap.of());
+                Optional.empty());
 
         assertTrue(pageSource.isPresent());
 

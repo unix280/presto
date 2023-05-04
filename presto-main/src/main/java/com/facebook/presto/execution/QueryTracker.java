@@ -16,6 +16,7 @@ package com.facebook.presto.execution;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
 import com.facebook.presto.execution.QueryTracker.TrackedQuery;
+import com.facebook.presto.resourcemanager.ClusterQueryTrackerService;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupQueryLimits;
@@ -51,7 +52,7 @@ import static com.facebook.presto.spi.StandardErrorCode.ABANDONED_QUERY;
 import static com.facebook.presto.spi.StandardErrorCode.EXCEEDED_TIME_LIMIT;
 import static com.facebook.presto.spi.StandardErrorCode.QUERY_HAS_TOO_MANY_STAGES;
 import static com.facebook.presto.spi.StandardErrorCode.SERVER_SHUTTING_DOWN;
-import static com.facebook.presto.sql.planner.PlanFragmenter.TOO_MANY_STAGES_MESSAGE;
+import static com.facebook.presto.sql.planner.PlanFragmenterUtils.TOO_MANY_STAGES_MESSAGE;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 import static java.util.Comparator.comparingInt;
@@ -81,7 +82,9 @@ public class QueryTracker<T extends TrackedQuery>
     @GuardedBy("this")
     private ScheduledFuture<?> backgroundTask;
 
-    public QueryTracker(QueryManagerConfig queryManagerConfig, ScheduledExecutorService queryManagementExecutor)
+    private final Optional<ClusterQueryTrackerService> clusterQueryTrackerService;
+
+    public QueryTracker(QueryManagerConfig queryManagerConfig, ScheduledExecutorService queryManagementExecutor, Optional<ClusterQueryTrackerService> clusterQueryTrackerService)
     {
         requireNonNull(queryManagerConfig, "queryManagerConfig is null");
         this.minQueryExpireAge = queryManagerConfig.getMinQueryExpireAge();
@@ -91,6 +94,7 @@ public class QueryTracker<T extends TrackedQuery>
         this.maxQueryRunningTaskCount = queryManagerConfig.getMaxQueryRunningTaskCount();
 
         this.queryManagementExecutor = requireNonNull(queryManagementExecutor, "queryManagementExecutor is null");
+        this.clusterQueryTrackerService = clusterQueryTrackerService;
     }
 
     public synchronized void start()
@@ -278,6 +282,10 @@ public class QueryTracker<T extends TrackedQuery>
             if (runningTaskCount > maxQueryRunningTaskCount) {
                 taskCountQueue.add(new QueryAndTaskCount(query, runningTaskCount));
             }
+        }
+
+        if (clusterQueryTrackerService.isPresent()) {
+            totalRunningTaskCount = clusterQueryTrackerService.get().getRunningTaskCount();
         }
 
         runningTaskCount.set(totalRunningTaskCount);

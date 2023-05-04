@@ -376,7 +376,7 @@ public final class HiveUtil
         return (Class<? extends InputFormat<?, ?>>) clazz.asSubclass(InputFormat.class);
     }
 
-    static String getInputFormatName(Properties schema)
+    public static String getInputFormatName(Properties schema)
     {
         String name = schema.getProperty(FILE_INPUT_FORMAT);
         checkCondition(name != null, HIVE_INVALID_METADATA, "Table or partition is missing Hive input format property: %s", FILE_INPUT_FORMAT);
@@ -982,13 +982,13 @@ public final class HiveUtil
         return partitionKey ? "partition key" : null;
     }
 
-    public static Optional<String> getPrefilledColumnValue(HiveColumnHandle columnHandle, HivePartitionKey partitionKey, Path path, OptionalInt bucketNumber, long fileSize, long fileModifiedTime)
+    public static Optional<String> getPrefilledColumnValue(HiveColumnHandle columnHandle, HivePartitionKey partitionKey, HiveFileSplit fileSplit, OptionalInt bucketNumber)
     {
         if (partitionKey != null) {
             return partitionKey.getValue();
         }
         if (isPathColumnHandle(columnHandle)) {
-            return Optional.of(path.toString());
+            return Optional.of(fileSplit.getPath());
         }
         if (isBucketColumnHandle(columnHandle)) {
             if (!bucketNumber.isPresent()) {
@@ -997,10 +997,10 @@ public final class HiveUtil
             return Optional.of(String.valueOf(bucketNumber.getAsInt()));
         }
         if (isFileSizeColumnHandle(columnHandle)) {
-            return Optional.of(String.valueOf(fileSize));
+            return Optional.of(String.valueOf(fileSplit.getFileSize()));
         }
         if (isFileModifiedTimeColumnHandle(columnHandle)) {
-            return Optional.of(String.valueOf(fileModifiedTime));
+            return Optional.of(String.valueOf(fileSplit.getFileModifiedTime()));
         }
 
         throw new PrestoException(NOT_SUPPORTED, "unsupported hidden column: " + columnHandle);

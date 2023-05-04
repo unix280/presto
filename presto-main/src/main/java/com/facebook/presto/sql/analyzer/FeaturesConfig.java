@@ -159,6 +159,7 @@ public class FeaturesConfig
     private double partialAggregationByteReductionThreshold = 0.5;
     private boolean optimizeTopNRowNumber = true;
     private boolean pushLimitThroughOuterJoin = true;
+    private boolean optimizeConstantGroupingKeys = true;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private Duration queryAnalyzerTimeout = new Duration(3, MINUTES);
@@ -219,10 +220,8 @@ public class FeaturesConfig
     private boolean queryOptimizationWithMaterializedViewEnabled;
 
     private AggregationIfToFilterRewriteStrategy aggregationIfToFilterRewriteStrategy = AggregationIfToFilterRewriteStrategy.DISABLED;
-    private AnalyzerType analyzerType = AnalyzerType.BUILTIN;
+    private String analyzerType = "BUILTIN";
     private boolean verboseRuntimeStatsEnabled;
-    private boolean hashBasedDistinctLimitEnabled;
-    private int hashBasedDistinctLimitThreshold = 10000;
 
     private boolean streamingForPartialAggregationEnabled;
     private boolean preferMergeJoin;
@@ -240,6 +239,9 @@ public class FeaturesConfig
     private String nativeExecutionExecutablePath = "./presto_server";
     private boolean randomizeOuterJoinNullKey;
     private boolean isOptimizeConditionalAggregationEnabled;
+    private boolean isRemoveRedundantDistinctAggregationEnabled = true;
+    private boolean inPredicatesAsInnerJoinsEnabled;
+    private double pushAggregationBelowJoinByteReductionThreshold = 1;
 
     public enum PartitioningPrecisionStrategy
     {
@@ -322,12 +324,6 @@ public class FeaturesConfig
         FILTER_WITH_IF, // Rewrites AGG(IF(condition, expr)) to AGG(IF(condition, expr)) FILTER (WHERE condition).
         UNWRAP_IF_SAFE, // Rewrites AGG(IF(condition, expr)) to AGG(expr) FILTER (WHERE condition) if it is safe to do so.
         UNWRAP_IF // Rewrites AGG(IF(condition, expr)) to AGG(expr) FILTER (WHERE condition).
-    }
-
-    public enum AnalyzerType
-    {
-        BUILTIN,
-        NATIVE
     }
 
     public double getCpuCostWeight()
@@ -1635,6 +1631,18 @@ public class FeaturesConfig
         return pushLimitThroughOuterJoin;
     }
 
+    @Config("optimizer.optimize-constant-grouping-keys")
+    public FeaturesConfig setOptimizeConstantGroupingKeys(boolean optimizeConstantGroupingKeys)
+    {
+        this.optimizeConstantGroupingKeys = optimizeConstantGroupingKeys;
+        return this;
+    }
+
+    public boolean isOptimizeConstantGroupingKeys()
+    {
+        return optimizeConstantGroupingKeys;
+    }
+
     @Config("max-concurrent-materializations")
     @ConfigDescription("The maximum number of materializing plan sections that can run concurrently")
     public FeaturesConfig setMaxConcurrentMaterializations(int maxConcurrentMaterializations)
@@ -2074,43 +2082,17 @@ public class FeaturesConfig
         return this;
     }
 
-    public AnalyzerType getAnalyzerType()
+    public String getAnalyzerType()
     {
         return analyzerType;
     }
 
     @Config("analyzer-type")
     @ConfigDescription("Set the analyzer type for parsing and analyzing.")
-    public FeaturesConfig setAnalyzerType(AnalyzerType analyzerType)
+    public FeaturesConfig setAnalyzerType(String analyzerType)
     {
         this.analyzerType = analyzerType;
         return this;
-    }
-
-    public boolean isHashBasedDistinctLimitEnabled()
-    {
-        return hashBasedDistinctLimitEnabled;
-    }
-
-    @Config("hash-based-distinct-limit-enabled")
-    @ConfigDescription("Enable fast hash-based distinct limit")
-    public FeaturesConfig setHashBasedDistinctLimitEnabled(boolean hashBasedDistinctLimitEnabled)
-    {
-        this.hashBasedDistinctLimitEnabled = hashBasedDistinctLimitEnabled;
-        return this;
-    }
-
-    @Config("hash-based-distinct-limit-threshold")
-    @ConfigDescription("Threshold for fast hash-based distinct limit")
-    public FeaturesConfig setHashBasedDistinctLimitThreshold(int hashBasedDistinctLimitThreshold)
-    {
-        this.hashBasedDistinctLimitThreshold = hashBasedDistinctLimitThreshold;
-        return this;
-    }
-
-    public int getHashBasedDistinctLimitThreshold()
-    {
-        return hashBasedDistinctLimitThreshold;
     }
 
     public boolean isHideUnauthorizedColumns()
@@ -2278,6 +2260,45 @@ public class FeaturesConfig
     public FeaturesConfig setOptimizeConditionalAggregationEnabled(boolean isOptimizeConditionalAggregationEnabled)
     {
         this.isOptimizeConditionalAggregationEnabled = isOptimizeConditionalAggregationEnabled;
+        return this;
+    }
+
+    public boolean isRemoveRedundantDistinctAggregationEnabled()
+    {
+        return isRemoveRedundantDistinctAggregationEnabled;
+    }
+
+    @Config("optimizer.remove-redundant-distinct-aggregation-enabled")
+    @ConfigDescription("Enable removing distinct aggregation node if input is already distinct")
+    public FeaturesConfig setRemoveRedundantDistinctAggregationEnabled(boolean isRemoveRedundantDistinctAggregationEnabled)
+    {
+        this.isRemoveRedundantDistinctAggregationEnabled = isRemoveRedundantDistinctAggregationEnabled;
+        return this;
+    }
+
+    public boolean isInPredicatesAsInnerJoinsEnabled()
+    {
+        return inPredicatesAsInnerJoinsEnabled;
+    }
+
+    @Config("optimizer.in-predicates-as-inner-joins-enabled")
+    @ConfigDescription("Enable rewrite of In predicates to INNER joins")
+    public FeaturesConfig setInPredicatesAsInnerJoinsEnabled(boolean inPredicatesAsInnerJoinsEnabled)
+    {
+        this.inPredicatesAsInnerJoinsEnabled = inPredicatesAsInnerJoinsEnabled;
+        return this;
+    }
+
+    public double getPushAggregationBelowJoinByteReductionThreshold()
+    {
+        return pushAggregationBelowJoinByteReductionThreshold;
+    }
+
+    @Config("optimizer.push-aggregation-below-join-byte-reduction-threshold")
+    @ConfigDescription("Byte reduction ratio threshold at which to disable pushdown of aggregation below inner join")
+    public FeaturesConfig setPushAggregationBelowJoinByteReductionThreshold(double pushAggregationBelowJoinByteReductionThreshold)
+    {
+        this.pushAggregationBelowJoinByteReductionThreshold = pushAggregationBelowJoinByteReductionThreshold;
         return this;
     }
 }

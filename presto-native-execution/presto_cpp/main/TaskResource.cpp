@@ -11,9 +11,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "TaskResource.h"
+#include "presto_cpp/main/TaskResource.h"
 #include <presto_cpp/main/common/Exception.h>
 #include "presto_cpp/external/json/json.hpp"
+#include "presto_cpp/main/common/Configs.h"
 #include "presto_cpp/main/thrift/ProtocolToThrift.h"
 #include "presto_cpp/main/thrift/ThriftIO.h"
 #include "presto_cpp/main/thrift/gen-cpp2/PrestoThrift.h"
@@ -111,6 +112,15 @@ void TaskResource::registerUris(http::HttpServer& server) {
         return acknowledgeResults(message, pathMatch);
       });
 
+  // task/(.+)/batch must come before the /v1/task/(.+) as it's more specific
+  // otherwise all requests will be matched with /v1/task/(.+)
+  server.registerPost(
+      R"(/v1/task/(.+)/batch)",
+      [&](proxygen::HTTPMessage* message,
+          const std::vector<std::string>& pathMatch) {
+        return createOrUpdateBatchTask(message, pathMatch);
+      });
+
   server.registerPost(
       R"(/v1/task/(.+))",
       [&](proxygen::HTTPMessage* message,
@@ -203,13 +213,18 @@ proxygen::RequestHandler* TaskResource::acknowledgeResults(
       });
 }
 
-proxygen::RequestHandler* TaskResource::createOrUpdateTask(
+proxygen::RequestHandler* TaskResource::createOrUpdateTaskImpl(
     proxygen::HTTPMessage* /*message*/,
-    const std::vector<std::string>& pathMatch) {
+    const std::vector<std::string>& pathMatch,
+    const std::function<void(
+        const protocol::TaskId&,
+        const std::string&,
+        protocol::TaskUpdateRequest&,
+        velox::core::PlanFragment&)>& parseFunc) {
   protocol::TaskId taskId = pathMatch[1];
 
   return new http::CallbackRequestHandler(
-      [this, taskId](
+      [this, taskId, parseFunc](
           proxygen::HTTPMessage* /*message*/,
           const std::vector<std::unique_ptr<folly::IOBuf>>& body,
           proxygen::ResponseHandler* downstream) {
@@ -222,17 +237,9 @@ proxygen::RequestHandler* TaskResource::createOrUpdateTask(
 
         std::unique_ptr<protocol::TaskInfo> taskInfo;
         try {
-          protocol::TaskUpdateRequest taskUpdateRequest =
-              json::parse(updateJson);
+          protocol::TaskUpdateRequest taskUpdateRequest;
           velox::core::PlanFragment planFragment;
-          if (taskUpdateRequest.fragment) {
-            auto fragment =
-                velox::encoding::Base64::decode(*taskUpdateRequest.fragment);
-            protocol::PlanFragment prestoPlan = json::parse(fragment);
-            VeloxQueryPlanConverter converter(pool_.get());
-            planFragment = converter.toVeloxQueryPlan(
-                prestoPlan, taskUpdateRequest.tableWriteInfo, taskId);
-          }
+          parseFunc(taskId, updateJson, taskUpdateRequest, planFragment);
           const auto& session = taskUpdateRequest.session;
           auto configs = std::unordered_map<std::string, std::string>(
               session.systemProperties.begin(), session.systemProperties.end());
@@ -274,6 +281,69 @@ proxygen::RequestHandler* TaskResource::createOrUpdateTask(
 
         json taskInfoJson = *taskInfo;
         sendOkResponse(downstream, taskInfoJson);
+      });
+}
+
+proxygen::RequestHandler* TaskResource::createOrUpdateBatchTask(
+    proxygen::HTTPMessage* message,
+    const std::vector<std::string>& pathMatch) {
+  return createOrUpdateTaskImpl(
+      message,
+      pathMatch,
+      [this](
+          const protocol::TaskId& taskId,
+          const std::string& updateJson,
+          protocol::TaskUpdateRequest& taskUpdateRequest,
+          velox::core::PlanFragment& planFragment) {
+        protocol::BatchTaskUpdateRequest batchTaskUpdateRequest =
+            json::parse(updateJson);
+        taskUpdateRequest = batchTaskUpdateRequest.taskUpdateRequest;
+        if (taskUpdateRequest.fragment == nullptr) {
+          return;
+        }
+        std::shared_ptr<protocol::String> serializedShuffleWriteInfo =
+            batchTaskUpdateRequest.shuffleWriteInfo;
+        auto shuffleName = SystemConfig::instance()->shuffleName();
+        if (serializedShuffleWriteInfo) {
+          VELOX_USER_CHECK(
+              !shuffleName.empty(),
+              "Shuffle name not provided from 'shuffle.name' property in "
+              "config.properties");
+        }
+        auto fragment =
+            velox::encoding::Base64::decode(*taskUpdateRequest.fragment);
+        protocol::PlanFragment prestoPlan = json::parse(fragment);
+        VeloxQueryPlanConverter converter(pool_.get());
+        planFragment = converter.toBatchVeloxQueryPlan(
+            prestoPlan,
+            taskUpdateRequest.tableWriteInfo,
+            taskId,
+            shuffleName,
+            std::move(serializedShuffleWriteInfo));
+      });
+}
+
+proxygen::RequestHandler* TaskResource::createOrUpdateTask(
+    proxygen::HTTPMessage* message,
+    const std::vector<std::string>& pathMatch) {
+  protocol::TaskId taskId = pathMatch[1];
+  return createOrUpdateTaskImpl(
+      message,
+      pathMatch,
+      [this](
+          const protocol::TaskId& taskId,
+          const std::string& updateJson,
+          protocol::TaskUpdateRequest& taskUpdateRequest,
+          velox::core::PlanFragment& planFragment) {
+        taskUpdateRequest = json::parse(updateJson);
+        if (taskUpdateRequest.fragment != nullptr) {
+          auto fragment =
+              velox::encoding::Base64::decode(*taskUpdateRequest.fragment);
+          protocol::PlanFragment prestoPlan = json::parse(fragment);
+          VeloxQueryPlanConverter converter(pool_.get());
+          planFragment = converter.toVeloxQueryPlan(
+              prestoPlan, taskUpdateRequest.tableWriteInfo, taskId);
+        }
       });
 }
 

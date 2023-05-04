@@ -17,6 +17,7 @@ import com.facebook.airlift.json.Codec;
 import com.facebook.airlift.json.JsonCodec;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.HistoryBasedPlanStatisticsTracker;
 import com.facebook.presto.event.QueryMonitor;
 import com.facebook.presto.execution.QueryStateTimer;
 import com.facebook.presto.execution.TaskInfo;
@@ -50,6 +51,7 @@ import com.facebook.presto.sql.planner.PlanFragment;
 import com.facebook.presto.sql.planner.SubPlan;
 import com.facebook.presto.sql.planner.plan.PlanFragmentId;
 import com.facebook.presto.transaction.TransactionManager;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
@@ -71,6 +73,7 @@ import java.util.concurrent.TimeoutException;
 import static com.facebook.presto.execution.QueryState.PLANNING;
 import static com.facebook.presto.spark.PrestoSparkQueryExecutionFactory.createQueryInfo;
 import static com.facebook.presto.spark.PrestoSparkQueryExecutionFactory.createStageInfo;
+import static com.facebook.presto.spark.PrestoSparkSettingsRequirements.SPARK_DYNAMIC_ALLOCATION_MAX_EXECUTORS_CONFIG;
 import static com.facebook.presto.spark.classloader_interface.ScalaUtils.collectScalaIterator;
 import static com.facebook.presto.spark.classloader_interface.ScalaUtils.emptyScalaIterator;
 import static com.facebook.presto.spark.util.PrestoSparkUtils.computeNextTimeout;
@@ -117,7 +120,8 @@ public class PrestoSparkStaticQueryExecution
             Optional<ErrorClassifier> errorClassifier,
             PrestoSparkPlanFragmenter planFragmenter,
             Metadata metadata,
-            PartitioningProviderManager partitioningProviderManager)
+            PartitioningProviderManager partitioningProviderManager,
+            HistoryBasedPlanStatisticsTracker historyBasedPlanStatisticsTracker)
     {
         super(
                 sparkContext,
@@ -151,7 +155,8 @@ public class PrestoSparkStaticQueryExecution
                 errorClassifier,
                 planFragmenter,
                 metadata,
-                partitioningProviderManager);
+                partitioningProviderManager,
+                historyBasedPlanStatisticsTracker);
     }
 
     @Override
@@ -159,6 +164,14 @@ public class PrestoSparkStaticQueryExecution
             throws SparkException, TimeoutException
     {
         SubPlan rootFragmentedPlan = createFragmentedPlan();
+
+        // executor allocation is currently only supported at root level of the plan
+        // in future this could be extended to fragment level configuration
+        if (planAndMore.getPhysicalResourceSettings().getMaxExecutorCount().isPresent()) {
+            sparkContext.sc().conf().set(SPARK_DYNAMIC_ALLOCATION_MAX_EXECUTORS_CONFIG,
+                    Integer.toString(planAndMore.getPhysicalResourceSettings().getMaxExecutorCount().getAsInt()));
+        }
+
         setFinalFragmentedPlan(rootFragmentedPlan);
         TableWriteInfo tableWriteInfo = getTableWriteInfo(session, rootFragmentedPlan);
         PlanFragment rootFragment = rootFragmentedPlan.getFragment();
@@ -235,7 +248,8 @@ public class PrestoSparkStaticQueryExecution
         return rootRdd.collectAndDestroyDependenciesWithTimeout(computeNextTimeout(queryCompletionDeadline), MILLISECONDS, waitTimeMetrics);
     }
 
-    private SubPlan createFragmentedPlan()
+    @VisibleForTesting
+    public SubPlan createFragmentedPlan()
     {
         SubPlan rootFragmentedPlan = planFragmenter.fragmentQueryPlan(session, planAndMore.getPlan(), warningCollector);
         queryMonitor.queryUpdatedEvent(
@@ -251,7 +265,7 @@ public class PrestoSparkStaticQueryExecution
                         warningCollector));
 
         log.info(textDistributedPlan(rootFragmentedPlan, metadata.getFunctionAndTypeManager(), session, true));
-        int hashPartitionCount = getHashPartitionCount(sparkContext.sc(), session.getQueryId(), session, planAndMore);
+        int hashPartitionCount = planAndMore.getPhysicalResourceSettings().getHashPartitionCount();
         rootFragmentedPlan = configureOutputPartitioning(session, rootFragmentedPlan, hashPartitionCount);
         return rootFragmentedPlan;
     }

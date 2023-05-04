@@ -48,7 +48,6 @@ import com.facebook.presto.hive.statistics.HiveStatisticsProvider;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorInsertTableHandle;
-import com.facebook.presto.spi.ConnectorMaterializedViewDefinition;
 import com.facebook.presto.spi.ConnectorMetadataUpdateHandle;
 import com.facebook.presto.spi.ConnectorNewTableLayout;
 import com.facebook.presto.spi.ConnectorOutputTableHandle;
@@ -64,6 +63,7 @@ import com.facebook.presto.spi.Constraint;
 import com.facebook.presto.spi.DiscretePredicates;
 import com.facebook.presto.spi.InMemoryRecordSet;
 import com.facebook.presto.spi.LocalProperty;
+import com.facebook.presto.spi.MaterializedViewDefinition;
 import com.facebook.presto.spi.MaterializedViewNotFoundException;
 import com.facebook.presto.spi.MaterializedViewStatus;
 import com.facebook.presto.spi.PrestoException;
@@ -107,7 +107,6 @@ import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
@@ -398,7 +397,7 @@ public class HiveMetadata
     private static final String CSV_QUOTE_KEY = OpenCSVSerde.QUOTECHAR;
     private static final String CSV_ESCAPE_KEY = OpenCSVSerde.ESCAPECHAR;
 
-    private static final JsonCodec<ConnectorMaterializedViewDefinition> MATERIALIZED_VIEW_JSON_CODEC = jsonCodec(ConnectorMaterializedViewDefinition.class);
+    private static final JsonCodec<MaterializedViewDefinition> MATERIALIZED_VIEW_JSON_CODEC = jsonCodec(MaterializedViewDefinition.class);
 
     private final boolean allowCorruptWritesForTesting;
     private final SemiTransactionalHiveMetastore metastore;
@@ -522,7 +521,7 @@ public class HiveMetadata
             return null;
         }
         Optional<List<List<String>>> partitionValuesList = getPartitionList(analyzeProperties);
-        ConnectorTableMetadata tableMetadata = getTableMetadata(session, handle.getSchemaTableName());
+        ConnectorTableMetadata tableMetadata = getTableMetadata(session, handle);
         handle = handle.withAnalyzePartitionValues(partitionValuesList);
 
         List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
@@ -620,13 +619,21 @@ public class HiveMetadata
     @Override
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return getTableMetadata(session, ((HiveTableHandle) tableHandle).getSchemaTableName());
+        MetastoreContext metastoreContext = getMetastoreContext(session);
+        HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
+        Optional<Table> table = metastore.getTable(metastoreContext, hiveTableHandle);
+        return getTableMetadata(table, hiveTableHandle.getSchemaTableName(), metastoreContext, session);
     }
 
     private ConnectorTableMetadata getTableMetadata(ConnectorSession session, SchemaTableName tableName)
     {
         MetastoreContext metastoreContext = getMetastoreContext(session);
         Optional<Table> table = metastore.getTable(metastoreContext, tableName.getSchemaName(), tableName.getTableName());
+        return getTableMetadata(table, tableName, metastoreContext, session);
+    }
+
+    private ConnectorTableMetadata getTableMetadata(Optional<Table> table, SchemaTableName tableName, MetastoreContext metastoreContext, ConnectorSession session)
+    {
         if (!table.isPresent() || table.get().getTableType().equals(VIRTUAL_VIEW)) {
             throw new TableNotFoundException(tableName);
         }
@@ -797,10 +804,10 @@ public class HiveMetadata
     @Override
     public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
+        HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
         MetastoreContext metastoreContext = getMetastoreContext(session);
-        Table table = metastore.getTable(metastoreContext, tableName.getSchemaName(), tableName.getTableName())
-                .orElseThrow(() -> new TableNotFoundException(tableName));
+        Table table = metastore.getTable(metastoreContext, hiveTableHandle)
+                .orElseThrow(() -> new TableNotFoundException(hiveTableHandle.getSchemaTableName()));
         return hiveColumnHandles(table).stream()
                 .collect(toImmutableMap(HiveColumnHandle::getName, identity()));
     }
@@ -1220,7 +1227,7 @@ public class HiveMetadata
             HiveStorageFormat hiveStorageFormat,
             Optional<TableEncryptionProperties> tableEncryptionProperties)
     {
-        Builder<String, String> tableProperties = ImmutableMap.builder();
+        ImmutableMap.Builder<String, String> tableProperties = ImmutableMap.builder();
 
         // Hook point for extended versions of the Hive Plugin
         tableProperties.putAll(tableParameterCodec.encode(tableMetadata.getProperties()));
@@ -1483,7 +1490,7 @@ public class HiveMetadata
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         MetastoreContext metastoreContext = getMetastoreContext(session);
 
-        Optional<Table> target = metastore.getTable(metastoreContext, handle.getSchemaName(), handle.getTableName());
+        Optional<Table> target = metastore.getTable(metastoreContext, handle);
         if (!target.isPresent()) {
             throw new TableNotFoundException(handle.getSchemaTableName());
         }
@@ -1497,10 +1504,11 @@ public class HiveMetadata
     public ConnectorTableHandle beginStatisticsCollection(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         verifyJvmTimeZone();
-        SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
+        HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
+        SchemaTableName tableName = hiveTableHandle.getSchemaTableName();
         MetastoreContext metastoreContext = getMetastoreContext(session);
 
-        metastore.getTable(metastoreContext, tableName.getSchemaName(), tableName.getTableName())
+        metastore.getTable(metastoreContext, hiveTableHandle)
                 .orElseThrow(() -> new TableNotFoundException(tableName));
         return tableHandle;
     }
@@ -2417,7 +2425,7 @@ public class HiveMetadata
     }
 
     @Override
-    public Optional<ConnectorMaterializedViewDefinition> getMaterializedView(ConnectorSession session, SchemaTableName viewName)
+    public Optional<MaterializedViewDefinition> getMaterializedView(ConnectorSession session, SchemaTableName viewName)
     {
         requireNonNull(viewName, "viewName is null");
 
@@ -2440,7 +2448,7 @@ public class HiveMetadata
     public MaterializedViewStatus getMaterializedViewStatus(ConnectorSession session, SchemaTableName materializedViewName, TupleDomain<String> baseQueryDomain)
     {
         MetastoreContext metastoreContext = getMetastoreContext(session);
-        ConnectorMaterializedViewDefinition viewDefinition = getMaterializedView(session, materializedViewName)
+        MaterializedViewDefinition viewDefinition = getMaterializedView(session, materializedViewName)
                 .orElseThrow(() -> new MaterializedViewNotFoundException(materializedViewName));
 
         List<Table> baseTables = viewDefinition.getBaseTables().stream()
@@ -2507,14 +2515,14 @@ public class HiveMetadata
     }
 
     @Override
-    public void createMaterializedView(ConnectorSession session, ConnectorTableMetadata viewMetadata, ConnectorMaterializedViewDefinition viewDefinition, boolean ignoreExisting)
+    public void createMaterializedView(ConnectorSession session, ConnectorTableMetadata viewMetadata, MaterializedViewDefinition viewDefinition, boolean ignoreExisting)
     {
         if (isExternalTable(viewMetadata.getProperties())) {
             throw new PrestoException(INVALID_TABLE_PROPERTY, "Specifying external location for materialized view is not supported.");
         }
 
         Table basicTable = prepareTable(session, viewMetadata, MATERIALIZED_VIEW);
-        viewDefinition = new ConnectorMaterializedViewDefinition(
+        viewDefinition = new MaterializedViewDefinition(
                 viewDefinition.getOriginalSql(),
                 viewDefinition.getSchema(),
                 viewDefinition.getTable(),
@@ -2554,7 +2562,7 @@ public class HiveMetadata
     @Override
     public void dropMaterializedView(ConnectorSession session, SchemaTableName viewName)
     {
-        Optional<ConnectorMaterializedViewDefinition> view = getMaterializedView(session, viewName);
+        Optional<MaterializedViewDefinition> view = getMaterializedView(session, viewName);
         if (!view.isPresent()) {
             throw new MaterializedViewNotFoundException(viewName);
         }
@@ -2617,7 +2625,7 @@ public class HiveMetadata
         HiveTableLayoutHandle layoutHandle = (HiveTableLayoutHandle) tableLayoutHandle;
 
         MetastoreContext metastoreContext = getMetastoreContext(session);
-        Optional<Table> table = metastore.getTable(metastoreContext, handle.getSchemaName(), handle.getTableName());
+        Optional<Table> table = metastore.getTable(metastoreContext, handle);
         if (!table.isPresent()) {
             throw new TableNotFoundException(handle.getSchemaTableName());
         }
@@ -2743,33 +2751,34 @@ public class HiveMetadata
         }
 
         TupleDomain<Subfield> domainPredicate = hivePartitionResult.getEffectivePredicate().transform(HiveMetadata::toSubfield);
-        Table table = metastore.getTable(
-                getMetastoreContext(session),
-                handle.getSchemaTableName().getSchemaName(),
-                handle.getSchemaTableName().getTableName())
+        Table table = metastore.getTable(getMetastoreContext(session), handle)
                 .orElseThrow(() -> new TableNotFoundException(handle.getSchemaTableName()));
+
+        String layoutString = createTableLayoutString(session, handle.getSchemaTableName(), hivePartitionResult.getBucketHandle(), hivePartitionResult.getBucketFilter(), TRUE_CONSTANT, domainPredicate);
+        Optional<Set<HiveColumnHandle>> requestedColumns = desiredColumns.map(columns -> columns.stream().map(column -> (HiveColumnHandle) column).collect(toImmutableSet()));
         return ImmutableList.of(new ConnectorTableLayoutResult(
                 getTableLayout(
                         session,
-                        new HiveTableLayoutHandle(
-                                handle.getSchemaTableName(),
-                                table.getStorage().getLocation(),
-                                hivePartitionResult.getPartitionColumns(),
-                                // remove comments to optimize serialization costs
-                                pruneColumnComments(hivePartitionResult.getDataColumns()),
-                                hivePartitionResult.getTableParameters(),
-                                hivePartitionResult.getPartitions(),
-                                domainPredicate,
-                                TRUE_CONSTANT,
-                                predicateColumns,
-                                hivePartitionResult.getEnforcedConstraint(),
-                                hiveBucketHandle,
-                                hivePartitionResult.getBucketFilter(),
-                                false,
-                                createTableLayoutString(session, handle.getSchemaTableName(), hivePartitionResult.getBucketHandle(), hivePartitionResult.getBucketFilter(), TRUE_CONSTANT, domainPredicate),
-                                desiredColumns.map(columns -> columns.stream().map(column -> (HiveColumnHandle) column).collect(toImmutableSet())),
-                                false,
-                                false)),
+                        new HiveTableLayoutHandle.Builder()
+                                .setSchemaTableName(handle.getSchemaTableName())
+                                .setTablePath(table.getStorage().getLocation())
+                                .setPartitionColumns(hivePartitionResult.getPartitionColumns())
+                                .setDataColumns(pruneColumnComments(hivePartitionResult.getDataColumns()))
+                                .setTableParameters(hivePartitionResult.getTableParameters())
+                                .setDomainPredicate(domainPredicate)
+                                .setRemainingPredicate(TRUE_CONSTANT)
+                                .setPredicateColumns(predicateColumns)
+                                .setPartitionColumnPredicate(hivePartitionResult.getEnforcedConstraint())
+                                .setPartitions(hivePartitionResult.getPartitions())
+                                .setBucketHandle(hiveBucketHandle)
+                                .setBucketFilter(hivePartitionResult.getBucketFilter())
+                                .setPushdownFilterEnabled(false)
+                                .setLayoutString(layoutString)
+                                .setRequestedColumns(requestedColumns)
+                                .setPartialAggregationsPushedDown(false)
+                                .setAppendRowNumberEnabled(false)
+                                .setHiveTableHandle(handle)
+                                .build()),
                 hivePartitionResult.getUnenforcedConstraint()));
     }
 
@@ -2821,8 +2830,7 @@ public class HiveMetadata
         Optional<ConnectorTablePartitioning> tablePartitioning = Optional.empty();
         SchemaTableName tableName = hiveLayoutHandle.getSchemaTableName();
         MetastoreContext metastoreContext = getMetastoreContext(session);
-        Table table = metastore.getTable(metastoreContext, tableName.getSchemaName(), tableName.getTableName())
-                .orElseThrow(() -> new TableNotFoundException(tableName));
+        Table table = hiveLayoutHandle.getTable(metastore, metastoreContext);
         // never ignore table bucketing for temporary tables as those are created such explicitly by the engine request
         boolean bucketExecutionEnabled = table.getTableType().equals(TEMPORARY_TABLE) || isBucketExecutionEnabled(session);
         if (bucketExecutionEnabled && hiveLayoutHandle.getBucketHandle().isPresent()) {
@@ -2871,15 +2879,28 @@ public class HiveMetadata
         }
 
         TupleDomain<ColumnHandle> predicate;
+        RowExpression subfieldPredicate;
         if (hiveLayoutHandle.isPushdownFilterEnabled()) {
             predicate = hiveLayoutHandle.getDomainPredicate()
                     .transform(subfield -> isEntireColumn(subfield) ? subfield.getRootName() : null)
                     .transform(hiveLayoutHandle.getPredicateColumns()::get)
                     .transform(ColumnHandle.class::cast)
                     .intersect(createPredicate(partitionColumns, partitions));
+
+            // capture subfields from domainPredicate to add to remainingPredicate
+            // so those filters don't get lost
+            Map<String, Type> columnTypes = hiveColumnHandles(table).stream()
+                    .collect(toImmutableMap(HiveColumnHandle::getName, columnHandle -> columnHandle.getColumnMetadata(typeManager).getType()));
+            SubfieldExtractor subfieldExtractor = new SubfieldExtractor(functionResolution, rowExpressionService.getExpressionOptimizer(), session);
+
+            subfieldPredicate = rowExpressionService.getDomainTranslator().toPredicate(
+                    hiveLayoutHandle.getDomainPredicate()
+                            .transform(subfield -> !isEntireColumn(subfield) ? subfield : null)
+                            .transform(subfield -> subfieldExtractor.toRowExpression(subfield, columnTypes.get(subfield.getRootName()))));
         }
         else {
             predicate = createPredicate(partitionColumns, partitions);
+            subfieldPredicate = TRUE_CONSTANT;
         }
 
         // Expose ordering property of the table when order based execution is enabled.
@@ -2911,6 +2932,12 @@ public class HiveMetadata
             streamPartitionColumns = Optional.of(streamPartitionColumnsBuilder.build());
         }
 
+        // combine subfieldPredicate with remainingPredicate
+        List<RowExpression> predicatesToCombine = ImmutableList.of(subfieldPredicate, hiveLayoutHandle.getRemainingPredicate()).stream()
+                .filter(p -> !p.equals(TRUE_CONSTANT))
+                .collect(toImmutableList());
+        RowExpression combinedRemainingPredicate = binaryExpression(SpecialFormExpression.Form.AND, predicatesToCombine);
+
         return new ConnectorTableLayout(
                 hiveLayoutHandle,
                 Optional.empty(),
@@ -2919,7 +2946,7 @@ public class HiveMetadata
                 streamPartitionColumns,
                 discretePredicates,
                 localPropertyBuilder.build(),
-                Optional.of(hiveLayoutHandle.getRemainingPredicate()));
+                Optional.of(combinedRemainingPredicate));
     }
 
     @Override
@@ -3022,24 +3049,10 @@ public class HiveMetadata
                 largerBucketCount % smallerBucketCount == 0 && Integer.bitCount(largerBucketCount / smallerBucketCount) == 1,
                 "The requested partitioning is not a valid alternative for the table layout");
 
-        return new HiveTableLayoutHandle(
-                hiveLayoutHandle.getSchemaTableName(),
-                hiveLayoutHandle.getTablePath(),
-                hiveLayoutHandle.getPartitionColumns(),
-                hiveLayoutHandle.getDataColumns(),
-                hiveLayoutHandle.getTableParameters(),
-                hiveLayoutHandle.getPartitions().get(),
-                hiveLayoutHandle.getDomainPredicate(),
-                hiveLayoutHandle.getRemainingPredicate(),
-                hiveLayoutHandle.getPredicateColumns(),
-                hiveLayoutHandle.getPartitionColumnPredicate(),
-                Optional.of(new HiveBucketHandle(bucketHandle.getColumns(), bucketHandle.getTableBucketCount(), hivePartitioningHandle.getBucketCount())),
-                hiveLayoutHandle.getBucketFilter(),
-                hiveLayoutHandle.isPushdownFilterEnabled(),
-                hiveLayoutHandle.getLayoutString(),
-                hiveLayoutHandle.getRequestedColumns(),
-                hiveLayoutHandle.isPartialAggregationsPushedDown(),
-                hiveLayoutHandle.isAppendRowNumberEnabled());
+        HiveBucketHandle updatedBucketHandle = new HiveBucketHandle(bucketHandle.getColumns(), bucketHandle.getTableBucketCount(), hivePartitioningHandle.getBucketCount());
+        return hiveLayoutHandle.builder()
+                .setBucketHandle(Optional.of(updatedBucketHandle))
+                .build();
     }
 
     @Override
@@ -3133,7 +3146,7 @@ public class HiveMetadata
         HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
         SchemaTableName tableName = hiveTableHandle.getSchemaTableName();
         MetastoreContext metastoreContext = getMetastoreContext(session);
-        Table table = metastore.getTable(metastoreContext, tableName.getSchemaName(), tableName.getTableName())
+        Table table = metastore.getTable(metastoreContext, hiveTableHandle)
                 .orElseThrow(() -> new TableNotFoundException(tableName));
 
         Optional<HiveBucketHandle> hiveBucketHandle = getHiveBucketHandle(table);

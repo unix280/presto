@@ -105,7 +105,6 @@ import com.facebook.presto.metadata.StaticCatalogStoreConfig;
 import com.facebook.presto.metadata.StaticFunctionNamespaceStore;
 import com.facebook.presto.metadata.StaticFunctionNamespaceStoreConfig;
 import com.facebook.presto.metadata.TablePropertyManager;
-import com.facebook.presto.metadata.ViewDefinition;
 import com.facebook.presto.operator.ExchangeClientConfig;
 import com.facebook.presto.operator.ExchangeClientFactory;
 import com.facebook.presto.operator.ExchangeClientSupplier;
@@ -122,6 +121,7 @@ import com.facebook.presto.operator.TableCommitContext;
 import com.facebook.presto.operator.TaskMemoryReservationSummary;
 import com.facebook.presto.operator.index.IndexJoinLookupStats;
 import com.facebook.presto.resourcemanager.ClusterMemoryManagerService;
+import com.facebook.presto.resourcemanager.ClusterQueryTrackerService;
 import com.facebook.presto.resourcemanager.ClusterStatusSender;
 import com.facebook.presto.resourcemanager.ForResourceManager;
 import com.facebook.presto.resourcemanager.NoopResourceGroupService;
@@ -149,7 +149,6 @@ import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.DomainTranslator;
 import com.facebook.presto.spi.relation.PredicateCompiler;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
-import com.facebook.presto.spi.tracing.TracerProvider;
 import com.facebook.presto.spiller.FileSingleStreamSpillerFactory;
 import com.facebook.presto.spiller.GenericPartitioningSpillerFactory;
 import com.facebook.presto.spiller.GenericSpillerFactory;
@@ -173,8 +172,12 @@ import com.facebook.presto.sql.Serialization.FunctionCallDeserializer;
 import com.facebook.presto.sql.Serialization.VariableReferenceExpressionDeserializer;
 import com.facebook.presto.sql.Serialization.VariableReferenceExpressionSerializer;
 import com.facebook.presto.sql.SqlEnvironmentConfig;
+import com.facebook.presto.sql.analyzer.AnalyzerProviderManager;
+import com.facebook.presto.sql.analyzer.BuiltInAnalyzerProvider;
+import com.facebook.presto.sql.analyzer.BuiltInQueryPreparer;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.SingleStreamSpillerChoice;
+import com.facebook.presto.sql.analyzer.ViewDefinition;
 import com.facebook.presto.sql.gen.ExpressionCompiler;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler;
@@ -195,8 +198,7 @@ import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.statusservice.NodeStatusService;
-import com.facebook.presto.tracing.NoopTracerProvider;
-import com.facebook.presto.tracing.SimpleTracerProvider;
+import com.facebook.presto.tracing.TracerProviderManager;
 import com.facebook.presto.tracing.TracingConfig;
 import com.facebook.presto.transaction.TransactionManagerConfig;
 import com.facebook.presto.type.TypeDeserializer;
@@ -245,8 +247,6 @@ import static com.facebook.drift.codec.guice.ThriftCodecBinder.thriftCodecBinder
 import static com.facebook.drift.server.guice.DriftServerBinder.driftServerBinder;
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.FLAT;
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.LEGACY;
-import static com.facebook.presto.tracing.TracingConfig.TracerType.NOOP;
-import static com.facebook.presto.tracing.TracingConfig.TracerType.SIMPLE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -299,6 +299,11 @@ public class ServerMainModule
         binder.bind(SqlParser.class).in(Scopes.SINGLETON);
         binder.bind(SqlParserOptions.class).toInstance(sqlParserOptions);
         sqlParserOptions.useEnhancedErrorHandler(serverConfig.isEnhancedErrorReporting());
+
+        // analyzer
+        binder.bind(BuiltInQueryPreparer.class).in(Scopes.SINGLETON);
+        binder.bind(BuiltInAnalyzerProvider.class).in(Scopes.SINGLETON);
+        binder.bind(AnalyzerProviderManager.class).in(Scopes.SINGLETON);
 
         jaxrsBinder(binder).bind(ThrowableMapper.class);
 
@@ -401,6 +406,7 @@ public class ServerMainModule
                         addressSelectorBinder.bind(AddressSelector.class).annotatedWith(annotation).to(RandomCatalogServerAddressSelector.class));
 
         newOptionalBinder(binder, ClusterMemoryManagerService.class);
+        newOptionalBinder(binder, ClusterQueryTrackerService.class);
         install(installModuleIf(
                 ServerConfig.class,
                 ServerConfig::isResourceManagerEnabled,
@@ -413,6 +419,7 @@ public class ServerMainModule
                         moduleBinder.bind(ClusterStatusSender.class).to(ResourceManagerClusterStatusSender.class).in(Scopes.SINGLETON);
                         if (serverConfig.isCoordinator()) {
                             moduleBinder.bind(ClusterMemoryManagerService.class).in(Scopes.SINGLETON);
+                            moduleBinder.bind(ClusterQueryTrackerService.class).in(Scopes.SINGLETON);
                             moduleBinder.bind(ResourceGroupService.class).to(ResourceManagerResourceGroupService.class).in(Scopes.SINGLETON);
                         }
                     }
@@ -742,15 +749,7 @@ public class ServerMainModule
 
         // Distributed tracing
         configBinder(binder).bindConfig(TracingConfig.class);
-        install(installModuleIf(
-                TracingConfig.class,
-                config -> !config.getEnableDistributedTracing() || NOOP.equalsIgnoreCase(config.getTracerType()),
-                moduleBinder -> moduleBinder.bind(TracerProvider.class).to(NoopTracerProvider.class).in(Scopes.SINGLETON)));
-
-        install(installModuleIf(
-                TracingConfig.class,
-                config -> config.getEnableDistributedTracing() && SIMPLE.equalsIgnoreCase(config.getTracerType()),
-                moduleBinder -> moduleBinder.bind(TracerProvider.class).to(SimpleTracerProvider.class).in(Scopes.SINGLETON)));
+        binder.bind(TracerProviderManager.class).in(Scopes.SINGLETON);
 
         //Optional Status Detector
         newOptionalBinder(binder, NodeStatusService.class);

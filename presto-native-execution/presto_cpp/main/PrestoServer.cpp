@@ -27,7 +27,11 @@
 #include "presto_cpp/main/common/Counters.h"
 #include "presto_cpp/main/connectors/hive/storage_adapters/FileSystems.h"
 #include "presto_cpp/main/http/HttpServer.h"
+#include "presto_cpp/main/operators/LocalPersistentShuffle.h"
+#include "presto_cpp/main/operators/ShuffleInterface.h"
+#include "presto_cpp/main/operators/UnsafeRowExchangeSource.h"
 #include "presto_cpp/presto_protocol/Connectors.h"
+#include "presto_cpp/presto_protocol/WriteProtocol.h"
 #include "presto_cpp/presto_protocol/presto_protocol.h"
 #include "velox/common/base/StatsReporter.h"
 #include "velox/common/caching/SsdCache.h"
@@ -143,10 +147,13 @@ void PrestoServer::run() {
   }
 
   registerPrestoCppCounters();
-  velox::filesystems::registerLocalFileSystem();
+  registerFileSystems();
   registerOptionalHiveStorageAdapters();
+  registerShuffleInterfaceFactories();
   protocol::registerHiveConnectors();
   protocol::registerTpchConnector();
+  protocol::HiveNoCommitWriteProtocol::registerProtocol();
+  protocol::HiveTaskCommitWriteProtocol::registerProtocol();
 
   auto executor = std::make_shared<folly::IOThreadPoolExecutor>(
       systemConfig->numIoThreads(),
@@ -229,13 +236,15 @@ void PrestoServer::run() {
 
   velox::functions::prestosql::registerAllScalarFunctions();
   velox::aggregate::prestosql::registerAllAggregateFunctions();
-  velox::window::registerWindowFunctions();
+  velox::window::prestosql::registerAllWindowFunctions();
   if (!velox::isRegisteredVectorSerde()) {
     velox::serializer::presto::PrestoVectorSerde::registerVectorSerde();
   }
 
   facebook::velox::exec::ExchangeSource::registerFactory(
       PrestoExchangeSource::createExchangeSource);
+  facebook::velox::exec::ExchangeSource::registerFactory(
+      operators::UnsafeRowExchangeSource::createExchangeSource);
 
   velox::dwrf::registerDwrfReaderFactory();
 #ifdef PRESTO_ENABLE_PARQUET
@@ -344,16 +353,15 @@ void PrestoServer::initializeAsyncCache() {
   }
   auto memoryBytes = memoryGb << 30;
 
-  memory::MmapAllocatorOptions options;
+  memory::MmapAllocator::Options options;
   options.capacity = memoryBytes;
   options.useMmapArena = systemConfig->useMmapArena();
   options.mmapArenaCapacityRatio = systemConfig->mmapArenaCapacityRatio();
-  
-  auto allocator = std::make_shared<memory::MmapAllocator>(options);
-  mappedMemory_ = std::make_shared<cache::AsyncDataCache>(
-      allocator, memoryBytes, std::move(ssd));
 
-  memory::MappedMemory::setDefaultInstance(mappedMemory_.get());
+  auto allocator = std::make_shared<memory::MmapAllocator>(options);
+  allocator_ = std::make_shared<cache::AsyncDataCache>(
+      allocator, memoryBytes, std::move(ssd));
+  memory::MemoryAllocator::setDefaultInstance(allocator_.get());
 }
 
 void PrestoServer::stop() {
@@ -465,12 +473,21 @@ std::vector<std::string> PrestoServer::registerConnectors(
   return catalogNames;
 }
 
+void PrestoServer::registerShuffleInterfaceFactories() {
+  operators::ShuffleInterfaceFactory::registerFactory(
+      operators::LocalPersistentShuffleFactory::kShuffleName.toString(),
+      std::make_unique<operators::LocalPersistentShuffleFactory>());
+}
+
+void PrestoServer::registerFileSystems() {
+  velox::filesystems::registerLocalFileSystem();
+}
+
 std::shared_ptr<velox::connector::Connector> PrestoServer::connectorWithCache(
     const std::string& connectorName,
     const std::string& catalogName,
     std::shared_ptr<const velox::Config> properties) {
-  VELOX_CHECK_NOT_NULL(
-      dynamic_cast<cache::AsyncDataCache*>(mappedMemory_.get()));
+  VELOX_CHECK_NOT_NULL(dynamic_cast<cache::AsyncDataCache*>(allocator_.get()));
   LOG(INFO) << "STARTUP: Using AsyncDataCache";
   return facebook::velox::connector::getConnectorFactory(connectorName)
       ->newConnector(

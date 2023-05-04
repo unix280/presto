@@ -64,6 +64,16 @@ class TaskManager {
           std::unordered_map<std::string, std::string>>&&
           connectorConfigStrings);
 
+  // Iterates through a map of resultRequests and fetches data from
+  // buffer manager. This method uses the getData() global call to fetch
+  // data for each resultRequest bufferManager. If the output buffer for task
+  // is not found, prepares the Result object with completed flags set to false
+  // and notifies the future.
+  // Note: This method is made public for unit testing purpose only.
+  void getDataForResultRequests(
+      const std::unordered_map<int64_t, std::shared_ptr<ResultRequest>>&
+          resultRequests);
+
   std::unique_ptr<protocol::TaskInfo> deleteTask(
       const protocol::TaskId& taskId,
       bool abort);
@@ -117,6 +127,13 @@ class TaskManager {
   // Returns array with number of tasks for each of five TaskState (enum defined
   // in exec/Task.h).
   std::array<size_t, 5> getTaskNumbers(size_t& numTasks) const;
+
+  /// Build directory path for spilling for the given task.
+  /// Always returns non-empty string.
+  static std::string buildTaskSpillDirectoryPath(
+      const std::string& baseSpillPath,
+      const std::string& queryId,
+      const protocol::TaskId& taskId);
 
  public:
   static constexpr folly::StringPiece kMaxDriversPerTask{

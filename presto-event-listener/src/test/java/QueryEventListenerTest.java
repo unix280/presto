@@ -144,6 +144,7 @@ public class QueryEventListenerTest
                 URI.create("http://localhost"),
                 Optional.of(""),
                 Optional.of("plan"),
+                Optional.of("graphvizPlan"),
                 Optional.of(""),
                 new ArrayList<>(),
                 Optional.empty());

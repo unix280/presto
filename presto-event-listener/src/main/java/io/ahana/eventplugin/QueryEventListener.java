@@ -129,6 +129,7 @@ public final class QueryEventListener
                 queryCreatedEvent.getMetadata().getUri(),
                 Optional.of(""),
                 queryCreatedEvent.getMetadata().getJsonPlan(),
+                queryCreatedEvent.getMetadata().getGraphvizPlan(),
                 Optional.of(""),
                 queryCreatedEvent.getMetadata().getRuntimeOptimizedStages(),
                 queryCreatedEvent.getMetadata().getTracingId());
@@ -173,6 +174,7 @@ public final class QueryEventListener
                 queryCompletedEvent.getMetadata().getUri(),
                 Optional.of(""),
                 queryCompletedEvent.getMetadata().getJsonPlan(),
+                queryCompletedEvent.getMetadata().getGraphvizPlan(),
                 Optional.of(""),
                 queryCompletedEvent.getMetadata().getRuntimeOptimizedStages(),
                 queryCompletedEvent.getMetadata().getTracingId());
@@ -193,7 +195,8 @@ public final class QueryEventListener
                 queryCompletedEvent.getOperatorStatistics(),
                 queryCompletedEvent.getPlanStatisticsRead(),
                 queryCompletedEvent.getPlanStatisticsWritten(),
-                queryCompletedEvent.getExpandedQuery());
+                queryCompletedEvent.getExpandedQuery(),
+                queryCompletedEvent.getOptimizerInformation());
 
         try {
             // Logging for payload

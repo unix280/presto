@@ -10,7 +10,7 @@
 
     <groupId>com.facebook.presto</groupId>
     <artifactId>presto-root</artifactId>
-    <version>0.278</version>
+    <version>0.279</version>
     <packaging>pom</packaging>
 
     <name>presto-root</name>
@@ -30,7 +30,7 @@
     <scm>
         <connection>scm:git:git://github.com/prestodb/presto.git</connection>
         <url>https://github.com/prestodb/presto</url>
-        <tag>0.278</tag>
+        <tag>0.279</tag>
     </scm>
 
     <properties>
@@ -64,7 +64,7 @@
         <dep.nexus-staging-plugin.version>1.6.8</dep.nexus-staging-plugin.version>
         <dep.asm.version>9.0</dep.asm.version>
         <dep.gcs.version>1.9.17</dep.gcs.version>
-        <dep.alluxio.version>2.8.1</dep.alluxio.version>
+        <dep.alluxio.version>2.9.0</dep.alluxio.version>
         <dep.slf4j.version>1.7.32</dep.slf4j.version>
         <dep.kafka.version>2.3.1</dep.kafka.version>
         <dep.pinot.version>0.11.0</dep.pinot.version>
@@ -192,6 +192,7 @@
         <module>presto-hudi</module>
         <module>presto-native-execution</module>
         <module>presto-router</module>
+        <module>presto-open-telemetry</module>
     </modules>
 
     <dependencyManagement>
@@ -747,6 +748,13 @@
 
             <dependency>
                 <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-spark-base</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-spark-launcher</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -882,6 +890,12 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-testng-services</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-open-telemetry</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -2211,6 +2225,60 @@
                         <artifactId>asm</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-api</artifactId>
+                <version>1.19.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-context</artifactId>
+                <version>1.19.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-exporter-otlp</artifactId>
+                <version>1.19.0</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.squareup.okhttp3</groupId>
+                        <artifactId>okhttp</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-extension-trace-propagators</artifactId>
+                <version>1.19.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-sdk</artifactId>
+                <version>1.19.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-sdk-common</artifactId>
+                <version>1.19.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-sdk-trace</artifactId>
+                <version>1.19.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-semconv</artifactId>
+                <version>1.19.0-alpha</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

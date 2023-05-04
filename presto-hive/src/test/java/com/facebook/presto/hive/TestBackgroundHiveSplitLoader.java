@@ -202,8 +202,8 @@ public class TestBackgroundHiveSplitLoader
 
         List<HiveSplit> splits = drainSplits(hiveSplitSource);
         assertEquals(splits.size(), 1);
-        assertEquals(splits.get(0).getPath(), RETURNED_PATH.toString());
-        assertEquals(splits.get(0).getLength(), 0);
+        assertEquals(splits.get(0).getFileSplit().getPath(), RETURNED_PATH.toString());
+        assertEquals(splits.get(0).getFileSplit().getLength(), 0);
     }
 
     @Test
@@ -428,7 +428,8 @@ public class TestBackgroundHiveSplitLoader
             throws Exception
     {
         return drainSplits(source).stream()
-                .map(HiveSplit::getPath)
+                .map(HiveSplit::getFileSplit)
+                .map(HiveFileSplit::getPath)
                 .collect(toImmutableList());
     }
 
@@ -671,7 +672,7 @@ public class TestBackgroundHiveSplitLoader
                 new BlockLocation[] {});
     }
 
-    private static class TestingHdfsEnvironment
+    public static class TestingHdfsEnvironment
             extends HdfsEnvironment
     {
         private final List<LocatedFileStatus> files;

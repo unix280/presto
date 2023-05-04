@@ -68,25 +68,32 @@ struct ResultRequest {
 struct PrestoTask {
   const PrestoTaskId id;
   std::shared_ptr<velox::exec::Task> task;
-  bool taskStarted = false;
+
+  // Has the task been normally created and started.
+  // When you create task with error - it has never been started.
+  // When you create task from 'delete task' - it has never been started.
+  // When you create task from any other endpoint, such as 'get result' - it has
+  // not been started, until the actual 'create task' message comes.
+  bool taskStarted{false};
+
   uint64_t lastHeartbeatMs{0};
   mutable std::mutex mutex;
 
-  // Error before task is created or when task is being created.
-  std::exception_ptr error = nullptr;
+  /// Error before task is created or when task is being created.
+  std::exception_ptr error{nullptr};
 
-  // Contains state info but is never returned.
+  /// Contains state info but is never returned.
   protocol::TaskInfo info;
 
-  // Pending result requests keyed on buffer ID. May arrive before 'task' is
-  // created. May be accessed on different threads outside of 'mutex', hence
-  // shared_ptr to define lifetime.
+  /// Pending result requests keyed on buffer ID. May arrive before 'task' is
+  /// created. May be accessed on different threads outside of 'mutex', hence
+  /// shared_ptr to define lifetime.
   std::unordered_map<int64_t, std::shared_ptr<ResultRequest>> resultRequests;
 
-  // Pending status request. May arrive before there is a Task.
+  /// Pending status request. May arrive before there is a Task.
   PromiseHolderWeakPtr<std::unique_ptr<protocol::TaskStatus>> statusRequest;
 
-  // Info request. May arrive before there is a Task.
+  /// Info request. May arrive before there is a Task.
   PromiseHolderWeakPtr<std::unique_ptr<protocol::TaskInfo>> infoRequest;
 
   explicit PrestoTask(const std::string& taskId);
@@ -108,7 +115,7 @@ struct PrestoTask {
     return updateInfoLocked();
   }
 
-  // Turn the task numbers (per state) into a string.
+  /// Turns the task numbers (per state) into a string.
   static std::string taskNumbersToString(
       const std::array<size_t, 5>& taskNumbers);
 

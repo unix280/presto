@@ -37,10 +37,10 @@ import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
-class QueryAssertions
+public class QueryAssertions
         implements Closeable
 {
-    private final QueryRunner runner;
+    protected QueryRunner runner;
 
     public QueryAssertions()
     {
@@ -61,17 +61,17 @@ class QueryAssertions
 
     public QueryAssertions(Session session)
     {
-        this(LocalQueryRunner.create(session));
-    }
-
-    public QueryRunner getQueryRunner()
-    {
-        return runner;
+        this(LocalQueryRunner.create(requireNonNull(session, "session is null")));
     }
 
     public QueryAssertions(QueryRunner runner)
     {
         this.runner = requireNonNull(runner, "runner is null");
+    }
+
+    public QueryRunner getQueryRunner()
+    {
+        return runner;
     }
 
     public void assertFails(@Language("SQL") String sql, @Language("RegExp") String expectedMessageRegExp)
