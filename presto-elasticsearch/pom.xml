@@ -253,14 +253,14 @@
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>
-            <version>5.10.0</version>
+            <version>5.5.0</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
-            <version>1.15.3</version>
+            <version>1.15.2</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -270,10 +270,6 @@
                 <exclusion>
                     <groupId>com.fasterxml.jackson.core</groupId>
                     <artifactId>jackson-annotations</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>net.java.dev.jna</groupId>
-                    <artifactId>jna</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -291,6 +287,10 @@
                     <groupId>org.apache.commons</groupId>
                     <artifactId>commons-compress</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -298,6 +298,12 @@
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main</artifactId>
             <type>test-jar</type>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                </exclusion>
+            </exclusions>
             <scope>test</scope>
         </dependency>
 
@@ -318,6 +324,10 @@
                 <exclusion>
                     <groupId>net.java.dev.jna</groupId>
                     <artifactId>jna</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
                 </exclusion>
             </exclusions>
             <scope>test</scope>
