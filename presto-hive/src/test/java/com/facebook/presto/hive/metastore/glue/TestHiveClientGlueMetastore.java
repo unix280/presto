@@ -67,6 +67,7 @@ import static com.facebook.presto.common.type.BigintType.BIGINT;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.hive.HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER;
+import static com.facebook.presto.hive.HiveStorageFormat.ALPHA;
 import static com.facebook.presto.hive.HiveStorageFormat.AVRO;
 import static com.facebook.presto.hive.HiveStorageFormat.CSV;
 import static com.facebook.presto.hive.HiveStorageFormat.ORC;
@@ -150,7 +151,7 @@ public class TestHiveClientGlueMetastore
         this.createTableFormats = difference(
                 ImmutableSet.copyOf(HiveStorageFormat.values()),
                 // exclude formats that change table schema with serde
-                ImmutableSet.of(AVRO, CSV, PAGEFILE));
+                ImmutableSet.of(AVRO, CSV, ALPHA, PAGEFILE));
     }
 
     /**

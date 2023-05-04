@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
+import static com.facebook.presto.hive.HiveStorageFormat.ALPHA;
 import static com.facebook.presto.hive.HiveStorageFormat.AVRO;
 import static com.facebook.presto.hive.HiveStorageFormat.CSV;
 import static com.facebook.presto.hive.HiveStorageFormat.PAGEFILE;
@@ -61,7 +62,7 @@ public class TestHiveClientGlueMetastoreWithImpersonation
         this.createTableFormats = difference(
                 ImmutableSet.copyOf(HiveStorageFormat.values()),
                 // exclude formats that change table schema with serde
-                ImmutableSet.of(AVRO, CSV, PAGEFILE));
+                ImmutableSet.of(AVRO, CSV, ALPHA, PAGEFILE));
     }
 
     @Override
