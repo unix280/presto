@@ -55,6 +55,9 @@ public interface HiveMetastoreClient
     List<String> getAllTables(String databaseName)
             throws TException;
 
+    List<String> getTablesByParameterType(String databaseName, String tableType)
+            throws TException;
+
     List<String> getTableNamesByFilter(String databaseName, String filter)
             throws TException;
 

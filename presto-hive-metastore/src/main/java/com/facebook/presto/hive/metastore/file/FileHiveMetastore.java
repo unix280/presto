@@ -405,6 +405,13 @@ public class FileHiveMetastore
     }
 
     @Override
+    public Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        /*TODO:check what should be implemented here*/
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public synchronized Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {
         Optional<List<String>> tables = getAllTables(metastoreContext, databaseName);

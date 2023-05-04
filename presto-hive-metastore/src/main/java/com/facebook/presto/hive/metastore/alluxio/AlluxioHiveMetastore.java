@@ -450,4 +450,10 @@ public class AlluxioHiveMetastore
     {
         throw new UnsupportedOperationException("setPartitionLeases is not supported in AlluxioHiveMetastore");
     }
+
+    @Override
+    public Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        throw new UnsupportedOperationException();
+    }
 }

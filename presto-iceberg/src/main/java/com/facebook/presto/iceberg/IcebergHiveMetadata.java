@@ -89,6 +89,7 @@ public class IcebergHiveMetadata
 {
     private final ExtendedHiveMetastore metastore;
     private final HdfsEnvironment hdfsEnvironment;
+    public static final String ICEBERG_TABLE_TYPE_VALUE = "iceberg";
 
     public IcebergHiveMetadata(
             ExtendedHiveMetastore metastore,
@@ -163,7 +164,7 @@ public class IcebergHiveMetadata
     {
         MetastoreContext metastoreContext = new MetastoreContext(session.getIdentity(), session.getQueryId(), session.getClientInfo(), session.getSource(), Optional.empty(), false, HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER);
         return metastore
-                .getAllTables(metastoreContext, schemaName.get())
+                .getTablesByParameterType(metastoreContext, schemaName.get(), ICEBERG_TABLE_TYPE_VALUE)
                 .orElseGet(() -> metastore.getAllDatabases(metastoreContext))
                 .stream()
                 .map(table -> new SchemaTableName(schemaName.get(), table))

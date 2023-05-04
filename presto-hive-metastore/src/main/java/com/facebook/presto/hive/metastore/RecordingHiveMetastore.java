@@ -268,6 +268,13 @@ public class RecordingHiveMetastore
     }
 
     @Override
+    public Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        /*TODO:Check what whould be implemeted here*/
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {
         return loadValue(allViewsCache, databaseName, () -> delegate.getAllViews(metastoreContext, databaseName));

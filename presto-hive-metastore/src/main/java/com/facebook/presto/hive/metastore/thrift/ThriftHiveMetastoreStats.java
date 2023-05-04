@@ -21,6 +21,7 @@ public class ThriftHiveMetastoreStats
     private final HiveMetastoreApiStats getAllDatabases = new HiveMetastoreApiStats();
     private final HiveMetastoreApiStats getDatabase = new HiveMetastoreApiStats();
     private final HiveMetastoreApiStats getAllTables = new HiveMetastoreApiStats();
+    private final HiveMetastoreApiStats getTablesByParameterType = new HiveMetastoreApiStats();
     private final HiveMetastoreApiStats getAllViews = new HiveMetastoreApiStats();
     private final HiveMetastoreApiStats getTable = new HiveMetastoreApiStats();
     private final HiveMetastoreApiStats getFields = new HiveMetastoreApiStats();
@@ -74,6 +75,13 @@ public class ThriftHiveMetastoreStats
     public HiveMetastoreApiStats getGetAllTables()
     {
         return getAllTables;
+    }
+
+    @Managed
+    @Nested
+    public HiveMetastoreApiStats getTablesByParameterType()
+    {
+        return getTablesByParameterType;
     }
 
     @Managed

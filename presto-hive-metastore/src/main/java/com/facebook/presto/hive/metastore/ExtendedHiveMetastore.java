@@ -60,6 +60,8 @@ public interface ExtendedHiveMetastore
 
     Optional<List<String>> getAllTables(MetastoreContext metastoreContext, String databaseName);
 
+    Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType);
+
     Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName);
 
     void createDatabase(MetastoreContext metastoreContext, Database database);
