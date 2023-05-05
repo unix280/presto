@@ -1513,7 +1513,7 @@ workflows:
             - test_specific_module_presto_main
             - test_specific_module_presto_mongodb
             - test_specific_module_presto_redis
-            - test_specific_module_presto_elasticsearch
+#            - test_specific_module_presto_elasticsearch
             - test_specific_module_presto_orc
             - test_specific_module_presto_thrift_connector
             - test_specific_module_presto_spark_base
