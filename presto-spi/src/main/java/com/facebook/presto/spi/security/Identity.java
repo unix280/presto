@@ -25,7 +25,7 @@ import static java.util.Objects.requireNonNull;
 
 public class Identity
 {
-    private final String user;
+    private String user;
     private final Optional<Principal> principal;
     private final Map<String, SelectedRole> roles;
     private final Map<String, String> extraCredentials;
@@ -76,6 +76,9 @@ public class Identity
 
     public String getUser()
     {
+        if (principal != null) {
+            user = principal.get().getName();
+        }
         return user;
     }
 
