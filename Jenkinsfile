@@ -132,9 +132,6 @@ pipeline {
                 }
 
                 stage('Docker Native Build') {
-                    when {
-                        expression { false }
-                    }
                     steps {
                         echo "Building ${DOCKER_NATIVE_IMAGE}"
                         withCredentials([[
@@ -180,10 +177,6 @@ pipeline {
                 }
 
                 stage('Publish Native Docker Image') {
-                    when {
-                        expression { false }
-                    }
-
                     steps {
                         withCredentials([[
                                 $class:            'AmazonWebServicesCredentialsBinding',
