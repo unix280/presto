@@ -244,7 +244,7 @@ public class OrcTester
             @Override
             public Serializer createSerializer()
             {
-                return new com.facebook.hive.orc.OrcSerde();
+                return new OrcSerde();
             }
         };
 

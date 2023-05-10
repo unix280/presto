@@ -148,7 +148,7 @@
         <module>presto-benchmark-driver</module>
         <module>presto-server</module>
         <module>presto-server-rpm</module>
-        <module>presto-docs</module>
+<!--        <module>presto-docs</module>-->
         <module>presto-verifier</module>
         <module>presto-testing-server-launcher</module>
         <module>presto-plugin-toolkit</module>
@@ -799,10 +799,38 @@
                 <version>2.7.4-9.4</version>
             </dependency>
 
+<!--            <dependency>-->
+<!--                <groupId>com.facebook.presto.hive</groupId>-->
+<!--                <artifactId>hive-apache</artifactId>-->
+<!--                <version>3.0.0-8</version>-->
+<!--            </dependency>-->
+
             <dependency>
                 <groupId>com.facebook.presto.hive</groupId>
-                <artifactId>hive-apache</artifactId>
+                <artifactId>hive-apache-ibm</artifactId>
                 <version>3.0.0-8</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.google.inject</groupId>
+                        <artifactId>guice</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.alluxio</groupId>
+                        <artifactId>alluxio-shaded-client</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.httpcomponents</groupId>
+                        <artifactId>httpcore</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.httpcomponents</groupId>
+                        <artifactId>httpclient</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>
@@ -908,7 +936,7 @@
             <dependency>
                 <groupId>io.airlift</groupId>
                 <artifactId>aircompressor</artifactId>
-                <version>0.15</version>
+                <version>0.19</version>
             </dependency>
 
             <dependency>
@@ -1312,7 +1340,7 @@
             <dependency>
                 <groupId>org.apache.thrift</groupId>
                 <artifactId>libthrift</artifactId>
-                <version>0.9.3</version>
+                <version>0.16.0</version>
                 <exclusions>
                     <exclusion>
                         <groupId>org.apache.httpcomponents</groupId>
@@ -1321,6 +1349,22 @@
                     <exclusion>
                         <groupId>org.apache.httpcomponents</groupId>
                         <artifactId>httpclient</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.thrift</groupId>
+                        <artifactId>libthrift</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.facebook.presto.hadoop</groupId>
+                        <artifactId>hadoop-apache2</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.github.luben</groupId>
+                        <artifactId>zstd-jni</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>
@@ -1374,7 +1418,7 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
-                <version>3.4</version>
+                <version>3.12.0</version>
             </dependency>
 
             <dependency>
@@ -2020,6 +2064,10 @@
                         <groupId>com.google.code.findbugs</groupId>
                         <artifactId>annotations</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>com.facebook.presto.hive</groupId>
+                        <artifactId>hive-apache</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
 
@@ -2511,6 +2559,23 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <id>Run Script</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>installHiveDep.sh</executable>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

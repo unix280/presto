@@ -126,7 +126,7 @@
 
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
+            <artifactId>hive-apache-ibm</artifactId>
         </dependency>
 
         <dependency>
@@ -234,4 +234,56 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+    <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.basepom.maven</groupId>
+                <artifactId>duplicate-finder-maven-plugin</artifactId>
+                <configuration>
+                    <ignoredResourcePatterns>
+                        <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                        <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                        <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/api.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/impl.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/spi.properties</ignoredResourcePattern>
+                    </ignoredResourcePatterns>
+                    <ignoredClassPatterns>
+                        <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                        <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.codehaus.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.ctc.wstx.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.jersey.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.jute.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.zookeeper.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.ws.rs.ext.RuntimeDelegateImpl</ignoredClassPattern>
+                    </ignoredClassPatterns>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

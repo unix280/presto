@@ -211,7 +211,7 @@ public class ParquetTestUtils
     {
         try {
             Serializer result = ParquetHiveSerDe.class.getConstructor().newInstance();
-            result.initialize(conf, properties);
+//            result.initialize(conf, properties);
             return result;
         }
         catch (Exception e) {

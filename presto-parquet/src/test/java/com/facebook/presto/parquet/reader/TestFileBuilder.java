@@ -144,7 +144,7 @@ public class TestFileBuilder
                 .withValidation(true)
                 .withPageSize(pageSize)
                 .withRowGroupSize(rowGroupSize)
-                .withEncryption(encryptionProperties)
+//                .withEncryption(encryptionProperties)
                 .withDictionaryEncoding(dictionaryEnabled)
                 .withCompressionCodec(CompressionCodecName.valueOf(codec));
         try (ParquetWriter writer = builder.build()) {
