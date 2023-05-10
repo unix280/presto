@@ -63,6 +63,7 @@ velox-submodule:		#: Check out code for velox submodule
 
 velox-patches:
 	git apply ./patches/velox-s3filesystem.patch
+	git apply ./patches/velox-arrow.patch
 
 submodules: velox-submodule velox-patches
 
