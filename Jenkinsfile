@@ -177,6 +177,13 @@ pipeline {
                 }
 
                 stage('Publish Native Docker Image') {
+                    when {
+                        anyOf {
+                            expression { params.PUBLISH_ARTIFACTS_ON_CURRENT_BRANCH }
+                            branch "develop"
+                        }
+                        beforeAgent true
+                    }
                     steps {
                         withCredentials([[
                                 $class:            'AmazonWebServicesCredentialsBinding',
