@@ -42,7 +42,7 @@ endif()
 option(PRESTO_ENABLE_S3 "Build S3 connector" OFF)
 option(PRESTO_ENABLE_HDFS "Build HDFS connector" OFF)
 option(PRESTO_ENABLE_PARQUET "Enable Parquet support" OFF)
-option(PRESTO_ENABLE_TESTING "Enable tests" ON)
+option(PRESTO_ENABLE_TESTING "Enable tests" OFF)
 
 # Set all Velox options below
 if(PRESTO_ENABLE_S3)
