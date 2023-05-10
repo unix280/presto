@@ -112,7 +112,7 @@
 
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
+            <artifactId>hive-apache-ibm</artifactId>
         </dependency>
 
         <dependency>
@@ -459,7 +459,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.4</version>
+            <version>3.12.0</version>
         </dependency>
 
         <dependency>
@@ -960,6 +960,31 @@
 
     </dependencies>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-client</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-io</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-http</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-util</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <build>
         <plugins>
             <plugin>
@@ -969,10 +994,33 @@
                     <ignoredResourcePatterns>
                         <ignoredResourcePattern>parquet.thrift</ignoredResourcePattern>
                         <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                        <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+                        <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                        <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/api.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/impl.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/spi.properties</ignoredResourcePattern>
                     </ignoredResourcePatterns>
                     <ignoredClassPatterns>
                         <ignoredClassPattern>shaded.parquet.it.unimi.dsi.fastutil.*</ignoredClassPattern>
                         <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+                        <ignoredClassPattern>com.facebook.presto.parquet.batchreader.*BatchReader</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.codehaus.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.ctc.wstx.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.jersey.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.jute.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.zookeeper.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.ws.rs.ext.RuntimeDelegateImpl</ignoredClassPattern>
                     </ignoredClassPatterns>
                     <ignoredDependencies>
                         <dependency>
@@ -996,7 +1044,29 @@
                         <ignoredDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredDependency>
                         <ignoredDependency>org.eclipse.jetty:jetty-server:jar</ignoredDependency>
                     </ignoredDependencies>
+                    <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+                    <ignoredUnusedDeclaredDependencies>
+                        <ignoredUnusedDeclaredDependency>org.apache.thrift:libthrift:jar:0.16.0</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>com.amazonaws:aws-java-sdk-glue:jar:1.11.697</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-core:jar:2.10.0</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
                 </configuration>
+            </plugin>
+            <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

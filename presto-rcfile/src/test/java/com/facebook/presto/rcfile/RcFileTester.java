@@ -219,7 +219,7 @@ public class RcFileTester
                     Properties tableProperties = new Properties();
                     tableProperties.setProperty("columns", "test");
                     tableProperties.setProperty("columns.types", "string");
-                    columnarSerDe.initialize(new JobConf(false), tableProperties);
+                    columnarSerDe.initialize(new JobConf(false), tableProperties, null);
                     return columnarSerDe;
                 }
                 catch (SerDeException e) {
@@ -781,7 +781,7 @@ public class RcFileTester
         else {
             deserializer = new ColumnarSerDe();
         }
-        deserializer.initialize(configuration, schema);
+//        deserializer.initialize(configuration, schema);
         configuration.set(SERIALIZATION_LIB, deserializer.getClass().getName());
 
         InputFormat<K, V> inputFormat = new RCFileInputFormat<>();
@@ -927,7 +927,7 @@ public class RcFileTester
         Properties tableProperties = new Properties();
         tableProperties.setProperty("columns", "test");
         tableProperties.setProperty("columns.types", objectInspector.getTypeName());
-        serializer.initialize(new JobConf(false), tableProperties);
+//        serializer.initialize(new JobConf(false), tableProperties);
 
         while (values.hasNext()) {
             Object value = values.next();

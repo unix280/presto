@@ -84,6 +84,12 @@
         </dependency>
 
         <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>security</artifactId>
+            <version>200</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
         </dependency>
@@ -95,13 +101,27 @@
 
         <dependency>
             <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
+            <artifactId>hive-apache-ibm</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpclient</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpcore</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.thrift</groupId>
-            <artifactId>libthrift</artifactId>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.thrift</groupId>-->
+<!--            <artifactId>libthrift</artifactId>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>com.amazonaws</groupId>
@@ -244,6 +264,36 @@
         </dependency>
     </dependencies>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.airlift</groupId>
+                <artifactId>aircompressor</artifactId>
+                <version>0.19</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.thrift</groupId>
+                <artifactId>libthrift</artifactId>
+                <version>0.16.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>1.7.32</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponent</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.5</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponent</groupId>
+                <artifactId>httpcore</artifactId>
+                <version>4.4.15</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <profiles>
         <profile>
             <id>ci</id>
@@ -260,4 +310,54 @@
             </build>
         </profile>
     </profiles>
+    <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.basepom.maven</groupId>
+                    <artifactId>duplicate-finder-maven-plugin</artifactId>
+                    <configuration>
+                        <ignoredResourcePatterns>
+                            <ignoredResourcePattern>version.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                            <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                            <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                            <ignoredResourcePattern>public-suffix-list.txt</ignoredResourcePattern>
+                        </ignoredResourcePatterns>
+                        <ignoredClassPatterns>
+                            <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                            <ignoredClassPattern>module-info</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                            <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                            <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                        </ignoredClassPatterns>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.1.1</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>analyze-only</goal>
+                            </goals>
+                            <configuration>
+                                <ignoredUnusedDeclaredDependencies>
+                                    <ignoredUnusedDeclaredDependency>joda-time:joda-time:jar:2.10.8</ignoredUnusedDeclaredDependency>
+                                    <ignoredUnusedDeclaredDependency>javax.inject:javax.inject:jar:1</ignoredUnusedDeclaredDependency>
+                                    <ignoredUnusedDeclaredDependency>org.apache.thrift:libthrift:jar:0.16.0</ignoredUnusedDeclaredDependency>
+                                    <ignoredUnusedDeclaredDependency>com.google.inject:guice:jar:4.2.2</ignoredUnusedDeclaredDependency>
+                                </ignoredUnusedDeclaredDependencies>
+                                <ignoredUsedUndeclaredDependencies>
+                                    <ignoredUsedUndeclaredDependency>joda-time:joda-time:jar:2.10.8</ignoredUsedUndeclaredDependency>
+                                </ignoredUsedUndeclaredDependencies>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

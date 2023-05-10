@@ -309,6 +309,32 @@
         </dependency>
     </dependencies>
 
+    <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-client</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-io</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-http</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-util</artifactId>
+                <version>9.4.40.v20210413</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <build>
         <plugins>
             <plugin>
@@ -318,10 +344,30 @@
                     <ignoredResourcePatterns>
                         <ignoredResourcePattern>parquet.thrift</ignoredResourcePattern>
                         <ignoredResourcePattern>about.html</ignoredResourcePattern>
+                        <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+                        <ignoredResourcePattern>core-default.xml</ignoredResourcePattern>
+                        <ignoredResourcePattern>common-version-info.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>org.apache.hadoop.application-classloader.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/api.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/impl.properties</ignoredResourcePattern>
+                        <ignoredResourcePattern>com/sun/jersey/impl/spi.properties</ignoredResourcePattern>
                     </ignoredResourcePatterns>
                     <ignoredClassPatterns>
                         <ignoredClassPattern>shaded.parquet.it.unimi.dsi.fastutil.*</ignoredClassPattern>
                         <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
+                        <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.codehaus.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.ctc.wstx.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.jersey.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.jute.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.zookeeper.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.ws.rs.ext.RuntimeDelegateImpl</ignoredClassPattern>
                     </ignoredClassPatterns>
                 </configuration>
             </plugin>

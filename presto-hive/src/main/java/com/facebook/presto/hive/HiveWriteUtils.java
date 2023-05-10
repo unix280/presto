@@ -60,7 +60,6 @@ import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.ql.io.RCFile;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat;
-import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.Serializer;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
@@ -228,13 +227,13 @@ public final class HiveWriteUtils
     {
         try {
             Serializer result = (Serializer) Class.forName(serializerName).getConstructor().newInstance();
-            result.initialize(conf, properties);
+//            result.initialize(conf, properties);
             return result;
         }
         catch (ClassNotFoundException e) {
             throw new PrestoException(HIVE_SERDE_NOT_FOUND, "Serializer does not exist: " + serializerName);
         }
-        catch (SerDeException | ReflectiveOperationException e) {
+        catch (ReflectiveOperationException e) {
             throw new PrestoException(HIVE_WRITER_DATA_ERROR, e);
         }
     }

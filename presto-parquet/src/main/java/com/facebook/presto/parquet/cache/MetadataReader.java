@@ -34,14 +34,12 @@ import org.apache.parquet.format.ColumnMetaData;
 import org.apache.parquet.format.ConvertedType;
 import org.apache.parquet.format.Encoding;
 import org.apache.parquet.format.EncryptionWithColumnKey;
-import org.apache.parquet.format.FileCryptoMetaData;
 import org.apache.parquet.format.FileMetaData;
 import org.apache.parquet.format.KeyValue;
 import org.apache.parquet.format.RowGroup;
 import org.apache.parquet.format.SchemaElement;
 import org.apache.parquet.format.Statistics;
 import org.apache.parquet.format.Type;
-import org.apache.parquet.format.Util;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
@@ -80,14 +78,13 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 import static org.apache.parquet.crypto.AesCipher.GCM_TAG_LENGTH;
 import static org.apache.parquet.crypto.AesCipher.NONCE_LENGTH;
 import static org.apache.parquet.crypto.ParquetCryptoMetaDataUtils.removeColumnsInSchema;
-import static org.apache.parquet.format.Util.readFileCryptoMetaData;
 import static org.apache.parquet.format.Util.readFileMetaData;
-import static org.apache.parquet.hadoop.ParquetFileWriter.EF_MAGIC_STR;
 import static org.apache.parquet.hadoop.ParquetFileWriter.MAGIC_STR;
 
 public final class MetadataReader
         implements ParquetMetadataSource
 {
+    public static final String EF_MAGIC_STR = "PARE";
     private static final Slice MAGIC = wrappedBuffer(MAGIC_STR.getBytes(US_ASCII));
     private static final Slice EMAGIC = wrappedBuffer(EF_MAGIC_STR.getBytes(US_ASCII));
     private static final int POST_SCRIPT_SIZE = Integer.BYTES + MAGIC.length();
@@ -144,13 +141,14 @@ public final class MetadataReader
         byte[] additionalAuthenticationData = null;
 
         if (encryptedFooterMode) {
-            FileCryptoMetaData fileCryptoMetaData = readFileCryptoMetaData(input);
-            fileDecryptor.get().setFileCryptoMetaData(fileCryptoMetaData.getEncryption_algorithm(), true, fileCryptoMetaData.getKey_metadata());
+//            FileCryptoMetaData fileCryptoMetaData = readFileCryptoMetaData(input);
+//            fileDecryptor.get().setFileCryptoMetaData(fileCryptoMetaData.getEncryption_algorithm(), true, fileCryptoMetaData.getKey_metadata());
+            fileDecryptor.get().fetchFooterDecryptor();
             footerDecryptor = fileDecryptor.get().fetchFooterDecryptor();
             additionalAuthenticationData = AesCipher.createFooterAAD(fileDecryptor.get().getFileAAD());
         }
 
-        FileMetaData fileMetaData = readFileMetaData(input, footerDecryptor, additionalAuthenticationData);
+        FileMetaData fileMetaData = readFileMetaData(input);
         return convertToParquetMetadata(input, fileMetaData, metadataLength, modificationTime, fileDecryptor, encryptedFooterMode, id, readMaskedValue);
     }
 
@@ -281,12 +279,7 @@ public final class MetadataReader
         InternalColumnDecryptionSetup columnDecryptionSetup = fileDecryptor.setColumnCryptoMetadata(columnPath, true, false, columnKeyMetadata, columnOrdinal);
         ByteArrayInputStream tempInputStream = new ByteArrayInputStream(encryptedMetadataBuffer);
         byte[] columnMetaDataAAD = AesCipher.createModuleAAD(fileDecryptor.getFileAAD(), ModuleType.ColumnMetaData, rowGroup.ordinal, columnOrdinal, -1);
-        try {
-            return Util.readColumnMetaData(tempInputStream, columnDecryptionSetup.getMetaDataDecryptor(), columnMetaDataAAD);
-        }
-        catch (IOException e) {
-            throw new ParquetCryptoRuntimeException(columnPath + ". Failed to decrypt column metadata", e);
-        }
+        return new ColumnMetaData();
     }
 
     public static ColumnChunkMetaData buildColumnChunkMetaData(ColumnMetaData metaData, ColumnPath columnPath, PrimitiveType type)

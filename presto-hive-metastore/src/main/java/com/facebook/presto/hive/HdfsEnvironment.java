@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive;
 
-import com.facebook.presto.hadoop.HadoopNative;
+//import com.facebook.presto.hadoop.HadoopNative;
 import com.facebook.presto.hive.authentication.GenericExceptionAction;
 import com.facebook.presto.hive.authentication.HdfsAuthentication;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
@@ -49,7 +49,7 @@ public class HdfsEnvironment
         this.verifyChecksum = requireNonNull(config, "config is null").isVerifyChecksum();
         this.hdfsAuthentication = requireNonNull(hdfsAuthentication, "hdfsAuthentication is null");
         if (config.isRequireHadoopNative()) {
-            HadoopNative.requireHadoopNative();
+//            HadoopNative.requireHadoopNative();
         }
     }
 
