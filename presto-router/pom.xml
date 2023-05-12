@@ -16,13 +16,6 @@
         <main-class>com.facebook.presto.router.PrestoRouter</main-class>
     </properties>
 
-    <repositories>
-        <repository>
-            <id>ahana-s3-maven-repo-releases</id>
-            <url>s3://ahana-maven-repo/release</url>
-        </repository>
-    </repositories>
-
     <dependencies>
         <dependency>
             <groupId>com.facebook.presto</groupId>
