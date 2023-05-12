@@ -16,13 +16,6 @@
         <dep.nessie.version>0.44.0</dep.nessie.version>
     </properties>
 
-    <repositories>
-        <repository>
-            <id>ahana-s3-maven-repo-releases</id>
-            <url>s3://ahana-maven-repo/release</url>
-        </repository>
-    </repositories>
-
     <dependencies>
         <dependency>
             <groupId>com.facebook.airlift</groupId>
