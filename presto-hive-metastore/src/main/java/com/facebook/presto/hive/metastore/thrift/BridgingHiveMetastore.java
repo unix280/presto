@@ -163,6 +163,12 @@ public class BridgingHiveMetastore
     }
 
     @Override
+    public Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        return delegate.getTablesByParameterType(metastoreContext, databaseName, tableType);
+    }
+
+    @Override
     public Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName)
     {
         return delegate.getAllViews(metastoreContext, databaseName);
