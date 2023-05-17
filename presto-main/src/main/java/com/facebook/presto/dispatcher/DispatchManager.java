@@ -37,6 +37,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.analyzer.AnalyzerOptions;
 import com.facebook.presto.spi.analyzer.AnalyzerProvider;
+import com.facebook.presto.spi.governance.QueryAuditAndGovernance;
 import com.facebook.presto.spi.resourceGroups.SelectionContext;
 import com.facebook.presto.spi.resourceGroups.SelectionCriteria;
 import com.facebook.presto.spi.security.AccessControlContext;
@@ -95,6 +96,8 @@ public class DispatchManager
     private final SecurityConfig securityConfig;
     private final AnalyzerProviderManager analyzerProviderManager;
 
+    private final QueryAuditAndGovernance queryAuditAndGovernance;
+
     /**
      * Dispatch Manager is used for the pre-queuing part of queries prior to the query execution phase.
      *
@@ -130,7 +133,8 @@ public class DispatchManager
             DispatchExecutor dispatchExecutor,
             ClusterStatusSender clusterStatusSender,
             SecurityConfig securityConfig,
-            Optional<ClusterQueryTrackerService> clusterQueryTrackerService)
+            Optional<ClusterQueryTrackerService> clusterQueryTrackerService,
+            QueryAuditAndGovernance queryAuditAndGovernance)
     {
         this.queryIdGenerator = requireNonNull(queryIdGenerator, "queryIdGenerator is null");
         this.analyzerProviderManager = requireNonNull(analyzerProviderManager, "analyzerProviderManager is null");
@@ -153,6 +157,8 @@ public class DispatchManager
         this.queryTracker = new QueryTracker<>(queryManagerConfig, dispatchExecutor.getScheduledExecutor(), clusterQueryTrackerService);
 
         this.securityConfig = requireNonNull(securityConfig, "securityConfig is null");
+
+        this.queryAuditAndGovernance = requireNonNull(queryAuditAndGovernance, "Query Audit Governance is null");
     }
 
     /**
@@ -287,6 +293,12 @@ public class DispatchManager
             AnalyzerOptions analyzerOptions = createAnalyzerOptions(session, session.getWarningCollector());
             AnalyzerProvider analyzerProvider = analyzerProviderManager.getAnalyzerProvider(getAnalyzerType(session));
             preparedQuery = analyzerProvider.getQueryPreparer().prepareQuery(analyzerOptions, query, session.getPreparedStatements(), session.getWarningCollector());
+            //Query Rewrite Code for QAAG Plugin
+            String modifiedQuery = queryAuditAndGovernance.governquery(preparedQuery, query, sessionContext.getCatalog(), sessionContext.getSchema(), sessionContext.getIdentity());
+            if (null != modifiedQuery && !"".equalsIgnoreCase(modifiedQuery)) {
+                query = modifiedQuery;
+                preparedQuery = analyzerProvider.getQueryPreparer().prepareQuery(analyzerOptions, query, session.getPreparedStatements(), session.getWarningCollector());
+            }
             query = preparedQuery.getFormattedQuery().orElse(query);
 
             // select resource group
