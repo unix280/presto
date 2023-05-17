@@ -76,7 +76,7 @@ public class Identity
 
     public String getUser()
     {
-        if (principal != null) {
+        if (principal != null && principal.isPresent()) {
             user = principal.get().getName();
         }
         return user;
