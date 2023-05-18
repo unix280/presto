@@ -2585,13 +2585,13 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <id>Run Script WKC</id>
+                        <id>Run Script Repo Config</id>
                         <phase>initialize</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>installWKCDep.sh</executable>
+                            <executable>install_repo_config.sh</executable>
                         </configuration>
                     </execution>
                 </executions>
