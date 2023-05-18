@@ -185,14 +185,14 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.10.2</version>
+            <version>2.13.4</version>
             <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.10.2</version>
+            <version>2.13.4.2</version>
             <scope>compile</scope>
         </dependency>
 
@@ -436,7 +436,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.10.2</version>
+            <version>2.13.4</version>
             <scope>provided</scope>
         </dependency>
 
@@ -561,6 +561,7 @@
                             <ignoredClassPattern>org.apache.jute.*</ignoredClassPattern>
                             <ignoredClassPattern>org.apache.zookeeper.*</ignoredClassPattern>
                             <ignoredClassPattern>com.sun.ws.rs.ext.RuntimeDelegateImpl</ignoredClassPattern>
+                            <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
                         </ignoredClassPatterns>
                     </configuration>
                 </plugin>
