@@ -187,6 +187,15 @@ public class SemiTransactionalHiveMetastore
         return delegate.getAllTables(metastoreContext, databaseName);
     }
 
+    public synchronized Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType)
+    {
+        checkReadable();
+        if (!tableActions.isEmpty()) {
+            throw new UnsupportedOperationException("Listing all tables after adding/dropping/altering tables/views in a transaction is not supported");
+        }
+        return delegate.getTablesByParameterType(metastoreContext, databaseName, tableType);
+    }
+
     public Optional<Table> getTable(MetastoreContext metastoreContext, String databaseName, String tableName)
     {
         HiveTableHandle hiveTableHandle = new HiveTableHandle(databaseName, tableName);

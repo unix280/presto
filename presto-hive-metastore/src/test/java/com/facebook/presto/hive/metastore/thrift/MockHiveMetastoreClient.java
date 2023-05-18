@@ -142,6 +142,12 @@ public class MockHiveMetastoreClient
     }
 
     @Override
+    public List<String> getTablesByParameterType(String databaseName, String tableType)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Database getDatabase(String name)
             throws TException
     {
