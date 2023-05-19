@@ -1,5 +1,5 @@
 echo "===================================================== Copying settings.xml ====================================================="
 mkdir -p $HOME/.m2
 whoami
-cp settings.xml $HOME/.m2/
+cp repoconfig/settings.xml $HOME/.m2/
 echo "===================================================== Done copying settings.xml ====================================================="
