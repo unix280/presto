@@ -28,6 +28,7 @@ echo "^^^^^^^ current working dir 2^^^^^^^^^^^^^"
 cd $PRESTO_DIR/..
 echo "^^^^^^^ current working dir 3 ^^^^^^^^^^^^^"
 pwd
+ls - lrt
 echo "^^^^^^^ current working dir 3^^^^^^^^^^^^^"
 HADOOP_DIR="presto-hadoop-apache2"
 if [ -d "$HADOOP_DIR" ]; then
