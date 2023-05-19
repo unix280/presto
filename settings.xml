@@ -7,8 +7,8 @@
         <server>
             <id>ahana-s3-maven-repo-snapshots</id>
             <!-- TODO: Remove Access Key from here and store in CircleCI secrets -->
-            <username>MAVEN_S3_ACCESS_KEY</username>
-            <password>MAVEN_S3_SECRET_KEY</password>
+            <username>${env.artifactory_user}</username>
+	  <password>${env.artifactory_token}</password>
             <configuration>
                 <region>us-east-2</region>
                 <publicRepository>false</publicRepository>
@@ -18,8 +18,8 @@
         <server>
             <id>ahana-s3-maven-repo-releases</id>
             <!-- TODO: Remove Access Key from here and store in CircleCI secrets -->
-            <username>MAVEN_S3_ACCESS_KEY</username>
-            <password>MAVEN_S3_SECRET_KEY</password>
+            <username>${env.artifactory_user}</username>
+	  <password>${env.artifactory_token}</password>
             <configuration>
                 <region>us-east-2</region>
                 <publicRepository>false</publicRepository>
