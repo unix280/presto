@@ -356,6 +356,10 @@
                             <artifactId>ratis-server-api</artifactId>
                         </dependency>
                     </ignoredDependencies>
+                    <ignoredClassPatterns>
+                        <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
+                    </ignoredClassPatterns>
                 </configuration>
             </plugin>
             <plugin>
