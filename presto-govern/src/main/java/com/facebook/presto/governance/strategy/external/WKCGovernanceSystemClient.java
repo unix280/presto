@@ -92,7 +92,6 @@ public class WKCGovernanceSystemClient
     Logger log = Logger.get(WKCGovernanceSystemClient.class);
 
     static {
-        //System.setProperty("lts-masking-filename", "/Users/bentonyjoe/MyWorks/lakehouse/tmp/frommario/liblts-masking.dylib");
         System.setProperty("lts-masking-filename", getPropertyValueFromWKCConfiguration(LTS_MASKING_FILE_PROPERTY_NAME));
     }
 
@@ -121,9 +120,6 @@ public class WKCGovernanceSystemClient
 
     private String getUniqueResourceKey(TableBasicInfo tableInfo, String catalog, String schema, Identity identity)
     {
-        //String lhHostExtIpAddress = System.getenv("LH_HOST_IP_ADDRESS");
-        //String lhHostPort = System.getenv("LH_HOST_PORT");
-
         String lhHostExtIpAddress = getPropertyValueFromWKCConfiguration(LH_HOST_IP_ADDRESS_PROPERTY_NAME);
         String lhHostPort = getPropertyValueFromWKCConfiguration(LH_HOST_PORT_PROPERTY_NAME);
 
@@ -136,17 +132,16 @@ public class WKCGovernanceSystemClient
 
     private void transformPolicyEvalResult(PepEvaluation evaluation, TableBasicInfo tableInfoObj, GovernPolicyFormat policyFormatObj)
     {
-        log.info("======== transformPolicyEvalResult START ========");
-        //String dpsDecisionOutputJson = "{\"outcome\": \"Transform\",\"transforms\": [{\"operation_type\":\"research/pseudo-pretty\",\"parameters\":[{\"maskingChar\":\"P\",\"maskingType\":\"Full\",\"name\":\"name\",\"preserveFormat\":\"false\",\"maskingLen\":\"10\"}],\"schemas\":[{\"name\":\"name\",\"type\":{\"length\":20.0,\"nullable\":true,\"type\":\"varchar\",\"scale\":0.0,\"signed\":false},\"order\":1}],\"profiled_dataclass\":\"65df5f9a-dafa-45e2-ac27-3accca24e595_dfd662b9-f6af-4af9-b8cc-014c3f59bbe1\"},{\"operation_type\":\"research/pseudo\",\"parameters\":[{\"salt\":\"034f0be01d6680b628a7fb5069e1b5f59b3c876ba3c2d65436db09b3e0e59b72\",\"dataclass\":\"EA\",\"maskingType\":\"Partial\",\"name\":\"email\",\"preserveFormat\":\"true\",\"maskingProcessor\":\"RepeatableFormatFabrication\",\"maskingOptions\":[{\"name\":\"User name\",\"value\":\"Generate user name\"},{\"name\":\"Domain name\",\"value\":\"Original\"}]}],\"schemas\":[{\"name\":\"email\",\"type\":{\"length\":50.0,\"nullable\":true,\"type\":\"varchar\",\"scale\":0.0,\"signed\":false},\"order\":3}],\"profiled_dataclass\":\"65df5f9a-dafa-45e2-ac27-3accca24e595_7d967c9c-fb56-4ac8-aa2b-637b848eac33\"},{\"operation_type\":\"description/transform_metadata\",\"parameters\":[{\"schema\":[{\"name\":\"stdid\",\"type\":{\"length\":10.0,\"nullable\":true,\"type\":\"integer\",\"scale\":0.0,\"signed\":true},\"order\":0},{\"name\":\"name\",\"type\":{\"length\":20.0,\"nullable\":true,\"type\":\"varchar\",\"scale\":0.0,\"signed\":false},\"order\":1},{\"name\":\"location\",\"type\":{\"length\":10.0,\"nullable\":true,\"type\":\"integer\",\"scale\":0.0,\"signed\":true},\"order\":2},{\"name\":\"email\",\"type\":{\"length\":50.0,\"nullable\":true,\"type\":\"varchar\",\"scale\":0.0,\"signed\":false},\"order\":3}],\"transformation_cost\":-1.0,\"transform_option\":\"advanced\",\"resource_key\":\"0000:0000:0000:0000:0000:FFFF:092E:50E3|8443|hive-hms:/testdemo2/student\",\"datasource_type\":\"11849f0a-54cc-448d-bb8c-d79206636e3d\",\"governance_convention\":\"AEAD\"}],\"schemas\":[]}]}";
+        log.debug("======== transformPolicyEvalResult START ========");
         String dpsDecisionOutputJson = "{\"outcome\": \"Transform\",\"transforms\": " + evaluation.getTransformSpec() + "}";
 
         Map<String, String> maskParamMap = new HashMap<>();
-        log.info("======== LtsConvertor START ========");
+        log.debug("======== LtsConvertor START ========");
         LtsConvertor convertor = new LtsConvertor(true, LtsConvertor.OutputType.PARAM_CPP, dpsDecisionOutputJson);
-        log.info("======== LtsConvertor END ========");
+        log.debug("======== LtsConvertor END ========");
         Map<String, MaskSpecification> maskEntries = convertor.getSelectEntries();
         for (String columnName : maskEntries.keySet()) {
-            log.info("WKC Debug MaskSpecification columnName" + columnName);
+            log.debug("WKC Debug MaskSpecification columnName" + columnName);
             MaskSpecification spec = maskEntries.get(columnName);
             //Workaround
             int columnLength = spec.getColumnLength();
@@ -154,7 +149,7 @@ public class WKCGovernanceSystemClient
                 columnLength = 20;
             }
             String strAdditionalParam = COMMA_SYMBOL + spec.getMaskType() + COMMA_SYMBOL + SINGLE_QUOTE_SYMBOL + spec.getMaskParams() + SINGLE_QUOTE_SYMBOL + COMMA_SYMBOL + SINGLE_QUOTE_SYMBOL + spec.getFormat() + SINGLE_QUOTE_SYMBOL + COMMA_SYMBOL + SINGLE_QUOTE_SYMBOL + spec.getSeed() + SINGLE_QUOTE_SYMBOL + COMMA_SYMBOL + columnLength + COMMA_SYMBOL + SINGLE_QUOTE_SYMBOL + spec.getColumnDataType() + SINGLE_QUOTE_SYMBOL;
-            log.info("WKC Debug strAdditionalParam" + strAdditionalParam);
+            log.debug("WKC Debug strAdditionalParam" + strAdditionalParam);
             maskParamMap.put(columnName, strAdditionalParam);
         }
 
@@ -163,7 +158,7 @@ public class WKCGovernanceSystemClient
         //Adding Available Column List for Select * Scenario
         List<String> availableColumnList = getAvailableColumnList("{\"transforms\": " + evaluation.getTransformSpec() + "}");
         tableInfoObj.setAvailableColumnList(availableColumnList);
-        log.info("======== transformPolicyEvalResult END ========");
+        log.debug("======== transformPolicyEvalResult END ========");
     }
 
     /**
@@ -233,26 +228,16 @@ public class WKCGovernanceSystemClient
     private PepEvaluation getAssetEvaluateResponseFromAPI(TableBasicInfo tableInfoObj, String srUniqueResourceKey, Identity identity)
             throws QureyGovernanceException
     {
-        log.info("======== getAssetEvaluateResponseFromAPI START ========");
+        log.debug("======== getAssetEvaluateResponseFromAPI START ========");
         PepEvaluation evaluation = null;
 
         String bearerToken = getBearerTokenFromAPI();
-        //System.out.println(bearerToken);
 
-        //String dpsUri = "https://cpd-wkc.apps.testincjob.cp.fyre.ibm.com";
         String dpsUri = getPropertyValueFromWKCConfiguration(WKC_ENV_URL_PROPERTY_NAME);
 
-        //String authorization = "Basic <service_token>";
-        //String authorization = "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRJT1RhSjdIYTBBVHM0WVRBN0pmQkE5Ulc3bmpqeGRYQWIzZ1Zxd2g3M3cifQ.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6IkFkbWluIiwicGVybWlzc2lvbnMiOlsibWFuYWdlX3ZhdWx0c19hbmRfc2VjcmV0cyIsInNoYXJlX3NlY3JldHMiLCJhZGRfdmF1bHRzIiwiYWRtaW5pc3RyYXRvciIsImNhbl9wcm92aXNpb24iLCJtb25pdG9yX3BsYXRmb3JtIiwiY29uZmlndXJlX3BsYXRmb3JtIiwidmlld19wbGF0Zm9ybV9oZWFsdGgiLCJjb25maWd1cmVfYXV0aCIsIm1hbmFnZV91c2VycyIsIm1hbmFnZV9ncm91cHMiLCJtYW5hZ2Vfc2VydmljZV9pbnN0YW5jZXMiLCJtYW5hZ2VfY2F0YWxvZyIsImNyZWF0ZV9wcm9qZWN0IiwiY3JlYXRlX3NwYWNlIiwiYXV0aG9yX2dvdmVybmFuY2VfYXJ0aWZhY3RzIiwibWFuYWdlX2dvdmVybmFuY2Vfd29ya2Zsb3ciLCJ2aWV3X2dvdmVybmFuY2VfYXJ0aWZhY3RzIiwibWFuYWdlX2NhdGVnb3JpZXMiLCJtYW5hZ2VfZ2xvc3NhcnkiLCJhY2Nlc3NfY2F0YWxvZyJdLCJncm91cHMiOlsxMDAwMF0sInN1YiI6ImFkbWluIiwiaXNzIjoiS05PWFNTTyIsImF1ZCI6IkRTWCIsInVpZCI6IjEwMDAzMzA5OTkiLCJhdXRoZW50aWNhdG9yIjoiZGVmYXVsdCIsImRpc3BsYXlfbmFtZSI6ImFkbWluIiwiaWF0IjoxNjc5NTAyOTQ3LCJleHAiOjE2Nzk1NDYxMTF9.oeInMzFmmL_pvXgVDCRQfYXt5dHbawlKWPu3ptL8erf_8dVRD8td9waS6P_myyH9xEGRfJmVucjca1TMREYMPqkYeX4zpq2XquIfEGeuBHjUJulls6n2WNkjKqpOFx0Fk6B8YQKscrr2nYl_TYQK7ekXxDqbycPgYhsX2JRgnZ2rGH1LiA62E0RaZzmiQr24irhn21TPclWBk6NRauWXjJcfl3hqkHH8zHL6bNMBTlPznF1tINWvBOnu9Xe4CHfed_sXOywfKUhwi4EyNZIZUXE84yJ0I5jBNJMvdalpfDPU9Je2UT-biOkCweDY9TwajPxwPrjxN1t1hHmxFxX_oQ";
         String authorization = "Bearer " + bearerToken;
         log.info("WKC Debug bearerToken" + bearerToken);
-        //String catalogId = "13d23746-3852-4a75-8574-69ee8a65ed5d";
-        //String assetId = "34f76936-1bc7-4bb9-9a8c-336a7a57d9a2";
-
-        //String resourcePath = "8574-69ee8a65ed5d:/DB2INST1/EMPLOYEE";
-        //String resourcePath = "0000:0000:0000:0000:0000:ffff:092E:50E3|8443|hive-hms|testdemo2|student";
         String resourcePath = srUniqueResourceKey;
-        //String userId = "1000330999";
         String bssId = "999";
 
         PEP pep = null;
@@ -268,8 +253,6 @@ public class WKCGovernanceSystemClient
             pepConfig.setCacheTTL(3600000); // default: 3600000; // 1 hour
 
             PepContext pepContext = new PepContext();
-            //pepContext.setUser(userId);
-            //pepContext.setCatalogId(catalogId);
             pepContext.setBssAccountId(bssId);
 
             // Set pep host type. Allowed values: [DV, DB2, CAMS, GUARDIUM, DATAFABRIC]
@@ -292,31 +275,19 @@ public class WKCGovernanceSystemClient
             // Get PEP instance (singleton)
             pep = PEP.getInstance();
 
-            // Register PEP instance - Not needed for now.
-            // pep.registerPEP(PEPHostType.DV, "mjayapa-as-2.svl.ibm.com", "9.30.52.145");
-
-            // Evaluate single item
-            //PepEvaluation evaluation = pep.evaluateItem("Access", pepContext, assetId);
-            //System.out.println("outcome:" + evaluation.getOutcome());
-
             // Evaluate single resource
             evaluation = pep.evaluateResource("Access", pepContext, resourcePath);
-            //System.out.println("outcome:" + evaluation.getOutcome());
-            //System.out.println(evaluation.getTransformSpec());
-            log.info("======== getAssetEvaluateResponseFromAPI END ========");
+            log.debug("======== getAssetEvaluateResponseFromAPI END ========");
         }
         catch (Exception e) {
-            System.out.println("Exception inside getAssetEvaluateResponseFromAPI");
-            log.info("======== Exception inside getAssetEvaluateResponseFromAPI ========" + e);
+            log.error("======== Exception inside getAssetEvaluateResponseFromAPI ========" + e);
         }
         finally {
-            // Terminate PEP SDK
             try {
                 pep.terminate();
             }
             catch (Exception ex) {
-                System.out.println("123");
-                log.info("======== Exception inside getAssetEvaluateResponseFromAPI Finally========" + ex);
+                log.error("======== Exception inside getAssetEvaluateResponseFromAPI Finally========" + ex);
             }
         }
         return evaluation;
@@ -341,21 +312,15 @@ public class WKCGovernanceSystemClient
     private static String getBearerTokenFromAPI()
     {
         try {
-            //URL url = new URL("https://cpd-wkc.apps.testincjob.cp.fyre.ibm.com/icp4d-api/v1/authorize");
-
             URL url = new URL(getPropertyValueFromWKCConfiguration(WKC_ENV_URL_PROPERTY_NAME) + "/icp4d-api/v1/authorize");
 
             //disableSSLVerification();
 
             HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
             httpConn.setRequestMethod("POST");
-
             httpConn.setRequestProperty("Content-Type", "application/json");
-            //httpConn.setRequestProperty("Cookie", "1e7fba00fc13fda922f1da74a484e589=7d22607a044d942f639020c5e59f3206");
-
             httpConn.setDoOutput(true);
             OutputStreamWriter writer = new OutputStreamWriter(httpConn.getOutputStream());
-            //writer.write("{\"username\":\"admin\",\"password\":\"kE1OMptxx5Nu\"}");
             writer.write("{\"username\":\"" + getPropertyValueFromWKCConfiguration(WKC_ENV_USR_NAME_PROPERTY_NAME) + "\",\"password\":\"" + getPropertyValueFromWKCConfiguration(WKC_ENV_USR_PASSWORD_PROPERTY_NAME) + "\"}");
             writer.flush();
             writer.close();
@@ -368,18 +333,14 @@ public class WKCGovernanceSystemClient
 
             if (null != response && !"".equalsIgnoreCase(response)) {
                 JsonObject jobj = convertToJsonObject(response);
-                //JsonObject jobj = new Gson().fromJson(response, JsonObject.class);
                 if (null != jobj && null != jobj.get(TOKEN)) {
                     String bearerToken = jobj.get(TOKEN).toString();
                     bearerToken = bearerToken.replaceAll(ESCAPE_DOUBLE_QUOTES, EMPTY_STRING);
                     return bearerToken;
                 }
             }
-
-            // System.out.println(response);
         }
         catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
