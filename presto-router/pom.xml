@@ -202,6 +202,7 @@
                     <ignoredClassPatterns>
                         <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
                         <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <ignoredClassPattern>net.jodah.*</ignoredClassPattern>
                     </ignoredClassPatterns>
                 </configuration>
             </plugin>
