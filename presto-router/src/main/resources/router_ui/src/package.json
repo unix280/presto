@@ -31,5 +31,8 @@
     "install": "webpack -p --config webpack.config.js",
     "package": "webpack -p --config webpack.config.js",
     "watch": "webpack --config webpack.config.js --watch"
+  },
+  "resolutions": {
+    "d3-color": "3.1.0"
   }
 }
