@@ -159,6 +159,10 @@
                         <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
                         <ignoredClassPattern>module-info</ignoredClassPattern>
                     </ignoredClassPatterns>
+                    <!-- TODO: To be removed: Inconsistent warnings coming up from the plugin -->
+                    <ignoredUnusedDeclaredDependencies>
+                        <ignoredUnusedDeclaredDependency>com.facebook.airlift:concurrent:jar:0.205</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
                 </configuration>
             </plugin>
         </plugins>

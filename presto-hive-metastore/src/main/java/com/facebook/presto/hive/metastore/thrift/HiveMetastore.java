@@ -64,6 +64,8 @@ public interface HiveMetastore
 
     Optional<List<String>> getAllTables(MetastoreContext metastoreContext, String databaseName);
 
+    Optional<List<String>> getTablesByParameterType(MetastoreContext metastoreContext, String databaseName, String tableType);
+
     Optional<List<String>> getAllViews(MetastoreContext metastoreContext, String databaseName);
 
     Optional<Database> getDatabase(MetastoreContext metastoreContext, String databaseName);

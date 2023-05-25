@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.thrift;
 
+import com.facebook.airlift.log.Logger;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hive.metastore.api.CheckLockRequest;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
@@ -63,6 +64,8 @@ public class ThriftHiveMetastoreClient
 {
     private final TTransport transport;
     private final ThriftHiveMetastore.Client client;
+    public static final String ENGINE_NAME = "presto";
+    private static final Logger log = Logger.get(ThriftHiveMetastoreClient.class);
 
     public ThriftHiveMetastoreClient(TTransport transport)
     {
@@ -115,6 +118,17 @@ public class ThriftHiveMetastoreClient
             throws TException
     {
         return client.get_table_names_by_filter(databaseName, filter, (short) -1);
+    }
+
+    @Override
+    public List<String> getTablesByParameterType(String databaseName, String tableType)
+            throws TException
+    {
+        long startTime = System.currentTimeMillis();
+        List<String> tableNamesList = client.get_tables(databaseName, tableType);
+        long endTime = System.currentTimeMillis();
+        log.info("Metadata manager list table time taken for %d ms", (endTime - startTime));
+        return tableNamesList;
     }
 
     @Override
@@ -177,8 +191,7 @@ public class ThriftHiveMetastoreClient
     public List<ColumnStatisticsObj> getTableColumnStatistics(String databaseName, String tableName, List<String> columnNames)
             throws TException
     {
-        String engine = "presto";
-        TableStatsRequest tableStatsRequest = new TableStatsRequest(databaseName, tableName, columnNames, engine);
+        TableStatsRequest tableStatsRequest = new TableStatsRequest(databaseName, tableName, columnNames, ENGINE_NAME);
         return client.get_table_statistics_req(tableStatsRequest).getTableStats();
     }
 
@@ -188,6 +201,7 @@ public class ThriftHiveMetastoreClient
     {
         ColumnStatisticsDesc statisticsDescription = new ColumnStatisticsDesc(true, databaseName, tableName);
         ColumnStatistics request = new ColumnStatistics(statisticsDescription, statistics);
+        request.setEngine(ENGINE_NAME);
         client.update_table_column_statistics(request);
     }
 
@@ -195,14 +209,14 @@ public class ThriftHiveMetastoreClient
     public void deleteTableColumnStatistics(String databaseName, String tableName, String columnName)
             throws TException
     {
-        client.delete_table_column_statistics(databaseName, tableName, columnName, "presto");
+        client.delete_table_column_statistics(databaseName, tableName, columnName, ENGINE_NAME);
     }
 
     @Override
     public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(String databaseName, String tableName, List<String> partitionNames, List<String> columnNames)
             throws TException
     {
-        PartitionsStatsRequest partitionsStatsRequest = new PartitionsStatsRequest(databaseName, tableName, columnNames, partitionNames, "presto");
+        PartitionsStatsRequest partitionsStatsRequest = new PartitionsStatsRequest(databaseName, tableName, columnNames, partitionNames, ENGINE_NAME);
         return client.get_partitions_statistics_req(partitionsStatsRequest).getPartStats();
     }
 
@@ -213,6 +227,7 @@ public class ThriftHiveMetastoreClient
         ColumnStatisticsDesc statisticsDescription = new ColumnStatisticsDesc(false, databaseName, tableName);
         statisticsDescription.setPartName(partitionName);
         ColumnStatistics request = new ColumnStatistics(statisticsDescription, statistics);
+        request.setEngine(ENGINE_NAME);
         client.update_partition_column_statistics(request);
     }
 
@@ -220,7 +235,7 @@ public class ThriftHiveMetastoreClient
     public void deletePartitionColumnStatistics(String databaseName, String tableName, String partitionName, String columnName)
             throws TException
     {
-        client.delete_partition_column_statistics(databaseName, tableName, partitionName, columnName, "presto");
+        client.delete_partition_column_statistics(databaseName, tableName, partitionName, columnName, ENGINE_NAME);
     }
 
     @Override
