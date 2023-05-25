@@ -326,7 +326,7 @@ public class WKCGovernanceSystemClient
             OutputStreamWriter writer = new OutputStreamWriter(httpConn.getOutputStream());
             String wkcAdminUserName = System.getenv("WKC_ADMIN_USER");
             String wkcAdminPassword = System.getenv("WKC_ADMIN_PASS");
-            if(StringHelperUtil.isNullString(wkcAdminUserName) || StringHelperUtil.isNullString(wkcAdminPassword)){
+            if (StringHelperUtil.isNullString(wkcAdminUserName) || StringHelperUtil.isNullString(wkcAdminPassword)) {
                 throw new QureyGovernanceException("WKC Credentials are not available and is mandatory as WKC Policy Enforcement is enabled");
             }
             //String wkcAdminUserName = getPropertyValueFromWKCConfiguration(WKC_ENV_USR_NAME_PROPERTY_NAME);
@@ -335,7 +335,6 @@ public class WKCGovernanceSystemClient
             writer.flush();
             writer.close();
             httpConn.getOutputStream().close();
-
 
             InputStream responseStream = httpConn.getResponseCode() / 100 == 2 ? httpConn.getInputStream()
                     : httpConn.getErrorStream();
@@ -353,7 +352,8 @@ public class WKCGovernanceSystemClient
         }
         catch (QureyGovernanceException ex) {
             throw ex;
-        }catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
 
