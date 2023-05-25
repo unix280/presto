@@ -324,10 +324,18 @@ public class WKCGovernanceSystemClient
             httpConn.setRequestProperty("Content-Type", "application/json");
             httpConn.setDoOutput(true);
             OutputStreamWriter writer = new OutputStreamWriter(httpConn.getOutputStream());
-            writer.write("{\"username\":\"" + getPropertyValueFromWKCConfiguration(WKC_ENV_USR_NAME_PROPERTY_NAME) + "\",\"password\":\"" + getPropertyValueFromWKCConfiguration(WKC_ENV_USR_PASSWORD_PROPERTY_NAME) + "\"}");
+            String wkcAdminUserName = System.getenv("WKC_ADMIN_USER");
+            String wkcAdminPassword = System.getenv("WKC_ADMIN_PASS");
+            if(StringHelperUtil.isNullString(wkcAdminUserName) || StringHelperUtil.isNullString(wkcAdminPassword)){
+                throw new QureyGovernanceException("WKC Credentials are not available and is mandatory as WKC Policy Enforcement is enabled");
+            }
+            //String wkcAdminUserName = getPropertyValueFromWKCConfiguration(WKC_ENV_USR_NAME_PROPERTY_NAME);
+            //String wkcAdminPassword = getPropertyValueFromWKCConfiguration(WKC_ENV_USR_PASSWORD_PROPERTY_NAME);
+            writer.write("{\"username\":\"" + wkcAdminUserName + "\",\"password\":\"" + wkcAdminPassword + "\"}");
             writer.flush();
             writer.close();
             httpConn.getOutputStream().close();
+
 
             InputStream responseStream = httpConn.getResponseCode() / 100 == 2 ? httpConn.getInputStream()
                     : httpConn.getErrorStream();
@@ -343,7 +351,9 @@ public class WKCGovernanceSystemClient
                 }
             }
         }
-        catch (Exception e) {
+        catch (QureyGovernanceException ex) {
+            throw ex;
+        }catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -410,8 +420,8 @@ public class WKCGovernanceSystemClient
             Map<String, String> properties = loadProperties(WKC_CONFIG_PROPERTIES);
             properties = new HashMap<>(properties);
             checkArgument(!isNullOrEmpty(properties.get(propertyName)),
-                    "Bearer Token configuration %s does not contain %s",
-                    WKC_CONFIG_PROPERTIES.getAbsoluteFile(),
+                    "WKC configuration %s does not contain mandatory configuration %s , This configuration is mandatory as WKC Policy Governance is enabled",
+                    WKC_CONFIG_PROPERTIES.getPath(),
                     propertyName);
 
             propertyValue = properties.remove(propertyName);
