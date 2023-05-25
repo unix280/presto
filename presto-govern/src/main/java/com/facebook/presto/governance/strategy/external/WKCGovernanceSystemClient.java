@@ -258,7 +258,7 @@ public class WKCGovernanceSystemClient
             // Set pep host type. Allowed values: [DV, DB2, CAMS, GUARDIUM, DATAFABRIC]
             pepContext.setPepHostType(PepContext.PEPHostType.GUARDIUM);
 
-            if ("true".equalsIgnoreCase(getPropertyValueFromWKCConfiguration(WKC_QUERY_CONTEXT_CONFIG_USER_APPLICABLE))) {
+            /*if ("true".equalsIgnoreCase(getPropertyValueFromWKCConfiguration(WKC_QUERY_CONTEXT_CONFIG_USER_APPLICABLE))) {
                 log.info("WKC Debug Config User Applicable TRUE");
                 pepContext.setUser(getPropertyValueFromWKCConfiguration(WKC_QUERY_CONTEXT_CONFIG_USER_PROPERTY_NAME));
             }
@@ -266,7 +266,9 @@ public class WKCGovernanceSystemClient
                 log.info("WKC Debug Config User Applicable FALSE");
                 String userName = getUserNameFromIdentity(identity);
                 pepContext.setUser(userName);
-            }
+            }*/
+            String userName = getUserNameFromIdentity(identity);
+            pepContext.setUser(userName);
             pepContext.setUserNameFlag(true);
 
             // Initialize PEP SDK for cached evaluation.
@@ -281,6 +283,7 @@ public class WKCGovernanceSystemClient
         }
         catch (Exception e) {
             log.error("======== Exception inside getAssetEvaluateResponseFromAPI ========" + e);
+            throw new QureyGovernanceException("Exception in data protection policy management check " + e.getMessage());
         }
         finally {
             try {

@@ -22,6 +22,6 @@ public class QureyGovernanceException
 {
     public QureyGovernanceException(String message)
     {
-        super(PERMISSION_DENIED, "Exception in Governance: " + message);
+        super(PERMISSION_DENIED, "Governance Exception : " + message);
     }
 }
