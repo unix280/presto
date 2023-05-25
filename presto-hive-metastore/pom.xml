@@ -325,6 +325,7 @@
                             <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
                             <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
                             <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                            <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
                         </ignoredClassPatterns>
                     </configuration>
                 </plugin>
