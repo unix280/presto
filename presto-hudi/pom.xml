@@ -211,7 +211,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.10.2</version>
+            <version>2.13.4</version>
             <scope>provided</scope>
         </dependency>
 
@@ -276,6 +276,29 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.basepom.maven</groupId>
+                <artifactId>duplicate-finder-maven-plugin</artifactId>
+                <configuration>
+                    <ignoredClassPatterns>
+                        <ignoredClassPattern>com.facebook.presto.parquet.batchreader.*BatchReader</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.http.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.codehaus.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.ctc.wstx.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.jersey.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.jute.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.zookeeper.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.ws.rs.ext.RuntimeDelegateImpl</ignoredClassPattern>
+                        <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
+                        <ignoredClassPattern>module-info</ignoredClassPattern>
+                    </ignoredClassPatterns>
+                </configuration>
             </plugin>
         </plugins>
     </build>

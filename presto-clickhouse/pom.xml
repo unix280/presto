@@ -29,6 +29,14 @@
                     <groupId>commons-logging</groupId>
                     <artifactId>commons-logging</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpcore</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-codec</groupId>
+                    <artifactId>commons-codec</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -231,6 +239,16 @@
                                 <exclude>**/TestClickHouseIntegrationSmokeTest.java</exclude>
                                 <include>**/TestClickHouseDistributedQueries.java</include>
                             </excludes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.basepom.maven</groupId>
+                        <artifactId>duplicate-finder-maven-plugin</artifactId>
+                        <configuration>
+                            <ignoredClassPatterns>
+                                <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
+                                <ignoredClassPattern>module-info</ignoredClassPattern>
+                            </ignoredClassPatterns>
                         </configuration>
                     </plugin>
                 </plugins>

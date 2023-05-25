@@ -16,8 +16,8 @@
   "dependencies": {
     "d3": "^5.7.0",
     "dagre-d3": "^0.6.1",
-    "react": "^16.4.1",
-    "react-dom": "^16.4.1",
+    "react": "^16.5.0",
+    "react-dom": "^16.5.0",
     "reactable": "^1.0.2"
   },
   "babel": {
@@ -31,5 +31,8 @@
     "install": "webpack -p --config webpack.config.js",
     "package": "webpack -p --config webpack.config.js",
     "watch": "webpack --config webpack.config.js --watch"
+  },
+  "resolutions": {
+    "d3-color": "3.1.0"
   }
 }
