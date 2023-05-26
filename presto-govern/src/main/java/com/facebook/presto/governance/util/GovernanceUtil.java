@@ -253,7 +253,7 @@ public class GovernanceUtil
                     if (!tableObject.isColumnMetadataUnavailable()) {
                         for (String strColumnName : availableColumnList) {
                             ColumnDetails columnDetails = new ColumnDetails();
-                            columnDetails.setColumnName(strColumnName);
+                            columnDetails.setColumnName(StringHelperUtil.removeDoubleQuotes(strColumnName));
                             columnDetails.setReferenceType(ID_TYPE);
                             //columnDetails.setAliasName(strColumnName);
                             columnDetails.setReferredName(referredTableName + DOT_SYMBOL + strColumnName);
@@ -290,7 +290,7 @@ public class GovernanceUtil
                     else {
                         referredColumnName = strColumnName;
                     }
-                    columnDetails.setColumnName(strColumnName);
+                    columnDetails.setColumnName(StringHelperUtil.removeDoubleQuotes(strColumnName));
                     columnDetails.setReferenceType(ID_TYPE);
                     columnDetails.setAliasName(strAliasName);
                     columnDetails.setReferredName(referredColumnName);
@@ -327,7 +327,7 @@ public class GovernanceUtil
                         else {
                             referredColumnName = strColumnName;
                         }
-                        columnDetails.setColumnName(strColumnName);
+                        columnDetails.setColumnName(StringHelperUtil.removeDoubleQuotes(strColumnName));
                         columnDetails.setReferenceType(ID_TYPE);
                         columnDetails.setAliasName(strAliasName);
                         columnDetails.setReferredName(referredColumnName);
@@ -349,7 +349,7 @@ public class GovernanceUtil
                         else if (!StringHelperUtil.isNullString(strTableName)) {
                             referredTableName = strTableName;
                         }
-                        columnDetails.setColumnName(strColumnName);
+                        columnDetails.setColumnName(StringHelperUtil.removeDoubleQuotes(strColumnName));
                         columnDetails.setAliasName(strAliasName);
                         columnDetails.setReferredName(referredTableName + DOT_SYMBOL + strColumnName);
                         columnDetails.setReferenceType(DEREF_TYPE);

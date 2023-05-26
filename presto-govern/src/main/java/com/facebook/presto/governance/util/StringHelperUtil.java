@@ -15,6 +15,10 @@ package com.facebook.presto.governance.util;
 
 public final class StringHelperUtil
 {
+    public static final String DOUBLE_QUOTES_SYMBOL = "\"";
+
+    public static final String EMPTY_STRING = "";
+
     private StringHelperUtil()
     {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
@@ -22,6 +26,7 @@ public final class StringHelperUtil
 
     /**
      * This method will check whether the given input String is NULL/EMPTY
+     *
      * @param str
      * @return
      */
@@ -31,5 +36,19 @@ public final class StringHelperUtil
             return true;
         }
         return false;
+    }
+
+    /**
+     * This method will remove the double quotes from the string if any
+     *
+     * @param str
+     * @return
+     */
+    public static String removeDoubleQuotes(String str)
+    {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.replaceAll(DOUBLE_QUOTES_SYMBOL, EMPTY_STRING);
     }
 }
