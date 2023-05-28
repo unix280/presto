@@ -7,28 +7,7 @@
 		<activeProfile>artifactory</activeProfile>
 	</activeProfiles>
 ​
-    <servers>
-        <server>
-            <id>ahana-s3-maven-repo-snapshots</id>
-            <!-- TODO: Remove Access Key from here and store in CircleCI secrets -->
-            <username>MAVEN_S3_ACCESS_KEY</username>
-            <password>MAVEN_S3_SECRET_KEY</password>
-            <configuration>
-                <region>us-east-2</region>
-                <publicRepository>false</publicRepository>
-            </configuration>
-        </server>
-
-        <server>
-            <id>ahana-s3-maven-repo-releases</id>
-            <!-- TODO: Remove Access Key from here and store in CircleCI secrets -->
-            <username>MAVEN_S3_ACCESS_KEY</username>
-            <password>MAVEN_S3_SECRET_KEY</password>
-            <configuration>
-                <region>us-east-2</region>
-                <publicRepository>false</publicRepository>
-            </configuration>
-        </server>
+    <servers>        
         <server>
 			<id>hyc-mpc</id>
 			<username>${env.artifactory_user}</username>
