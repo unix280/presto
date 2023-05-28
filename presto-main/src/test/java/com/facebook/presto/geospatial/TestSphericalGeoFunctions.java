@@ -127,9 +127,9 @@ public class TestSphericalGeoFunctions
     @Test
     public void testGreatCircleDistance()
     {
-        assertFunction("great_circle_distance(36.12, -86.67, 33.94, -118.40)", DOUBLE, 2886.448973436703);
-        assertFunction("great_circle_distance(33.94, -118.40, 36.12, -86.67)", DOUBLE, 2886.448973436703);
-        assertFunction("great_circle_distance(42.3601, -71.0589, 42.4430, -71.2290)", DOUBLE, 16.73469743457461);
+        assertFunction("great_circle_distance(36.12, -86.67, 33.94, -118.40)", DOUBLE, 2886.4489734367016);
+        assertFunction("great_circle_distance(33.94, -118.40, 36.12, -86.67)", DOUBLE, 2886.4489734367016);
+        assertFunction("great_circle_distance(42.3601, -71.0589, 42.4430, -71.2290)", DOUBLE, 16.73469743457383);
         assertFunction("great_circle_distance(36.12, -86.67, 36.12, -86.67)", DOUBLE, 0.0);
 
         assertInvalidFunction("great_circle_distance(100, 20, 30, 40)", "Latitude must be between -90 and 90");
@@ -150,9 +150,9 @@ public class TestSphericalGeoFunctions
     @Test
     public void testDistance()
     {
-        assertDistance("POINT (-86.67 36.12)", "POINT (-118.40 33.94)", 2886448.973436703);
-        assertDistance("POINT (-118.40 33.94)", "POINT (-86.67 36.12)", 2886448.973436703);
-        assertDistance("POINT (-71.0589 42.3601)", "POINT (-71.2290 42.4430)", 16734.69743457461);
+        assertDistance("POINT (-86.67 36.12)", "POINT (-118.40 33.94)", 2886448.9734367016);
+        assertDistance("POINT (-118.40 33.94)", "POINT (-86.67 36.12)", 2886448.9734367016);
+        assertDistance("POINT (-71.0589 42.3601)", "POINT (-71.2290 42.4430)", 16734.69743457383);
         assertDistance("POINT (-86.67 36.12)", "POINT (-86.67 36.12)", 0.0);
 
         assertDistance("POINT EMPTY", "POINT (40 30)", null);

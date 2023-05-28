@@ -20,6 +20,12 @@
         <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>http-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -55,6 +61,12 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-parquet</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -428,7 +440,7 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.2.4</version>
+            <version>2.8.9</version>
             <scope>runtime</scope>
         </dependency>
 
@@ -445,6 +457,10 @@
                 <exclusion>
                     <groupId>org.apache.yetus</groupId>
                     <artifactId>audience-annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>-org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -560,6 +576,82 @@
                     <groupId>org.apache.logging.log4j</groupId>
                     <artifactId>log4j-api</artifactId>
                 </exclusion>
+<!--                <exclusion>-->
+<!--                    <groupId>org.elasticsearch</groupId>-->
+<!--                    <artifactId>elasticsearch-core</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.elasticsearch.plugin</groupId>-->
+<!--                    <artifactId>aggs-matrix-stats-client</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.elasticsearch.plugin</groupId>-->
+<!--                    <artifactId>rank-eval-client</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.elasticsearch.plugin</groupId>-->
+<!--                    <artifactId>lang-mustache-client</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.elasticsearch</groupId>-->
+<!--                    <artifactId>elasticsearch-x-content</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.elasticsearch</groupId>-->
+<!--                    <artifactId>elasticsearch-secure-sm</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-core</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-backward-codecs</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-grouping</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-queries</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-highlighter</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-memory</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-join</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-misc</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-queryparser</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-sandbox</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-spatial3d</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-spatial-extras</artifactId>-->
+<!--                </exclusion>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.lucene</groupId>-->
+<!--                    <artifactId>lucene-suggest</artifactId>-->
+<!--                </exclusion>-->
             </exclusions>
         </dependency>
 
@@ -630,18 +722,22 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpcore</artifactId>
-            <version>4.4.9</version>
+            <version>4.4.13</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.5</version>
+            <version>4.5.13</version>
             <exclusions>
                 <exclusion>
                     <groupId>commons-logging</groupId>
                     <artifactId>commons-logging</artifactId>
                 </exclusion>
+<!--                <exclusion>-->
+<!--                    <groupId>commons-codec</groupId>-->
+<!--                    <artifactId>commons-codec</artifactId>-->
+<!--                </exclusion>-->
             </exclusions>
         </dependency>
 
@@ -848,6 +944,12 @@
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -958,22 +1060,22 @@
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-client</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-io</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-http</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-util</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -1014,6 +1116,8 @@
                         <ignoredClassPattern>org.apache.jute.*</ignoredClassPattern>
                         <ignoredClassPattern>org.apache.zookeeper.*</ignoredClassPattern>
                         <ignoredClassPattern>com.sun.ws.rs.ext.RuntimeDelegateImpl</ignoredClassPattern>
+                        <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
                     </ignoredClassPatterns>
                     <ignoredDependencies>
                         <dependency>
@@ -1041,7 +1145,7 @@
                     <ignoredUnusedDeclaredDependencies>
                         <ignoredUnusedDeclaredDependency>org.apache.thrift:libthrift:jar:0.16.0</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>com.amazonaws:aws-java-sdk-glue:jar:1.11.697</ignoredUnusedDeclaredDependency>
-                        <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-core:jar:2.10.0</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-core:jar:2.13.4</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                 </configuration>
             </plugin>

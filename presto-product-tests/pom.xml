@@ -56,6 +56,10 @@
                     <groupId>com.facebook.presto.hive</groupId>
                     <artifactId>hive-apache</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>commons-codec</groupId>
+                    <artifactId>commons-codec</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -164,22 +168,22 @@
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-client</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-io</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-http</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-util</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>

@@ -95,6 +95,7 @@ import static com.facebook.presto.plugin.postgresql.util.TypeUtils.getJdbcObject
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.emptyToNull;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static io.airlift.slice.Slices.wrappedLongArray;
@@ -142,7 +143,8 @@ public class PostgreSqlClient
                     // skip unsupported column types
                     if (columnMapping.isPresent()) {
                         boolean nullable = (resultSet.getInt("NULLABLE") != columnNoNulls);
-                        handles.add(new JdbcColumnHandle(connectorId, columnName, typeHandle, columnMapping.get().getType(), nullable, Optional.empty()));
+                        Optional<String> comment = Optional.ofNullable(emptyToNull(resultSet.getString("REMARKS")));
+                        handles.add(new JdbcColumnHandle(connectorId, columnName, typeHandle, columnMapping.get().getType(), nullable, comment));
                     }
                 }
                 if (handles.isEmpty()) {

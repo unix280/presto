@@ -204,6 +204,8 @@
                             <ignoredClassPattern>org.apache.hadoop.*</ignoredClassPattern>
                             <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
                             <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                            <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
+                            <ignoredClassPattern>module-info</ignoredClassPattern>
                         </ignoredClassPatterns>
                     </configuration>
                 </plugin>

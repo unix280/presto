@@ -128,22 +128,22 @@
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-client</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-io</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-http</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-util</artifactId>
-                <version>9.4.40.v20210413</version>
+                <version>9.4.51.v20230217</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -235,6 +235,25 @@
                         <ignoredUnusedDeclaredDependency>com.facebook.presto:presto-tests:jar:0.279</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>com.facebook.presto:presto-hive:test-jar:0.279</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.basepom.maven</groupId>
+                <artifactId>duplicate-finder-maven-plugin</artifactId>
+                <configuration>
+                    <ignoredClassPatterns>
+                        <ignoredClassPattern>META-INF.versions.9.module-info</ignoredClassPattern>
+                        <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.thrift.*</ignoredClassPattern>
+                        <ignoredClassPattern>module-info</ignoredClassPattern>
+                        <ignoredClassPattern>org.apache.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.github.luben.zstd.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.nimbusds.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.codehaus.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.ctc.wstx.*</ignoredClassPattern>
+                        <ignoredClassPattern>com.sun.*</ignoredClassPattern>
+                        <ignoredClassPattern>org.antlr.runtime.*</ignoredClassPattern>
+                    </ignoredClassPatterns>
                 </configuration>
             </plugin>
         </plugins>

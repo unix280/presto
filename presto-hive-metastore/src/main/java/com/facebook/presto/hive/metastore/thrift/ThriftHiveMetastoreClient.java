@@ -201,6 +201,7 @@ public class ThriftHiveMetastoreClient
     {
         ColumnStatisticsDesc statisticsDescription = new ColumnStatisticsDesc(true, databaseName, tableName);
         ColumnStatistics request = new ColumnStatistics(statisticsDescription, statistics);
+        request.setEngine(ENGINE_NAME);
         client.update_table_column_statistics(request);
     }
 
@@ -226,6 +227,7 @@ public class ThriftHiveMetastoreClient
         ColumnStatisticsDesc statisticsDescription = new ColumnStatisticsDesc(false, databaseName, tableName);
         statisticsDescription.setPartName(partitionName);
         ColumnStatistics request = new ColumnStatistics(statisticsDescription, statistics);
+        request.setEngine(ENGINE_NAME);
         client.update_partition_column_statistics(request);
     }
 
