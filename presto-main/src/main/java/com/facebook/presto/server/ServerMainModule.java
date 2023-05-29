@@ -290,8 +290,6 @@ public class ServerMainModule
             install(new WorkerModule());
         }
 
-        install(new InternalCommunicationModule());
-
         configBinder(binder).bindConfig(FeaturesConfig.class);
 
         binder.bind(PlanChecker.class).in(Scopes.SINGLETON);

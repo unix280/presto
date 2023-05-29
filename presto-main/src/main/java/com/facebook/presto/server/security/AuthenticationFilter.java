@@ -15,6 +15,7 @@ package com.facebook.presto.server.security;
 
 import com.facebook.airlift.http.server.AuthenticationException;
 import com.facebook.airlift.http.server.Authenticator;
+import com.facebook.presto.server.InternalAuthenticationManager;
 import com.facebook.presto.server.security.oauth2.OAuth2Authenticator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
@@ -57,15 +58,17 @@ public class AuthenticationFilter
     private final boolean httpsForwardingEnabled;
     private final WebUiAuthenticationManager webUiAuthenticationManager;
     private final boolean isOauth2Enabled;
+    private final InternalAuthenticationManager internalAuthenticationManager;
 
     @Inject
-    public AuthenticationFilter(List<Authenticator> authenticators, SecurityConfig securityConfig, WebUiAuthenticationManager webUiAuthenticationManager)
+    public AuthenticationFilter(List<Authenticator> authenticators, SecurityConfig securityConfig, WebUiAuthenticationManager webUiAuthenticationManager, InternalAuthenticationManager internalAuthenticationManager)
     {
         this.authenticators = ImmutableList.copyOf(requireNonNull(authenticators, "authenticators is null"));
         this.httpsForwardingEnabled = requireNonNull(securityConfig, "securityConfig is null").getEnableForwardingHttps();
         this.webUiAuthenticationManager = requireNonNull(webUiAuthenticationManager, "webUiAuthenticationManager is null");
         this.isOauth2Enabled = this.authenticators.stream()
                 .anyMatch(a -> a.getClass().equals(OAuth2Authenticator.class));
+        this.internalAuthenticationManager = requireNonNull(internalAuthenticationManager, "internalAuthenticationManager is null");
     }
 
     @Override
@@ -86,6 +89,17 @@ public class AuthenticationFilter
             this.webUiAuthenticationManager.handleRequest(request, response, nextFilter);
             return;
         }
+
+        if (internalAuthenticationManager.isInternalRequest(request)) {
+            Principal principal = internalAuthenticationManager.authenticateInternalRequest(request);
+            if (principal == null) {
+                response.sendError(SC_UNAUTHORIZED);
+                return;
+            }
+            nextFilter.doFilter(withPrincipal(request, principal), response);
+            return;
+        }
+
         // skip authentication if non-secure or not configured
         if (!doesRequestSupportAuthentication(request)) {
             nextFilter.doFilter(request, response);
