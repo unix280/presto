@@ -1,0 +1,74 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.facebook.presto.governance.entity;
+
+public class UserDefinedFunctionInfo
+{
+    public String methodName;
+    public String referenceReplaceName;
+    public String aliasName;
+    public String addOnParameters;
+
+    public String columnName;
+
+    public String getMethodName()
+    {
+        return methodName;
+    }
+
+    public void setMethodName(String methodName)
+    {
+        this.methodName = methodName;
+    }
+
+    public String getReferenceReplaceName()
+    {
+        return referenceReplaceName;
+    }
+
+    public String getAliasName()
+    {
+        return aliasName;
+    }
+
+    public void setAliasName(String aliasName)
+    {
+        this.aliasName = aliasName;
+    }
+
+    public void setReferenceReplaceName(String referenceReplaceName)
+    {
+        this.referenceReplaceName = referenceReplaceName;
+    }
+
+    public String getAddOnParameters()
+    {
+        return addOnParameters;
+    }
+
+    public void setAddOnParameters(String addOnParameters)
+    {
+        this.addOnParameters = addOnParameters;
+    }
+
+    public String getColumnName()
+    {
+        return columnName;
+    }
+
+    public void setColumnName(String columnName)
+    {
+        this.columnName = columnName;
+    }
+}

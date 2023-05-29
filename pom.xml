@@ -136,6 +136,7 @@
         <module>presto-bytecode</module>
         <module>presto-client</module>
         <module>presto-parser</module>
+        <module>presto-govern</module>
         <module>presto-main</module>
         <module>presto-ml</module>
         <module>presto-geospatial-toolkit</module>
@@ -610,6 +611,12 @@
                 <artifactId>presto-parser</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-govern</artifactId>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
@@ -2573,8 +2580,18 @@
                         <goals>
                             <goal>exec</goal>
                         </goals>
+                        <configuration>                            
+                          <executable>installHiveDep.sh</executable>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>Run Script Repo Config</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
-                            <executable>installHiveDep.sh</executable>
+                            <executable>install_repo_config.sh</executable>
                         </configuration>
                     </execution>
                 </executions>

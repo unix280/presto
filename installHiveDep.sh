@@ -2,6 +2,8 @@ echo "===================================================== Starting installHive
 echo "===================================================== Start building presto-hive4-apache ====================================================="
 
 PRESTO_DIR=`pwd`
+pwd
+echo $PRESTO_DIR
 cd $PRESTO_DIR/..
 HIVE_DIR="presto-hive4-apache"
 if [ -d "$HIVE_DIR" ]; then
@@ -31,3 +33,4 @@ echo "Building presto-hadoop-apache2..."
 ./mvnw clean install -DskipTests
 ./mvnw install:install-file -Dfile=target/hadoop-apache2-2.7.4-9.4.jar -DgroupId=com.facebook.presto.hadoop -DartifactId=hadoop-apache2 -Dversion=2.7.4-9.4 -Dpackaging=jar -DgeneratePom=true
 echo "presto-hadoop-apache2 JAR installed to .m2"
+

@@ -35,6 +35,7 @@ import java.net.URI;
 import java.util.function.BiFunction;
 
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static com.facebook.presto.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -72,14 +73,33 @@ public class HiveCachingHdfsConfiguration
                 }
                 FileSystem fileSystem = (new Path(factoryUri)).getFileSystem(currentConfig);
                 checkState(fileSystem instanceof ExtendedFileSystem);
+                //Fix For Iceberg getColumns Issue
+                boolean isCacheEnabled = false;
+                try {
+                    isCacheEnabled = context.getSession().map(HiveSessionProperties::isCacheEnabled).orElse(cacheConfig.isCachingEnabled());
+                }
+                catch (PrestoException e) {
+                    if (!e.getErrorCode().equals(INVALID_SESSION_PROPERTY.toErrorCode())) {
+                        throw e;
+                    }
+                    isCacheEnabled = cacheConfig.isCachingEnabled();
+                }
                 return cacheFactory.createCachingFileSystem(
+                        factoryConfig,
+                        factoryUri,
+                        (ExtendedFileSystem) fileSystem,
+                        cacheManager,
+                        isCacheEnabled,
+                        cacheConfig.getCacheType(),
+                        cacheConfig.isValidationEnabled());
+                /*return cacheFactory.createCachingFileSystem(
                         factoryConfig,
                         factoryUri,
                         (ExtendedFileSystem) fileSystem,
                         cacheManager,
                         context.getSession().map(HiveSessionProperties::isCacheEnabled).orElse(cacheConfig.isCachingEnabled()),
                         cacheConfig.getCacheType(),
-                        cacheConfig.isValidationEnabled());
+                        cacheConfig.isValidationEnabled());*/
             }
             catch (IOException e) {
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "cannot create caching file system", e);

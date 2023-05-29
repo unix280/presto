@@ -38,6 +38,8 @@ import com.facebook.presto.eventlistener.EventListenerModule;
 import com.facebook.presto.execution.resourceGroups.ResourceGroupManager;
 import com.facebook.presto.execution.scheduler.NodeSchedulerConfig;
 import com.facebook.presto.execution.warnings.WarningCollectorModule;
+import com.facebook.presto.governance.QueryAuditAndGovernanceManager;
+import com.facebook.presto.governance.QueryAuditAndGovernanceModule;
 import com.facebook.presto.metadata.Catalog;
 import com.facebook.presto.metadata.CatalogManager;
 import com.facebook.presto.metadata.StaticCatalogStore;
@@ -137,7 +139,8 @@ public class PrestoServer
                 new TempStorageModule(),
                 new QueryPrerequisitesManagerModule(),
                 new NodeTtlFetcherManagerModule(),
-                new ClusterTtlProviderManagerModule());
+                new ClusterTtlProviderManagerModule(),
+                new QueryAuditAndGovernanceModule());
 
         modules.addAll(getAdditionalModules());
 
@@ -172,6 +175,7 @@ public class PrestoServer
             if (!serverConfig.isResourceManager()) {
                 injector.getInstance(AccessControlManager.class).loadSystemAccessControl();
             }
+            injector.getInstance(QueryAuditAndGovernanceManager.class).loadQueryAuditAndGovernance();
             injector.getInstance(PasswordAuthenticatorManager.class).loadPasswordAuthenticator();
             injector.getInstance(EventListenerManager.class).loadConfiguredEventListener();
             injector.getInstance(TempStorageManager.class).loadTempStorages();
