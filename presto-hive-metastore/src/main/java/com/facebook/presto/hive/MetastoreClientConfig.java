@@ -399,7 +399,8 @@ public class MetastoreClientConfig
     public enum HiveMetastoreAuthenticationType
     {
         NONE,
-        KERBEROS
+        KERBEROS,
+        PLAIN
     }
 
     @NotNull
