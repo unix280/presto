@@ -107,6 +107,7 @@ public class StaticCatalogStore
 
         log.info("-- Loading catalog %s --", catalogName);
 
+        boolean propertySet = false;
         String connectorName = null;
         ImmutableMap.Builder<String, String> connectorProperties = ImmutableMap.builder();
         for (Entry<String, String> entry : properties.entrySet()) {
@@ -115,7 +116,13 @@ public class StaticCatalogStore
             }
             else {
                 connectorProperties.put(entry.getKey(), entry.getValue());
+                if (entry.getKey().equals("hive.metastore.authentication.type")) {
+                    propertySet = true;
+                }
             }
+        }
+        if (((connectorName.equals("iceberg")) || (connectorName.equals("hive-hadoop2"))) && !propertySet) {
+            connectorProperties.put("hive.metastore.authentication.type", "PLAIN");
         }
 
         checkState(connectorName != null, "Configuration for catalog %s does not contain connector.name", catalogName);
