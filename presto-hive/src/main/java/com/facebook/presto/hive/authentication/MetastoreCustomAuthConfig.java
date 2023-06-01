@@ -28,9 +28,15 @@ public class MetastoreCustomAuthConfig
     private static final Logger log = Logger.get(MetastoreCustomAuthConfig.class);
     private String hiveMetastoreClientPlainUsername;
     private String hiveMetastoreClientPlainToken;
+    public static final String LH_CONTEXT = "LH_CONTEXT";
+    public static final String LH_INSTANCE_NAME = "LH_INSTANCE_NAME";
+    public static final String LH_INSTANCE_SECRET = "LH_INSTANCE_SECRET";
+    public static final String SAAS_NAME = "/secrets/metadata-bucket-secret-volume/cos_bucket";
+    public static final String SAAS_SECRET = "/secrets/metadata-bucket-secret-volume/cos_secret_access_key";
+
     public MetastoreCustomAuthConfig()
     {
-        this.lhContext = System.getenv("LH_CONTEXT");
+        this.lhContext = System.getenv(LH_CONTEXT);
     }
     @Config("hive.metastore.Client.Plain.Username")
     @ConfigDescription("Hive Metastore client plain username")
@@ -45,7 +51,7 @@ public class MetastoreCustomAuthConfig
         String userName;
         try {
             if (lhContext.equals("sw_dev") || lhContext.equals("sw_ent") || lhContext.equals("sw_env")) {
-                userName = System.getenv("LH_INSTANCE_NAME");
+                userName = System.getenv(LH_INSTANCE_NAME);
                 log.info("dev or standalone - username : " + userName);
             }
             else {
@@ -76,8 +82,8 @@ public class MetastoreCustomAuthConfig
         String date = dateObj.format(formatter);
         try {
             if (lhContext.equals("sw_dev") || lhContext.equals("sw_ent") || lhContext.equals("sw_env")) {
-                tToken = System.getenv("LH_INSTANCE_SECRET");
-                name = System.getenv("LH_INSTANCE_NAME");
+                tToken = System.getenv(LH_INSTANCE_SECRET);
+                name = System.getenv(LH_INSTANCE_NAME);
                 token = (tToken != null) ? tToken : (name + "-" + date);
             }
             else {
@@ -94,8 +100,7 @@ public class MetastoreCustomAuthConfig
     {
         String userName;
         try {
-            String file = "/secrets/metadata-bucket-secret-volume/cos_bucket";
-            BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+            BufferedReader bufferedReader = new BufferedReader(new FileReader(SAAS_NAME));
             String name = bufferedReader.readLine();
             bufferedReader.close();
             userName = name;
@@ -113,16 +118,14 @@ public class MetastoreCustomAuthConfig
         String token;
         String name;
         try {
-            String file = "/secrets/metadata-bucket-secret-volume/cos_secret_access_key";
-            BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+            BufferedReader bufferedReader = new BufferedReader(new FileReader(SAAS_SECRET));
             tToken = bufferedReader.readLine();
             bufferedReader.close();
             token = tToken;
         }
         catch (Exception e) {
             try {
-                String file = "/secrets/metadata-bucket-secret-volume/cos_bucket";
-                BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+                BufferedReader bufferedReader = new BufferedReader(new FileReader(SAAS_NAME));
                 name = bufferedReader.readLine();
                 bufferedReader.close();
                 token = (name + "-" + date);

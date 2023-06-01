@@ -121,6 +121,7 @@ public class StaticCatalogStore
                 }
             }
         }
+        /*To be removed after hive.metastore.authentication.type has been added by lh_console team*/
         if (((connectorName.equals("iceberg")) || (connectorName.equals("hive-hadoop2"))) && !propertySet) {
             connectorProperties.put("hive.metastore.authentication.type", "PLAIN");
         }
