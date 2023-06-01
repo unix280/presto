@@ -21,6 +21,7 @@ import com.facebook.airlift.http.server.JsonWebTokenConfig;
 import com.facebook.airlift.http.server.KerberosAuthenticator;
 import com.facebook.airlift.http.server.KerberosConfig;
 import com.facebook.airlift.http.server.TheServlet;
+import com.facebook.presto.server.InternalCommunicationModule;
 import com.facebook.presto.server.security.SecurityConfig.AuthenticationType;
 import com.facebook.presto.server.security.oauth2.OAuth2AuthenticationSupportModule;
 import com.facebook.presto.server.security.oauth2.OAuth2Authenticator;
@@ -50,6 +51,7 @@ public class ServerSecurityModule
     @Override
     protected void setup(Binder binder)
     {
+        install(new InternalCommunicationModule());
         newOptionalBinder(binder, WebUiAuthenticationManager.class).setDefault().to(DefaultWebUiAuthenticationManager.class).in(Scopes.SINGLETON);
         newSetBinder(binder, Filter.class, TheServlet.class).addBinding()
                 .to(AuthenticationFilter.class).in(Scopes.SINGLETON);
