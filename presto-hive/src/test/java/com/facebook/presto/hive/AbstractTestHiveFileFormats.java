@@ -581,7 +581,6 @@ public abstract class AbstractTestHiveFileFormats
         Properties tableProperties = new Properties();
         tableProperties.setProperty("columns", Joiner.on(',').join(transform(testColumns, TestColumn::getName)));
         tableProperties.setProperty("columns.types", Joiner.on(',').join(transform(testColumns, TestColumn::getType)));
-        //serializer.initialize(new Configuration(), tableProperties);
         ((AbstractSerDe) serializer).initialize(new Configuration(), tableProperties, null);
         JobConf jobConf = configureCompression(new JobConf(), compressionCodec);
 
@@ -594,7 +593,6 @@ public abstract class AbstractTestHiveFileFormats
                 () -> {});
 
         try {
-            //serializer.initialize(new Configuration(), tableProperties);
             ((AbstractSerDe) serializer).initialize(new Configuration(), tableProperties, null);
             SettableStructObjectInspector objectInspector = getStandardStructObjectInspector(
                     ImmutableList.copyOf(transform(testColumns, TestColumn::getName)),

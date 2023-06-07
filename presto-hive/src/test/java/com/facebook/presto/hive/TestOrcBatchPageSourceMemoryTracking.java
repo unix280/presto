@@ -571,7 +571,6 @@ public class TestOrcBatchPageSourceMemoryTracking
         Properties tableProperties = new Properties();
         tableProperties.setProperty("columns", Joiner.on(',').join(transform(testColumns, TestColumn::getName)));
         tableProperties.setProperty("columns.types", Joiner.on(',').join(transform(testColumns, TestColumn::getType)));
-        //serializer.initialize(CONFIGURATION, tableProperties);
         ((AbstractSerDe) serializer).initialize(new Configuration(), tableProperties, null);
         JobConf jobConf = new JobConf();
         if (compressionCodec != null) {
