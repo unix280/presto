@@ -548,7 +548,8 @@ public final class HiveUtil
         }
         catch (RuntimeException e) {
             throw new RuntimeException("error initializing deserializer: " + deserializer.getClass().getName(), e);
-        } catch (SerDeException e) {
+        }
+        catch (SerDeException e) {
             throw new RuntimeException(e);
         }
     }
