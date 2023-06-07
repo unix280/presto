@@ -14,7 +14,9 @@
 package com.facebook.presto.hive.parquet.write;
 
 import com.facebook.airlift.log.Logger;
+import org.apache.hadoop.hive.common.type.Date;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.common.type.Timestamp;
 import org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe;
 import org.apache.hadoop.hive.ql.io.parquet.timestamp.NanoTimeUtils;
 import org.apache.hadoop.hive.ql.io.parquet.write.DataWritableWriter;
@@ -46,8 +48,7 @@ import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.Type;
 
-import java.sql.Date;
-import java.sql.Timestamp;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -367,8 +368,9 @@ public class TestDataWritableWriter
                 recordConsumer.addBinary(Binary.fromByteArray(vBinary));
                 break;
             case TIMESTAMP:
+                ZoneId sourceZoneid = ZoneId.systemDefault();
                 Timestamp ts = ((TimestampObjectInspector) inspector).getPrimitiveJavaObject(value);
-                recordConsumer.addBinary(NanoTimeUtils.getNanoTime(ts, false).toBinary());
+                recordConsumer.addBinary(NanoTimeUtils.getNanoTime(ts, sourceZoneid, false).toBinary());
                 break;
             case DECIMAL:
                 HiveDecimal vDecimal = ((HiveDecimal) inspector.getPrimitiveJavaObject(value));
@@ -377,7 +379,8 @@ public class TestDataWritableWriter
                 break;
             case DATE:
                 Date vDate = ((DateObjectInspector) inspector).getPrimitiveJavaObject(value);
-                recordConsumer.addInteger(DateWritable.dateToDays(vDate));
+                long tDate = vDate.toEpochMilli();
+                recordConsumer.addInteger(DateWritable.millisToDays(tDate));
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported primitive data type: " + inspector.getPrimitiveCategory());
