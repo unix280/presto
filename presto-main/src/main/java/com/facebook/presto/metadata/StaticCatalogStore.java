@@ -109,13 +109,22 @@ public class StaticCatalogStore
 
         boolean propertySet = false;
         String connectorName = null;
+        String propertyValue = null;
         ImmutableMap.Builder<String, String> connectorProperties = ImmutableMap.builder();
         for (Entry<String, String> entry : properties.entrySet()) {
             if (entry.getKey().equals("connector.name")) {
                 connectorName = entry.getValue();
             }
             else {
-                connectorProperties.put(entry.getKey(), entry.getValue());
+                propertyValue = entry.getValue();
+                if (propertyValue.length() > 2 && (propertyValue.charAt(0) == '$' && propertyValue.charAt(1) == '{')) {
+                    log.info("Found the placeholder %s from the catalog", catalogName);
+                    propertyValue = System.getenv(propertyValue.substring(propertyValue.indexOf("{") + 1, propertyValue.indexOf("}")));
+                    connectorProperties.put(entry.getKey(), propertyValue);
+                }
+                else {
+                    connectorProperties.put(entry.getKey(), entry.getValue());
+                }
                 if (entry.getKey().equals("hive.metastore.authentication.type")) {
                     propertySet = true;
                 }
