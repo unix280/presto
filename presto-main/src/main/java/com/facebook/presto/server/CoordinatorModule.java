@@ -58,6 +58,7 @@ import com.facebook.presto.execution.scheduler.PhasedExecutionPolicy;
 import com.facebook.presto.execution.scheduler.SectionExecutionFactory;
 import com.facebook.presto.execution.scheduler.SplitSchedulerStats;
 import com.facebook.presto.failureDetector.FailureDetectorModule;
+import com.facebook.presto.governance.QueryAuditAndGovernanceManager;
 import com.facebook.presto.memory.ClusterMemoryManager;
 import com.facebook.presto.memory.ForMemoryManager;
 import com.facebook.presto.memory.LowMemoryKiller;
@@ -78,6 +79,7 @@ import com.facebook.presto.server.protocol.QueuedStatementResource;
 import com.facebook.presto.server.protocol.RetryCircuitBreaker;
 import com.facebook.presto.server.remotetask.HttpRemoteTaskFactory;
 import com.facebook.presto.server.remotetask.RemoteTaskStats;
+import com.facebook.presto.spi.governance.QueryAuditAndGovernance;
 import com.facebook.presto.spi.memory.ClusterMemoryPoolManager;
 import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
@@ -192,6 +194,8 @@ public class CoordinatorModule
 
         jaxrsBinder(binder).bind(TaskInfoResource.class);
 
+        binder.bind(QueryAuditAndGovernanceManager.class).in(Scopes.SINGLETON);
+        binder.bind(QueryAuditAndGovernance.class).to(QueryAuditAndGovernanceManager.class).in(Scopes.SINGLETON);
         // dispatcher
         binder.bind(DispatchManager.class).in(Scopes.SINGLETON);
         binder.bind(FailedDispatchQueryFactory.class).in(Scopes.SINGLETON);

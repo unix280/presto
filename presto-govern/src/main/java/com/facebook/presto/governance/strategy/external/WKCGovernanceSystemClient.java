@@ -80,7 +80,7 @@ public class WKCGovernanceSystemClient
     private static final String WKC_QUERY_CONTEXT_CONFIG_USER_PROPERTY_NAME = "wkc-query-context.config.user";
 
     private static final String WKC_QUERY_CONTEXT_CONFIG_USER_APPLICABLE = "wkc-query-context.config.user.applicable";
-
+    private static final String WKC_ENV_FYRE = "wkc-env-fyre";
     private static final String LTS_MASKING_FILE_PROPERTY_NAME = "lts-masking-filename.path";
     public static final String TRANSFORMS = "transforms";
     public static final String OPERATION_TYPE = "operation_type";
@@ -317,7 +317,9 @@ public class WKCGovernanceSystemClient
         try {
             URL url = new URL(getPropertyValueFromWKCConfiguration(WKC_ENV_URL_PROPERTY_NAME) + "/icp4d-api/v1/authorize");
 
-            //disableSSLVerification();
+            if ("true".equalsIgnoreCase(getPropertyValueFromWKCConfiguration(WKC_ENV_FYRE))) {
+                disableSSLVerification();
+            }
 
             HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
             httpConn.setRequestMethod("POST");
@@ -352,6 +354,9 @@ public class WKCGovernanceSystemClient
         }
         catch (QureyGovernanceException ex) {
             throw ex;
+        }
+        catch (IllegalArgumentException iex) {
+            throw new QureyGovernanceException(iex.getMessage());
         }
         catch (Exception e) {
             e.printStackTrace();
