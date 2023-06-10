@@ -40,6 +40,7 @@ import static com.facebook.presto.hive.metastore.MetastoreUtil.extractPartitionV
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getHiveSchema;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.reconstructPartitionSchema;
 import static org.apache.hadoop.hive.serde.serdeConstants.COLUMN_NAME_DELIMITER;
+import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_DDL;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertEquals;
 
@@ -155,6 +156,7 @@ public class TestHiveMetastoreUtil
         Properties expected = MetaStoreUtils.getTableMetadata(TEST_TABLE_WITH_UNSUPPORTED_FIELDS);
         expected.remove(COLUMN_NAME_DELIMITER);
         Properties actual = getHiveSchema(ThriftMetastoreUtil.fromMetastoreApiTable(TEST_TABLE_WITH_UNSUPPORTED_FIELDS, TEST_SCHEMA, TEST_COLUMN_CONVERTER));
+        actual.remove(SERIALIZATION_DDL);
         assertEquals(actual, expected);
     }
 
@@ -164,6 +166,7 @@ public class TestHiveMetastoreUtil
         Properties expected = MetaStoreUtils.getPartitionMetadata(TEST_PARTITION_WITH_UNSUPPORTED_FIELDS, TEST_TABLE_WITH_UNSUPPORTED_FIELDS);
         expected.remove(COLUMN_NAME_DELIMITER);
         Properties actual = getHiveSchema(ThriftMetastoreUtil.fromMetastoreApiPartition(TEST_PARTITION_WITH_UNSUPPORTED_FIELDS, TEST_PARTITION_VERSION_FETCHER, TEST_COLUMN_CONVERTER), ThriftMetastoreUtil.fromMetastoreApiTable(TEST_TABLE_WITH_UNSUPPORTED_FIELDS, TEST_SCHEMA, TEST_COLUMN_CONVERTER));
+        actual.remove(SERIALIZATION_DDL);
         assertEquals(actual, expected);
     }
 

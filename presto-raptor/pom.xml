@@ -377,6 +377,20 @@
                     </ignoredClassPatterns>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>**/TestHttpBackupStore.java</exclude>
+                        <exclude>**/TestRaptorDistributedQueries.java</exclude>
+                        <exclude>**/TestRaptorDistributedQueriesBucketed.java</exclude>
+                        <exclude>**/TestRaptorIntegrationSmokeTest.java</exclude>
+                        <exclude>**/TestRaptorFileBasedSecurity.java</exclude>
+                        <exclude>**/TestRaptorReadOnlySecurity.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

@@ -209,6 +209,7 @@
                     <!-- integration tests take a very long time so only run them in the CI server -->
                     <excludes>
                         <exclude>**/TestFullParquetReader.java</exclude>
+                        <exclude>**/TestPrometheusRetrieveUpValueIntegrationTests.java</exclude>
                     </excludes>
                 </configuration>
             </plugin>

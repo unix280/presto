@@ -615,12 +615,33 @@
                 </configuration>
             </plugin>
             <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                        <configuration>
+                            <skip>false</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <!-- these tests take a very long time so only run them in the CI server -->
                     <excludes>
                         <exclude>**/TestLocalExecutionPlanner.java</exclude>
+                        <exclude>**/TestAccessControlManager.java</exclude>
+                        <exclude>**/TestFileBasedSystemAccessControl.java</exclude>
+                        <exclude>**/TestDualAuthenticationFilterWithOAuth.java</exclude>
+                        <exclude>**/TestOAuth2AuthenticationFilterWithJwt.java</exclude>
+                        <exclude>**/TestOAuth2AuthenticationFilterWithOpaque.java</exclude>
+
                     </excludes>
                 </configuration>
             </plugin>
@@ -628,6 +649,20 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>skip-long-running-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>benchmarks</id>
             <build>

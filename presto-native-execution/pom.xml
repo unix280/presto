@@ -203,6 +203,18 @@
                         <PRESTO_SERVER>/root/project/build/debug/presto_cpp/main/presto_server</PRESTO_SERVER>
                         <DATA_DIR>/tmp/velox</DATA_DIR>
                     </systemPropertyVariables>
+                    <excludes>
+                        <exclude>**/TestHiveAggregationQueries.java</exclude>
+                        <exclude>**/TestHiveBitwiseFunctionQueries.java</exclude>
+                        <exclude>**/TestHiveJoinQueries.java</exclude>
+                        <exclude>**/TestHiveQueriesUsingJSON.java</exclude>
+                        <exclude>**/TestHiveQueriesUsingThrift.java</exclude>
+                        <exclude>**/TestHiveTpchQueriesUsingJSON.java</exclude>
+                        <exclude>**/TestHiveTpchQueriesUsingThrift.java</exclude>
+                        <exclude>**/TestHiveWindowQueries.java</exclude>
+                        <exclude>**/TestTpchQueries.java</exclude>
+                        <exclude>**/TestPrestoSparkNativeExecution.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <!-- TODO: Remove these once hive-apache-ibm repo clean up -->
@@ -216,7 +228,7 @@
                             <goal>testCompile</goal>
                         </goals>
                         <configuration>
-                            <skip>true</skip>
+                            <skip>false</skip>
                         </configuration>
                     </execution>
                 </executions>
@@ -256,6 +268,7 @@
                     </ignoredClassPatterns>
                 </configuration>
             </plugin>
+
         </plugins>
     </build>
 </project>

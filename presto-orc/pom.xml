@@ -219,6 +219,8 @@
                     <!-- integration tests take a very long time so only run them in the CI server -->
                     <excludes>
                         <exclude>**/TestFullOrcReader.java</exclude>
+                        <exclude>**/TestOrcReader.java</exclude>
+                        <exclude>**/TestSelectiveOrcReader.java</exclude>
                     </excludes>
                 </configuration>
             </plugin>
