@@ -15,7 +15,6 @@ package com.facebook.presto.governance;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.analyzer.PreparedQuery;
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.governance.QueryAuditAndGovernance;
 import com.facebook.presto.spi.governance.QueryAuditAndGovernanceFactory;
 import com.facebook.presto.spi.security.Identity;
@@ -32,7 +31,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.facebook.presto.spi.StandardErrorCode.SERVER_STARTING_UP;
 import static com.facebook.presto.util.PropertiesUtil.loadProperties;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -46,6 +44,7 @@ public class QueryAuditAndGovernanceManager
     private static final Logger log = Logger.get(QueryAuditAndGovernanceManager.class);
     private static final File QUERY_GOVERNANCE_CONFIGURATION = new File("etc/query-governance.properties");
     private static final String QUERY_GOVERNANCE_PROPERTY_NAME = "query-governance.name";
+    public static final String EMPTY_STRING = "";
     private final Map<String, QueryAuditAndGovernanceFactory> queryAuditAndGovernanceFactories = new ConcurrentHashMap<>();
     private final AtomicReference<QueryAuditAndGovernance> qualityAuditAndGovernance = new AtomicReference<>(new InitializingQueryAuditAndGovernance());
     private final AtomicBoolean qualityAuditAndGovernanceLoading = new AtomicBoolean();
@@ -140,17 +139,17 @@ public class QueryAuditAndGovernanceManager
         requireNonNull(name, "name is null");
         requireNonNull(properties, "properties is null");
 
-        checkState(qualityAuditAndGovernanceLoading.compareAndSet(false, true), "System access control already initialized");
+        checkState(qualityAuditAndGovernanceLoading.compareAndSet(false, true), "Query Audit And Governance already initialized");
 
-        log.info("-- Loading system access control --");
+        log.info("-- Loading Query Audit And Governance --");
 
         QueryAuditAndGovernanceFactory queryAuditAndGovernanceFactory = queryAuditAndGovernanceFactories.get(name);
-        checkState(queryAuditAndGovernanceFactory != null, "QueryAuditANdGovernance %s is not registered", name);
+        checkState(queryAuditAndGovernanceFactory != null, "QueryAuditAndGovernance %s is not registered", name);
 
         QueryAuditAndGovernance queryAuditAndGovernance = queryAuditAndGovernanceFactory.create(ImmutableMap.copyOf(properties));
         this.qualityAuditAndGovernance.set(queryAuditAndGovernance);
 
-        log.info("-- Loaded system access control %s --", name);
+        log.info("-- Loaded Query Audit And Governance %s --", name);
     }
 
     private static class InitializingQueryAuditAndGovernance
@@ -169,7 +168,8 @@ public class QueryAuditAndGovernanceManager
         @Override
         public String governquery(PreparedQuery preparedQuery, String query, String catalog, String schema, Identity identity)
         {
-            throw new PrestoException(SERVER_STARTING_UP, "Presto server is still initializing");
+            //throw new PrestoException(SERVER_STARTING_UP, "Presto server is still initializing");
+            return EMPTY_STRING;
         }
 
         @Override
