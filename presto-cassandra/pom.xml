@@ -265,7 +265,7 @@
             </build>
         </profile>
         <profile>
-            <id>skip-long-running-tests</id>
+            <id>skip-tests-with-error</id>
             <build>
                 <plugins>
                     <plugin>
@@ -278,5 +278,6 @@
                 </plugins>
             </build>
         </profile>
+
     </profiles>
 </project>

@@ -209,7 +209,6 @@
                     <!-- integration tests take a very long time so only run them in the CI server -->
                     <excludes>
                         <exclude>**/TestFullParquetReader.java</exclude>
-                        <exclude>**/TestPrometheusRetrieveUpValueIntegrationTests.java</exclude>
                     </excludes>
                 </configuration>
             </plugin>
@@ -299,6 +298,22 @@
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
                             <excludes combine.self="override" />
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>skip-failing-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/TestPrometheusRetrieveUpValueIntegrationTests.java</exclude>
+                            </excludes>
                         </configuration>
                     </plugin>
                 </plugins>
