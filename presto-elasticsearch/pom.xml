@@ -445,7 +445,7 @@
     </build>
     <profiles>
         <profile>
-            <id>skip-failing-tests</id>
+            <id>skip-tests-with-error</id>
             <build>
                 <plugins>
                     <plugin>
