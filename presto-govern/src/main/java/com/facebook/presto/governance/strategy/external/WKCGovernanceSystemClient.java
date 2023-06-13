@@ -54,6 +54,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.facebook.presto.util.GovernPropertiesUtil.loadProperties;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -89,6 +91,8 @@ public class WKCGovernanceSystemClient
     public static final String SCHEMA = "schema";
     public static final String NAME_VALUE = "name";
     public static final String DATE_DATATYPE = "Date";
+
+    public static final String RESOURCE_KEY_ERROR_PATTERN = "WDPPS8705E: Resource key .* was not found";
     Logger log = Logger.get(WKCGovernanceSystemClient.class);
 
     static {
@@ -282,6 +286,12 @@ public class WKCGovernanceSystemClient
             log.debug("======== getAssetEvaluateResponseFromAPI END ========");
         }
         catch (Exception e) {
+            Pattern regex = Pattern.compile(RESOURCE_KEY_ERROR_PATTERN);
+            Matcher matcher = regex.matcher(e.getMessage());
+            if (matcher.find()) {
+                log.error("======== Resource Key not found in WKC ========" + e);
+                return null;
+            }
             log.error("======== Exception inside getAssetEvaluateResponseFromAPI ========" + e);
             throw new QureyGovernanceException("Exception in data protection policy management check " + e.getMessage());
         }
