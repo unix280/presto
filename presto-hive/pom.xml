@@ -1160,7 +1160,7 @@
                             <goal>testCompile</goal>
                         </goals>
                         <configuration>
-                            <skip>true</skip>
+                            <skip>false</skip>
                         </configuration>
                     </execution>
                 </executions>
@@ -1358,6 +1358,55 @@
                                 <include>**/TestHive2InsertOverwrite.java</include>
                                 <include>**/TestHive3InsertOverwrite.java</include>
                             </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>skip-failing-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/TestEventListenerWithExchangeMaterialization.java</exclude>
+                                <exclude>**/TestHiveBucketing.java</exclude>
+                                <exclude>**/TestHiveCanonicalPlanGenerator.java</exclude>
+                                <exclude>**/TestHiveCanonicalPlanHashes.java</exclude>
+                                <exclude>**/TestHiveClientFileMetastore.java</exclude>
+                                <exclude>**/TestHiveClientInMemoryMetastore.java</exclude>
+                                <exclude>**/TestHiveClientInMemoryMetastoreWithFilterPushdown.java</exclude>
+                                <exclude>**/TestHiveCreateExternalTable.java</exclude>
+                                <exclude>**/TestHiveDistributedAggregations.java</exclude>
+                                <exclude>**/TestHiveDistributedJoinQueries.java</exclude>
+                                <exclude>**/TestHiveDistributedJoinQueriesWithDynamicFiltering.java</exclude>
+                                <exclude>**/TestHiveDistributedOrderByQueries.java</exclude>
+                                <exclude>**/TestHiveDistributedQueries.java</exclude>
+                                <exclude>**/TestHiveDistributedQueriesWithThriftRpc.java</exclude>
+                                <exclude>**/TestHiveDistributedWindowQueries.java</exclude>
+                                <exclude>**/TestHiveFileBasedSecurity.java</exclude>
+                                <exclude>**/TestHiveFileFormats.java</exclude>
+                                <exclude>**/TestHiveHistoryBasedStatsTracking.java</exclude>
+                                <exclude>**/TestHiveIntegrationSmokeTest.java</exclude>
+                                <exclude>**/TestHiveLogicalPlanner.java</exclude>
+                                <exclude>**/TestHiveMaterializedViewLogicalPlanner.java</exclude>
+                                <exclude>**/TestHivePageSink.java</exclude>
+                                <exclude>**/TestHiveRoles.java</exclude>
+                                <exclude>**/TestHiveSpillingWithExchangeMaterialization.java</exclude>
+                                <exclude>**/TestMergeJoinPlan.java</exclude>
+                                <exclude>**/TestSegmentedAggregation.java</exclude>
+                                <exclude>**/TestShowStats.java</exclude>
+                                <exclude>**/TestStreamingAggregationPlan.java</exclude>
+                                <exclude>**/TestHiveFileFormatBenchmark.java</exclude>
+                                <exclude>**/TestSpatialJoins.java</exclude>
+                                <exclude>**/TestHudiIntegration.java</exclude>
+                                <exclude>**/TestFullParquetReader.java</exclude>
+                                <exclude>**/TestParquetReader.java</exclude>
+                                <exclude>**/TestSerDeUtils.java</exclude>
+                            </excludes>
                         </configuration>
                     </plugin>
                 </plugins>

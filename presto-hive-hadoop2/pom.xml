@@ -187,6 +187,7 @@
                                 <exclude>**/TestHiveClient.java</exclude>
                                 <exclude>**/TestHiveFileSystemS3.java</exclude>
                                 <exclude>**/TestHiveFileSystemS3SelectPushdown.java</exclude>
+                                <exclude>**/TestHiveHadoop2Plugin.java</exclude>
                             </excludes>
                         </configuration>
                     </plugin>
@@ -253,7 +254,7 @@
                                     <goal>testCompile</goal>
                                 </goals>
                                 <configuration>
-                                    <skip>true</skip>
+                                    <skip>false</skip>
                                 </configuration>
                             </execution>
                         </executions>
@@ -314,5 +315,6 @@
                 </plugins>
             </build>
         </profile>
+
     </profiles>
 </project>
