@@ -168,7 +168,35 @@ public class AccessControlManager
         requireNonNull(principal, "principal is null");
         requireNonNull(userName, "userName is null");
 
-        authenticationCheck(() -> systemAccessControl.get().checkCanSetUser(identity, context, principal, userName));
+        authenticationCheck(() -> {
+            long retryDelay = 100L;
+            int maxRetry = 3;
+            int retryCount = 1;
+            while (retryCount <= maxRetry) {
+                try {
+                    log.info("attempt: %d check can set user", retryCount);
+                    systemAccessControl.get().checkCanSetUser(identity, context, principal, userName);
+                    break;
+                }
+                catch (Exception e) {
+                    log.error(e);
+                    if (retryCount == maxRetry) {
+                        log.debug("max retry attempt reached");
+                        throw e;
+                    }
+                    else {
+                        retryCount += 1;
+                        log.info("retry in %d millisecond(s)", retryDelay);
+                        try {
+                            Thread.sleep(retryDelay);
+                        }
+                        catch (InterruptedException ex) {
+                            log.error(ex);
+                        }
+                    }
+                }
+            }
+        });
     }
 
     @Override
