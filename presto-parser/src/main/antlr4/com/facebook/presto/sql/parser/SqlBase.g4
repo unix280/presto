@@ -78,6 +78,8 @@ statement
         tableVersionExpression?
         (RETAIN retainDays=INTEGER_VALUE DAYS)?                         #createTag
     | ALTER TABLE (IF EXISTS)? tableName=qualifiedName
+        ALTER COLUMN columnName=identifier SET DATA TYPE type          #setColumnType
+    | ALTER TABLE (IF EXISTS)? tableName=qualifiedName
         DROP BRANCH (IF EXISTS)? name=string                           #dropBranch
     | ALTER TABLE (IF EXISTS)? tableName=qualifiedName
         DROP TAG (IF EXISTS)? name=string                              #dropTag

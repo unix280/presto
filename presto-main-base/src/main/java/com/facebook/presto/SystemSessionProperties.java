@@ -2260,7 +2260,7 @@ public final class SystemSessionProperties
     {
         return session.getSystemProperty(MAX_PREFIXES_COUNT, Integer.class);
     }
-    
+
     public static boolean isSpoolingOutputBufferEnabled(Session session)
     {
         return session.getSystemProperty(SPOOLING_OUTPUT_BUFFER_ENABLED, Boolean.class);

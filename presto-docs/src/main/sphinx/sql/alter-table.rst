@@ -15,6 +15,7 @@ Synopsis
     ALTER TABLE [ IF EXISTS ] name DROP CONSTRAINT [ IF EXISTS ] constraint_name
     ALTER TABLE [ IF EXISTS ] name ALTER [ COLUMN ] column_name { SET | DROP } NOT NULL
     ALTER TABLE [ IF EXISTS ] name SET PROPERTIES (property_name=value, [, ...])
+    ALTER TABLE [ IF EXISTS ] name ALTER COLUMN column_name SET DATA TYPE new_type
     ALTER TABLE [ IF EXISTS ] name DROP BRANCH [ IF EXISTS ] branch_name
     ALTER TABLE [ IF EXISTS ] name DROP TAG [ IF EXISTS ] tag_name
     ALTER TABLE [ IF EXISTS ] name CREATE [ OR REPLACE ] BRANCH [ IF NOT EXISTS ] branch_name

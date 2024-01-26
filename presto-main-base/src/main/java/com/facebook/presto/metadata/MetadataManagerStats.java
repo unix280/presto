@@ -127,6 +127,7 @@ public class MetadataManagerStats
     private final AtomicLong renameTableCalls = new AtomicLong();
     private final AtomicLong setTablePropertiesCalls = new AtomicLong();
     private final AtomicLong addColumnCalls = new AtomicLong();
+    private final AtomicLong setColumnTypeCalls = new AtomicLong();
     private final AtomicLong dropColumnCalls = new AtomicLong();
     private final AtomicLong renameColumnCalls = new AtomicLong();
     private final AtomicLong normalizeIdentifierCalls = new AtomicLong();
@@ -239,6 +240,7 @@ public class MetadataManagerStats
     private final TimeStat renameTableTime = new TimeStat(TimeUnit.NANOSECONDS);
     private final TimeStat setTablePropertiesTime = new TimeStat(TimeUnit.NANOSECONDS);
     private final TimeStat addColumnTime = new TimeStat(TimeUnit.NANOSECONDS);
+    private final TimeStat setColumnTypeTime = new TimeStat(TimeUnit.NANOSECONDS);
     private final TimeStat dropColumnTime = new TimeStat(TimeUnit.NANOSECONDS);
     private final TimeStat renameColumnTime = new TimeStat(TimeUnit.NANOSECONDS);
     private final TimeStat normalizeIdentifierTime = new TimeStat(TimeUnit.NANOSECONDS);
@@ -1805,6 +1807,12 @@ public class MetadataManagerStats
     {
         addColumnCalls.incrementAndGet();
         addColumnTime.add(duration, TimeUnit.NANOSECONDS);
+    }
+
+    public void recordSetColumnTypeCall(long duration)
+    {
+        setColumnTypeCalls.incrementAndGet();
+        setColumnTypeTime.add(duration, TimeUnit.NANOSECONDS);
     }
 
     public void recordDropColumnCall(long duration)
