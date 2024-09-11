@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.tests.expressions;
+package com.facebook.presto.session.sql.expressions;
 
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.ConstantExpression;
@@ -21,17 +21,21 @@ import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.relational.DelegatingRowExpressionOptimizer;
 import com.facebook.presto.sql.relational.FunctionResolution;
+import com.facebook.presto.tests.expressions.TestExpressions;
 import com.google.common.collect.ImmutableList;
-import org.intellij.lang.annotations.Language;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.net.URI;
 import java.util.Optional;
 
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.common.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
-import static com.facebook.presto.operator.scalar.ApplyFunction.APPLY_FUNCTION;
+import static com.facebook.presto.nativeworker.PrestoNativeQueryRunnerUtils.findRandomPortForWorker;
+import static com.facebook.presto.nativeworker.PrestoNativeQueryRunnerUtils.getNativeSidecarProcess;
+import static com.facebook.presto.session.sql.expressions.TestNativeExpressionOptimization.getExpressionOptimizer;
 import static com.facebook.presto.spi.relation.ExpressionOptimizer.Level;
 import static com.facebook.presto.spi.relation.ExpressionOptimizer.Level.EVALUATED;
 import static com.facebook.presto.spi.relation.ExpressionOptimizer.Level.OPTIMIZED;
@@ -47,17 +51,29 @@ public class TestDelegatingExpressionOptimizer
 {
     public static final FunctionResolution RESOLUTION = new FunctionResolution(METADATA.getFunctionAndTypeManager().getFunctionAndTypeResolver());
     private ExpressionOptimizer expressionOptimizer;
+    private Process sidecar;
 
     @BeforeClass
     public void setup()
+            throws Exception
     {
-        METADATA.getFunctionAndTypeManager().registerBuiltInFunctions(ImmutableList.of(APPLY_FUNCTION));
-        setupJsonFunctionNamespaceManager(METADATA.getFunctionAndTypeManager());
+        super.setup();
+        int port = findRandomPortForWorker();
+        URI sidecarUri = URI.create("http://127.0.0.1:" + port);
+        sidecar = getNativeSidecarProcess(URI.create("http://test.invalid/"), port);
 
-        expressionOptimizer = new DelegatingRowExpressionOptimizer(METADATA, () -> TestNativeExpressions.getExpressionOptimizer(METADATA, HANDLE_RESOLVER));
+        ExpressionOptimizer optimizer = getExpressionOptimizer(METADATA, HANDLE_RESOLVER, sidecarUri);
+        expressionOptimizer = new DelegatingRowExpressionOptimizer(METADATA, () -> optimizer);
     }
 
-    @Test
+    @AfterClass
+    public void tearDown()
+    {
+        sidecar.destroyForcibly();
+    }
+
+    // TODO: Pending on native function namespace manager.
+    @Test(enabled = false)
     public void assertLikeOptimizations()
     {
         assertOptimizedMatches("unbound_string LIKE bound_pattern", "unbound_string LIKE CAST('%el%' AS varchar)");
@@ -70,11 +86,44 @@ public class TestDelegatingExpressionOptimizer
     {
     }
 
-    // TODO: lambdas are currently unsupported by this test
+    // TODO: Pending on native function namespace manager.
+    @Test(enabled = false)
+    @Override
+    public void testLike()
+    {
+    }
+
+    // TODO: Pending on native function namespace manager.
+    @Test(enabled = false)
+    @Override
+    public void testLikeOptimization()
+    {
+    }
+
+    // TODO: Pending on native function namespace manager.
+    @Test(enabled = false)
+    @Override
+    public void testInvalidLike()
+    {
+    }
+
     @Test(enabled = false)
     @Override
     public void testLambda()
     {
+        assertDoNotOptimize("transform(unbound_array, x -> x + x)", OPTIMIZED);
+        assertOptimizedEquals("transform(ARRAY[1, 5], x -> x + x)", "transform(ARRAY[1, 5], x -> x + x)");
+        assertOptimizedEquals("transform(sequence(1, 5), x -> x + x)", "transform(sequence(1, 5), x -> x + x)");
+        assertRowExpressionEquals(
+                OPTIMIZED,
+                "transform(sequence(1, unbound_long), x -> cast(json_parse('[1, 2]') AS ARRAY<INTEGER>)[1] + x)",
+                "transform(sequence(1, unbound_long), x -> 1 + x)");
+        assertRowExpressionEquals(
+                OPTIMIZED,
+                "transform(sequence(1, unbound_long), x -> cast(json_parse('[1, 2]') AS ARRAY<INTEGER>)[1] + 1)",
+                "transform(sequence(1, unbound_long), x -> 2)");
+        // TODO: lambdas are currently unsupported by this test
+//        assertEquals(evaluate("reduce(ARRAY[1, 5], 0, (x, y) -> x + y, x -> x)", true), 6L);
     }
 
     // TODO: current timestamp returns the session timestamp, which is not supported by this test
@@ -91,11 +140,98 @@ public class TestDelegatingExpressionOptimizer
     {
     }
 
-    // TODO: non-deterministic function calls are not supported by this test and need to be tested separately
+    // TODO: apply function is not supported in Presto native.
     @Test(enabled = false)
     @Override
-    public void testNonDeterministicFunctionCall()
-    { }
+    public void testBind()
+    {
+    }
+
+    @Test
+    @Override
+    public void testLiterals()
+    {
+        optimize("date '2013-04-03' + unbound_interval");
+        // TODO: TIME type is unsupported in Presto native.
+//        optimize("time '03:04:05.321' + unbound_interval");
+//        optimize("time '03:04:05.321 UTC' + unbound_interval");
+        optimize("timestamp '2013-04-03 03:04:05.321' + unbound_interval");
+        optimize("timestamp '2013-04-03 03:04:05.321 UTC' + unbound_interval");
+
+        optimize("interval '3' day * unbound_long");
+        // TODO: Pending on velox PR: https://github.com/facebookincubator/velox/pull/11612.
+//        optimize("interval '3' year * unbound_integer");
+    }
+
+    // TODO: NULL_IF special form is unsupported in Presto native.
+    @Test(enabled = false)
+    @Override
+    public void testNullIf()
+    {
+    }
+
+    @Test
+    @Override
+    public void testCastBigintToBoundedVarchar()
+    {
+        assertEvaluatedEquals("CAST(12300000000 AS varchar(11))", "'12300000000'");
+        assertEvaluatedEquals("CAST(12300000000 AS varchar(50))", "'12300000000'");
+
+        // TODO: Velox permits this cast, but Presto does not
+//        try {
+//            evaluate("CAST(12300000000 AS varchar(3))", true);
+//            fail("Expected to throw an INVALID_CAST_ARGUMENT exception");
+//        }
+//        catch (PrestoException e) {
+//            try {
+//                assertEquals(e.getErrorCode(), INVALID_CAST_ARGUMENT.toErrorCode());
+//                assertEquals(e.getMessage(), "Value 12300000000 cannot be represented as varchar(3)");
+//            }
+//            catch (Throwable failure) {
+//                failure.addSuppressed(e);
+//                throw failure;
+//            }
+//        }
+//
+//        try {
+//            evaluate("CAST(-12300000000 AS varchar(3))", true);
+//        }
+//        catch (PrestoException e) {
+//            try {
+//                assertEquals(e.getErrorCode(), INVALID_CAST_ARGUMENT.toErrorCode());
+//                assertEquals(e.getMessage(), "Value -12300000000 cannot be represented as varchar(3)");
+//            }
+//            catch (Throwable failure) {
+//                failure.addSuppressed(e);
+//                throw failure;
+//            }
+//        }
+    }
+
+    // TODO: Non-legacy map subscript is not supported in Presto native.
+    @Test(enabled = false)
+    @Override
+    public void testMapSubscriptMissingKey()
+    {
+    }
+
+    // TODO: This test is not applicable in the sidecar so disabled for now.
+    //  To be enabled after changes in sidecar query runner to support Json
+    //  based UDF registration.
+    @Test(enabled = false)
+    @Override
+    public void testCppAggregateFunctionCall()
+    {
+    }
+
+    // TODO: This test is not applicable in the sidecar so disabled for now.
+    //  To be enabled after changes in sidecar query runner to support Json
+    //  based UDF registration.
+    @Test(enabled = false)
+    @Override
+    public void testCppFunctionCall()
+    {
+    }
 
     @Override
     protected void assertLike(byte[] value, String pattern, boolean expected)
@@ -118,7 +254,7 @@ public class TestDelegatingExpressionOptimizer
     }
 
     @Override
-    protected Object optimize(@Language("SQL") String expression)
+    protected Object optimize(String expression)
     {
         assertRoundTrip(expression);
         RowExpression parsedExpression = sqlToRowExpression(expression);
@@ -154,7 +290,7 @@ public class TestDelegatingExpressionOptimizer
     }
 
     @Override
-    protected void assertOptimizedEquals(@Language("SQL") String actual, @Language("SQL") String expected)
+    protected void assertOptimizedEquals(String actual, String expected)
     {
         Object optimizedActual = optimize(actual);
         Object optimizedExpected = optimize(expected);
@@ -162,7 +298,7 @@ public class TestDelegatingExpressionOptimizer
     }
 
     @Override
-    protected void assertOptimizedMatches(@Language("SQL") String actual, @Language("SQL") String expected)
+    protected void assertOptimizedMatches(String actual, String expected)
     {
         Object actualOptimized = optimize(actual);
         Object expectedOptimized = optimize(expected);
@@ -172,7 +308,7 @@ public class TestDelegatingExpressionOptimizer
     }
 
     @Override
-    protected void assertDoNotOptimize(@Language("SQL") String expression, Level optimizationLevel)
+    protected void assertDoNotOptimize(String expression, Level optimizationLevel)
     {
         assertRoundTrip(expression);
         RowExpression rowExpression = sqlToRowExpression(expression);
