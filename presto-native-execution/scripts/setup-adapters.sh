@@ -12,7 +12,9 @@
 # limitations under the License.
 
 # Propagate errors and improve debugging.
-set -eufx -o pipefail
+# set -eufx -o pipefail
+set -e
+set -x
 
 EXTRA_ARROW_PATCH=${EXTRA_ARROW_PATCH:-""}
 
