@@ -28,6 +28,9 @@
 #include "presto_cpp/main/common/ConfigReader.h"
 #include "presto_cpp/main/common/Counters.h"
 #include "presto_cpp/main/common/Utils.h"
+#ifdef __linux__
+#include "presto_cpp/main/common/process/IBMSignalHandler.h"
+#endif
 #include "presto_cpp/main/connectors/Registration.h"
 #include "presto_cpp/main/connectors/SystemConnector.h"
 #include "presto_cpp/main/connectors/hive/functions/HiveFunctionRegistration.h"
@@ -324,6 +327,14 @@ void PrestoServer::run() {
   prestoServerOperations_ =
       std::make_unique<PrestoServerOperations>(taskManager_.get(), this);
   registerSystemConnector();
+
+#ifdef __linux__
+  auto ibmSignalHandler =
+      folly::Singleton<facebook::presto::process::IBMSignalHandler>::try_get();
+  if (ibmSignalHandler) {
+    ibmSignalHandler->setTaskManager(taskManager_.get());
+  }
+#endif
 
   // The endpoint used by operation in production.
   httpServer_->registerGet(
