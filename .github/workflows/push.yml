@@ -50,9 +50,11 @@ jobs:
         env:
           PRESTO_RELEASE_VERSION: ${{ steps.get-version.outputs.PRESTO_RELEASE_VERSION }}
         run: |
-          echo `date` >> test.txt
+          date > test.txt
+          git remote -v >> test.txt
           git add test.txt
           git commit -m 'update test.txt'
+          cat test.txt
           git push --follow-tags --set-upstream https://x-access-token:${{ secrets.PRESTODB_CI_TOKEN }}@github.com/${{ github.repository }} master
           git checkout -b release-${{ env.PRESTO_RELEASE_VERSION }}
           git push origin release-${{ env.PRESTO_RELEASE_VERSION }}
