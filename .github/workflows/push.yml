@@ -32,7 +32,6 @@ jobs:
           git config --global user.name "oss-release-bot"
           git remote set-url origin https://x-access-token:${{ secrets.PRESTODB_CI_TOKEN }}@github.com/${{ github.repository }}
           git config pull.rebase false
-          git remote -v
 
       - name: Set Maven version
         run: |
@@ -50,8 +49,10 @@ jobs:
         env:
           PRESTO_RELEASE_VERSION: ${{ steps.get-version.outputs.PRESTO_RELEASE_VERSION }}
         run: |
-          echo `date` >> test.txt
+          date > text.txt
+          git remote -v >> test.txt
           git add test.txt
+          cat test.txt
           git commit -m 'update test.txt'
           git push --follow-tags --set-upstream https://x-access-token:${{ secrets.PRESTODB_CI_TOKEN }}@github.com/${{ github.repository }} master
           git checkout -b release-${{ env.PRESTO_RELEASE_VERSION }}
