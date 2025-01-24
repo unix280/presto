@@ -26,13 +26,11 @@ jobs:
           distribution: 'temurin'
 
       - name: Configure Git
-        env:
-          PRESTODB_CI_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
         run: |
           git config --global --add safe.directory ${{github.workspace}}
           git config --global user.email "oss-release-bot@prestodb.io"
           git config --global user.name "oss-release-bot"
-          git remote set-url origin https://x-access-token:$PRESTODB_CI_TOKEN@github.com/${{ github.repository }}
+          git remote set-url origin https://x-access-token:${{ secrets.PRESTODB_CI_TOKEN }}@github.com/${{ github.repository }}.git
           git config pull.rebase false
           git remote -v
 
