@@ -32,6 +32,7 @@ jobs:
           git config --global user.name "oss-release-bot"
           git remote set-url origin https://x-access-token:${{ secrets.PRESTODB_CI_TOKEN }}@github.com/${{ github.repository }}
           git config pull.rebase false
+          git remote -v
 
       - name: Set Maven version
         run: |
