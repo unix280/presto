@@ -53,6 +53,6 @@ jobs:
           echo `date` >> test.txt
           git add test.txt
           git commit -m 'update test.txt'
-          git push --follow-tags origin master
+          git push --follow-tags --set-upstream https://x-access-token:${{ secrets.PRESTODB_CI_TOKEN }}@github.com/${{ github.repository }} master
           git checkout -b release-${{ env.PRESTO_RELEASE_VERSION }}
           git push origin release-${{ env.PRESTO_RELEASE_VERSION }}
