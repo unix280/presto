@@ -25,7 +25,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: master
           show-progress: false
 
@@ -49,5 +49,5 @@ jobs:
 
       - name: Create release notes pull request
         run: |
-          ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.TOKEN }}
+          ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
 
