@@ -3,6 +3,9 @@ name: Generate Release Notes
 on:
   workflow_dispatch:
 
+env:
+  UPSTREAM: https://github.com/unix280/presto.git
+
 jobs:
   release-notes:
     runs-on: ubuntu-latest
@@ -22,7 +25,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.PRESTODB_CI_TOKEN }}
+          token: ${{ secrets.TOKEN }}
           ref: master
           show-progress: false
 
@@ -41,10 +44,10 @@ jobs:
 
       - name: Add git upstream
         run: |
-          git remote add upstream https://github.com/${{ github.repository }}.git
+          git remote add upstream ${{ env.UPSTREAM }}
           git fetch upstream
 
       - name: Create release notes pull request
         run: |
-          ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.PRESTODB_CI_TOKEN }}
+          ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.TOKEN }}
 
