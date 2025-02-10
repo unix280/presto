@@ -3,8 +3,11 @@ name: Publish Presto Release
 on:
   workflow_dispatch:
     inputs:
+      RELEASE_BRANCH:
+        description: 'Release branch (e.g., release-0.290)'
+        required: true
       RELEASE_VERSION:
-        description: 'Release version (e.g., 0.280)'
+        description: 'Release version (e.g., 0.290)'
         required: true
 
 jobs:
@@ -32,12 +35,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: $${{ github.event.inputs.RELEASE_BRANCH }}
           token: ${{ secrets.PRESTODB_CI_TOKEN }}
 
       - name: Configure Git
         run: |
           git config --global user.email "ci@lists.prestodb.io"
           git config --global user.name "prestodb-ci"
+          git checkout ${{ github.event.inputs.RELEASE_VERSION }}
           git log --pretty="format:%ce: %s" -5
 
       - name: Import GPG key
