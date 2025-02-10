@@ -16,7 +16,6 @@ jobs:
     env:
       SONATYPE_NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
       SONATYPE_NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
-      PRESTO_REPO_BRANCH_NAME: release-${{ github.event.inputs.RELEASE_VERSION }}
 
     steps:
       - name: Setup JDK 11
@@ -33,7 +32,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.PRESTO_REPO_BRANCH_NAME }}
           token: ${{ secrets.PRESTODB_CI_TOKEN }}
 
       - name: Configure Git
