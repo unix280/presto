@@ -37,6 +37,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.RELEASE_BRANCH }}
           token: ${{ secrets.PRESTODB_CI_TOKEN }}
+          fetch-depth: 0
           fetch-tags: true
 
       - name: Configure Git
