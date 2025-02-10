@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 300  # 5 hours
 
     env:
-      SONATYPE_NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-      SONATYPE_NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
     steps:
       - name: Setup JDK 11
@@ -49,11 +49,45 @@ jobs:
         env:
           GPG_TTY: $(tty)
 
+      - name: Create Maven Settings
+        run: |
+          cat > settings.xml << 'EOL'
+          <settings>
+            <servers>
+              <server>
+                <id>sonatype-nexus-snapshots</id>
+                <username>${env.NEXUS_USERNAME}</username>
+                <password>${env.NEXUS_PASSWORD}</password>
+              </server>
+              <server>
+                <id>sonatype.snapshots</id>
+                <username>${env.NEXUS_USERNAME}</username>
+                <password>${env.NEXUS_PASSWORD}</password>
+              </server>
+              <server>
+                <id>ossrh</id>
+                <username>${env.NEXUS_USERNAME}</username>
+                <password>${env.NEXUS_PASSWORD}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>nexus</id>
+                <!--Enable snapshots for the built in central repo to direct -->
+                <!--all requests to nexus via the mirror -->
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>nexus</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOL
+
       - name: Release Maven Artifacts
         run: |
           unset MAVEN_CONFIG
-          ./mvnw -s ${GITHUB_WORKSPACE}/settings.xml -V -B -U -e -T1C deploy \
-            -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }} \
+          ./mvnw -s ${{ github.workspace }}/settings.xml -V -B -U -e -T1C deploy \
+            -Dgpg.passphrase="${{ secrets.GPG_PASSPHRASE }}" \
             -Dmaven.wagon.http.retryHandler.count=8 \
             -DskipTests \
             -DstagingProfileId=28a0d8c4350ed \
