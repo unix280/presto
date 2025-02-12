@@ -35,10 +35,10 @@ jobs:
 
       - name: Add git upstream
         run: |
-          git remote add upstream ${{ env.UPSTREAM }}
+          git remote add upstream https://github.com/${{ env.UPSTREAM }}.git
           git fetch upstream --tags
+          git remote -v
 
       - name: Create release notes pull request
         run: |
-          echo ./src/release/release-notes.sh 
-          echo ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
+          echo ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
