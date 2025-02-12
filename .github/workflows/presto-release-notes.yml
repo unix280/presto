@@ -22,8 +22,6 @@ jobs:
       - name: Checkout presto source
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          fetch-tags: true
           ref: master
           show-progress: false
 
