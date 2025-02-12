@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  UPSTREAM: https://github.com/unix280/presto.git
+  UPSTREAM: https://github.com/prestodb/presto.git
 
 jobs:
   release-notes:
