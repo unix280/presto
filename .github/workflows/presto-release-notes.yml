@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  UPSTREAM: unix280/presto
+  UPSTREAM: prestodb/presto
 
 jobs:
   release-notes:
@@ -40,4 +40,5 @@ jobs:
 
       - name: Create release notes pull request
         run: |
-          echo ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
+          echo ./src/release/release-notes.sh 
+          echo ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
