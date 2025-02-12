@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  UPSTREAM: https://github.com/prestodb/presto.git
+  UPSTREAM: unix280/presto
 
 jobs:
   release-notes:
@@ -16,7 +16,7 @@ jobs:
         run: echo "Invalid branch. This action can only be run on the master branch." && exit 1
 
       - name: Check for personal repository
-        if: ${{ github.ref != env.UPSTREAM }}
+        if: ${{ github.repository == env.UPSTREAM }}
         run: echo "This action can only be run on personal repository, please clone ${{ env.UPSTREAM }}, and run this action in your own repo" && exit 1
 
       - name: Checkout presto source
@@ -40,5 +40,4 @@ jobs:
 
       - name: Create release notes pull request
         run: |
-          echo ./src/release/release-notes.sh 
-          echo ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
+          echo ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
