@@ -54,7 +54,9 @@ jobs:
           git cherry-pick ${{ env.RELEASE_NOTES_COMMIT }}
 
       - name: Create new release tag
-        run: git tag ${{ env.RELEASE_TAG }}
+        run: |
+          git tag -d ${{ env.RELEASE_TAG }} || true
+          git tag -a ${{ env.RELEASE_TAG }} -m "release ${{ env.RELEASE_TAG }}"
 
       - name: Push changes
         run: |
