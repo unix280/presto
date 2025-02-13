@@ -1,0 +1,61 @@
+name: Presto Stable Release Tag Finalize
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Release tag (e.g., 0.291)'
+        required: true
+      release-notes-commit:
+        description: 'Commit hash containing release notes'
+        required: true
+
+env:
+  RELEASE_BRANCH: release-${{ github.event.inputs.release-tag }}
+  RELEASE_TAG: ${{ github.event.inputs.release-tag }}
+  RELEASE_NOTES_COMMIT: ${{ github.event.inputs.release-notes-commit }}
+
+jobs:
+  finalize-release:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Validate inputs
+        run: |
+          if [ -z "${{ env.RELEASE_TAG }}" ]; then
+            echo "Error: release-tag is empty"
+            exit 1
+          fi
+          if [ -z "${{ env.RELEASE_NOTES_COMMIT }}" ]; then
+            echo "Error: release-notes-commit is empty"
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_BRANCH }}
+          token: ${{ secrets.PRESTODB_CI_TOKEN }}
+          fetch-depth: 0
+          fetch-tags: true
+          show-progress: false
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "ci@lists.prestodb.io"
+          git config --global user.name "prestodb-ci"
+          git config pull.rebase false
+
+      - name: Delete existing release tag
+        run: git push origin --delete ${{ env.RELEASE_TAG }} || true
+
+      - name: Cherry-pick release notes
+        run: |
+          git cherry-pick ${{ env.RELEASE_NOTES_COMMIT }}
+
+      - name: Create new release tag
+        run: git tag ${{ env.RELEASE_TAG }}
+
+      - name: Push changes
+        run: |
+          git push origin ${{ env.RELEASE_BRANCH }} --tags
