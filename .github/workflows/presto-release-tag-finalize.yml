@@ -47,7 +47,7 @@ jobs:
           git config pull.rebase false
 
       - name: Delete existing release tag
-        run: git push origin --delete ${{ env.RELEASE_TAG }} || true
+        run: git push origin :${{ env.RELEASE_TAG }} || true
 
       - name: Cherry-pick release notes
         run: |
@@ -58,6 +58,6 @@ jobs:
           git tag -d ${{ env.RELEASE_TAG }} || true
           git tag -a ${{ env.RELEASE_TAG }} -m "release ${{ env.RELEASE_TAG }}"
 
-      - name: Push changes
+      - name: Push the new release tag
         run: |
           git push origin ${{ env.RELEASE_BRANCH }} --tags
