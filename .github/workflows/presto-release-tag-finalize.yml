@@ -46,18 +46,16 @@ jobs:
           git config --global user.name "prestodb-ci"
           git config pull.rebase false
 
-      - name: Delete existing release tag
-        run: git push origin :${{ env.RELEASE_TAG }} || true
-
       - name: Cherry-pick release notes
         run: |
           git cherry-pick ${{ env.RELEASE_NOTES_COMMIT }}
 
+      - name: Delete existing release tag
+        run: |
+          git push origin :${{ env.RELEASE_TAG }} || true
+          git tag -d ${{ env.RELEASE_TAG }} || true
+
       - name: Create new release tag
         run: |
-          git tag -d ${{ env.RELEASE_TAG }} || true
           git tag -a ${{ env.RELEASE_TAG }} -m "release ${{ env.RELEASE_TAG }}"
-
-      - name: Push the new release tag
-        run: |
           git push origin ${{ env.RELEASE_BRANCH }} --tags
