@@ -20,4 +20,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build docker image
-        run: ./codeker/build.sh
+        run: ./docker/build.sh
