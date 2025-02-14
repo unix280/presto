@@ -2,6 +2,13 @@ name: Build and Publish Docker Image
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.291)'
+        required: true
+
+env:
+  VERSION: ${{ github.event.inputs.version }}
 
 jobs:
   docker:
@@ -19,5 +26,5 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build docker image
-        run: ./docker/build.sh
+      - name: Build and push
+        run: ./docker/build.sh ${{ env.VERSION }}
