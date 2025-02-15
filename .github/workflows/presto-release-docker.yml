@@ -44,7 +44,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: presto-artifacts
+          name: presto-artifacts-${{ env.VERSION }}
+          retention-days: 1
           path: |
             presto-server/target/presto-server-*.tar.gz
             presto-cli/target/presto-cli-*-executable.jar
@@ -56,11 +57,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VERSION }}
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: presto-artifacts
+          name: presto-artifacts-${{ env.VERSION }}
           path: ./
 
       - name: Login to DockerHub
@@ -100,7 +103,7 @@ jobs:
       - name: Upload Docker image
         uses: actions/upload-artifact@v4
         with:
-          name: docker-image
+          name: docker-image-${{ env.VERSION }}
           path: image.tar
           retention-days: 1
 
@@ -112,7 +115,7 @@ jobs:
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
-          name: docker-image
+          name: docker-image-${{ env.VERSION }}
           path: ./
 
       - name: Load Docker image
