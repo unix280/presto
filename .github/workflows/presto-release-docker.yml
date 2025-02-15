@@ -6,12 +6,24 @@ on:
       version:
         description: 'Release version (e.g., 0.291)'
         required: true
+      skip_maven_build:
+        description: 'Skip Maven build (true/false)'
+        required: true
+        default: false
+        type: boolean
+      skip_docker_build:
+        description: 'Skip Docker build (true/false)'
+        required: true
+        default: false
+        type: boolean
 
 env:
   VERSION: ${{ github.event.inputs.version }}
+  DOCKER_REPO: unidevel/test
 
 jobs:
   maven-build:
+    if: ${{ !inputs.skip_maven_build }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,7 +50,8 @@ jobs:
             presto-cli/target/presto-cli-*-executable.jar
 
   docker-build:
-    needs: maven-build
+    needs: [maven-build]
+    if: ${{ always() && !inputs.skip_docker_build && (inputs.skip_maven_build || success()) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -72,13 +85,40 @@ jobs:
           mv ./presto-server/target/presto-server-*.tar.gz docker/
           mv ./presto-cli/target/presto-cli-*-executable.jar docker/
 
-      - name: Build and push
+      - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
           context: docker
           platforms: linux/amd64,linux/arm64
           file: docker/Dockerfile
-          push: true
+          push: false
           build-args: |
             PRESTO_VERSION=${{ env.VERSION }}
-          tags: testbuild:${{ env.VERSION }}
+          tags: ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
+          outputs: type=tar,dest=image.tar
+
+      - name: Upload Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar
+          retention-days: 1
+
+  docker-push:
+    needs: [docker-build]
+    if: ${{ always() && (inputs.skip_docker_build || success()) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: ./
+
+      - name: Load Docker image
+        run: |
+          docker load --input image.tar
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
