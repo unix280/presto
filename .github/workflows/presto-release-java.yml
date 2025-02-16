@@ -1,4 +1,4 @@
-name: Build and Publish Docker Image
+name: Presto Java Publish Images
 
 on:
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
             presto-server/target/presto-server-*.tar.gz
             presto-cli/target/presto-cli-*-executable.jar
 
-  docker-build-and-publish:
+  docker-publish:
     needs: [maven-build]
     runs-on: ubuntu-latest
     environment: release
