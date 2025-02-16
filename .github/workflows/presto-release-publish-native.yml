@@ -57,29 +57,34 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            /tmp/.buildx-cache-deps
-            /tmp/.buildx-cache-runtime
-          key: ${{ runner.os }}-presto-native-${{ env.VERSION }}
+            /tmp/deps-image.tar
+            /tmp/runtime-image.tar
+          key: ${{ runner.os }}-presto-native-images-${{ env.VERSION }}
+
+      - name: Try load cached images
+        run: |
+          if [ -f "/tmp/deps-image.tar" ]; then
+            docker load --input /tmp/deps-image.tar || true
+          fi
+          if [ -f "/tmp/runtime-image.tar" ]; then
+            docker load --input /tmp/runtime-image.tar || true
+          fi
 
       - name: Build Dependency Image
         working-directory: presto-native-execution
         run: |
-          if ! docker compose build --cache-from type=local,src=/tmp/.buildx-cache-deps --cache-to type=local,dest=/tmp/.buildx-cache-deps-new,mode=max centos-native-dependency; then
-            echo "Cache miss or build failed, building from scratch..."
-            docker compose build --cache-to type=local,dest=/tmp/.buildx-cache-deps-new,mode=max centos-native-dependency
+          if ! docker images | grep -q "prestissimo-centos-native-dependency"; then
+            docker compose build centos-native-dependency
+            docker save prestissimo-centos-native-dependency:latest -o /tmp/deps-image.tar
           fi
-          rm -rf /tmp/.buildx-cache-deps
-          mv /tmp/.buildx-cache-deps-new /tmp/.buildx-cache-deps
 
       - name: Build Runtime Image
         working-directory: presto-native-execution
         run: |
-          if ! docker compose build --cache-from type=local,src=/tmp/.buildx-cache-runtime --cache-to type=local,dest=/tmp/.buildx-cache-runtime-new,mode=max centos-native-runtime; then
-            echo "Cache miss or build failed, building from scratch..."
-            docker compose build --cache-to type=local,dest=/tmp/.buildx-cache-runtime-new,mode=max centos-native-runtime
+          if ! docker images | grep -q "prestissimo-centos-native-runtime"; then
+            docker compose build centos-native-runtime
+            docker save prestissimo-centos-native-runtime:latest -o /tmp/runtime-image.tar
           fi
-          rm -rf /tmp/.buildx-cache-runtime
-          mv /tmp/.buildx-cache-runtime-new /tmp/.buildx-cache-runtime
 
       - name: Add release tag
         working-directory: presto-native-execution
