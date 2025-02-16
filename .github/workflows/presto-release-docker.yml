@@ -85,12 +85,7 @@ jobs:
           context: docker
           platforms: linux/amd64,linux/arm64
           file: docker/Dockerfile
-          push: false
+          push: true
           build-args: |
             PRESTO_VERSION=${{ env.VERSION }}
           tags: ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
-          outputs: type=tar,dest=image.tar
-
-      - name: Push Docker image
-        run: |
-          docker push ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
