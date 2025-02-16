@@ -6,6 +6,11 @@ on:
       version:
         description: 'Release version (e.g., 0.291)'
         required: true
+      publish_as_latest:
+        description: 'Also publish as latest version'
+        type: boolean
+        default: true
+        required: false
 
 env:
   VERSION: ${{ github.event.inputs.version }}
@@ -25,7 +30,6 @@ jobs:
         with:
           java-version: '11'
           distribution: 'temurin'
-          cache: 'maven'
 
       - name: Maven build
         run: mvn clean install -DskipTests
@@ -85,4 +89,7 @@ jobs:
           push: true
           build-args: |
             PRESTO_VERSION=${{ env.VERSION }}
-          tags: ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
+            JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
+          tags: |
+            ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
+            ${{ inputs.publish_as_latest && format('{0}:latest', env.DOCKER_REPO) || '' }}
