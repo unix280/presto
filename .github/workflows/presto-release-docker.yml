@@ -92,4 +92,4 @@ jobs:
             JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
           tags: |
             ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
-            ${{ inputs.publish_as_latest && format('{0}:latest', env.DOCKER_REPO) || '' }}
+            ${{ github.event.inputs.publish_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
