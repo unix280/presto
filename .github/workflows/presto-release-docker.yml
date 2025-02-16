@@ -92,7 +92,7 @@ jobs:
           build-args: |
             PRESTO_VERSION=${{ env.VERSION }}
             JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
-          outputs: type=docker,dest=presto-image.tar
+          outputs: type=oci,dest=presto-image.tar
           tags: ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
 
       - name: Upload Docker image
@@ -118,11 +118,17 @@ jobs:
         with:
           name: docker-image
 
+      - name: Convert and load Docker image
+        run: |
+          # Convert OCI to docker archive
+          skopeo copy oci:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
+          # Load the converted image
+          docker load < docker-image.tar
+          # Verify the loaded image
+          docker images
+
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
-
-      - name: Load Docker image
-        run: docker load --input presto-image.tar
 
       - name: Tag and push to DockerHub
         run: |
@@ -155,11 +161,14 @@ jobs:
         with:
           name: docker-image
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
-      - name: Load Docker image
-        run: docker load --input presto-image.tar
+      - name: Convert and load Docker image
+        run: |
+          # Convert OCI to docker archive
+          skopeo copy oci:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
+          # Load the converted image
+          docker load < docker-image.tar
+          # Verify the loaded image
+          docker images
 
       - name: Tag and push to GitHub Packages
         run: |
