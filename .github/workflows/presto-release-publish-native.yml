@@ -83,15 +83,15 @@ jobs:
         run: |
           if ! docker images | grep -q "prestissimo-centos-native-runtime"; then
             docker compose build centos-native-runtime
-            docker save prestissimo-centos-native-runtime:latest -o /tmp/runtime-image.tar
+            docker save docker.io/presto/prestissimo-runtime:centos9 -o /tmp/runtime-image.tar
           fi
 
       - name: Add release tag
         working-directory: presto-native-execution
         run: |
-          docker tag prestissimo-centos-native-runtime:latest ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          docker tag docker.io/presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
           if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
-            docker tag prestissimo-centos-native-runtime:latest ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
+            docker tag docker.io/presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
 
       - name: Push to DockerHub
