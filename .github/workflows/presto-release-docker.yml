@@ -6,16 +6,6 @@ on:
       version:
         description: 'Release version (e.g., 0.291)'
         required: true
-      skip_maven_build:
-        description: 'Skip Maven build (true/false)'
-        required: true
-        default: false
-        type: boolean
-      skip_docker_build:
-        description: 'Skip Docker build (true/false)'
-        required: true
-        default: false
-        type: boolean
 
 env:
   VERSION: ${{ github.event.inputs.version }}
@@ -23,7 +13,6 @@ env:
 
 jobs:
   maven-build:
-    if: ${{ !inputs.skip_maven_build }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,7 +41,6 @@ jobs:
 
   docker-build:
     needs: [maven-build]
-    if: ${{ always() && !inputs.skip_docker_build && (inputs.skip_maven_build || success()) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -99,28 +87,6 @@ jobs:
             PRESTO_VERSION=${{ env.VERSION }}
           tags: ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
           outputs: type=tar,dest=image.tar
-
-      - name: Upload Docker image
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image-${{ env.VERSION }}
-          path: image.tar
-          retention-days: 1
-
-  docker-push:
-    needs: [docker-build]
-    if: ${{ always() && (inputs.skip_docker_build || success()) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image-${{ env.VERSION }}
-          path: ./
-
-      - name: Load Docker image
-        run: |
-          docker load --input image.tar
 
       - name: Push Docker image
         run: |
