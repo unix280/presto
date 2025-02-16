@@ -1,0 +1,77 @@
+name: Presto Stable - Publish Native Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.291)'
+        required: true
+      publish_as_latest:
+        description: 'Also publish as latest version'
+        type: boolean
+        default: true
+        required: false
+
+env:
+  VERSION: ${{ github.event.inputs.version }}
+  ORG_NAME: unidevel
+  IMAGE_NAME: presto-native
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VERSION }}
+          submodules: true
+
+      - name: Initialize Prestissimo submodules
+        run: |
+          cd presto-native-execution && make submodules
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3.3.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Dependency Image
+        working-directory: presto-native-execution
+        run: |
+          docker compose build centos-native-dependency
+  
+      - name: Build Runtime Image
+        working-directory: presto-native-execution
+        run: |
+          docker compose build centos-native-runtime
+          docker tag prestissimo-centos-native-runtime:latest ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
+            docker tag prestissimo-centos-native-runtime:latest ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
+          fi
+
+      - name: Tag and push to DockerHub
+        run: |
+          docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
+            docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
+            docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
+          fi
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push to GitHub Packages
+        run: |
+          docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          docker push ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
+            docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            docker push ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+          fi
