@@ -1,4 +1,4 @@
-name: Presto Java Publish Images
+name: Presto Java Publish Docker Images
 
 on:
   workflow_dispatch:
