@@ -118,6 +118,9 @@ jobs:
         with:
           name: docker-image
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Load Docker image
         run: docker load --input presto-image.tar
 
@@ -151,6 +154,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: docker-image
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
 
       - name: Load Docker image
         run: docker load --input presto-image.tar
