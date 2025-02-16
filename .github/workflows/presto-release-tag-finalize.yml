@@ -1,4 +1,4 @@
-name: Presto Stable Release Tag Finalize
+name: Presto Stable - Tag Finalize
 
 on:
   workflow_dispatch:
