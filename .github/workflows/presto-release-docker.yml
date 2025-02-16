@@ -118,17 +118,17 @@ jobs:
         with:
           name: docker-image
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Convert and load Docker image
         run: |
           # Convert OCI to docker archive
-          skopeo copy oci:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
+          skopeo copy oci-archive:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
           # Load the converted image
           docker load < docker-image.tar
           # Verify the loaded image
           docker images
-
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
       - name: Tag and push to DockerHub
         run: |
@@ -161,10 +161,13 @@ jobs:
         with:
           name: docker-image
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Convert and load Docker image
         run: |
           # Convert OCI to docker archive
-          skopeo copy oci:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
+          skopeo copy oci-archive:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
           # Load the converted image
           docker load < docker-image.tar
           # Verify the loaded image
