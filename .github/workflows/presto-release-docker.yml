@@ -44,10 +44,13 @@ jobs:
             presto-server/target/presto-server-*.tar.gz
             presto-cli/target/presto-cli-*-executable.jar
 
-  docker-build:
+  docker-build-and-publish:
     needs: [maven-build]
     runs-on: ubuntu-latest
     environment: release
+    permissions:
+      packages: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,96 +85,26 @@ jobs:
           mv ./presto-server/target/presto-server-*.tar.gz docker/
           mv ./presto-cli/target/presto-cli-*-executable.jar docker/
 
-      - name: Build Docker image
+      - name: Build Docker image and push to dockerhub
         uses: docker/build-push-action@v6
         with:
           context: docker
           platforms: linux/amd64,linux/arm64,linux/ppc64le
           file: docker/Dockerfile
-          push: false
+          push: true
           build-args: |
             PRESTO_VERSION=${{ env.VERSION }}
             JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
-          outputs: type=oci,dest=presto-image.tar
-          tags: ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
-
-      - name: Upload Docker image
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: presto-image.tar
-          retention-days: 1
-
-  dockerhub-publish:
-    needs: [docker-build]
-    runs-on: ubuntu-latest
-    environment: release
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3.3.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
-      - name: Convert and load Docker image
-        run: |
-          # Convert OCI to docker archive
-          skopeo copy oci-archive:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
-          # Load the converted image
-          docker load < docker-image.tar
-          # Verify the loaded image
-          docker images
-
-      - name: Tag and push to DockerHub
-        run: |
-          docker push ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
-          if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
-            docker tag ${{ env.DOCKER_REPO }}:${{ env.VERSION }} ${{ env.DOCKER_REPO }}:latest
-            docker push ${{ env.DOCKER_REPO }}:latest
-          fi
           tags: |
             ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
             ${{ github.event.inputs.publish_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
 
-  github-publish:
-    needs: [docker-build]
-    runs-on: ubuntu-latest
-    environment: release
-    permissions:
-      packages: write
-      contents: read
-    steps:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3.3.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
-      - name: Convert and load Docker image
-        run: |
-          # Convert OCI to docker archive
-          skopeo copy oci-archive:presto-image.tar docker-archive:docker-image.tar:${{ env.DOCKER_REPO }}:${{ env.VERSION }}
-          # Load the converted image
-          docker load < docker-image.tar
-          # Verify the loaded image
-          docker images
 
       - name: Tag and push to GitHub Packages
         run: |
