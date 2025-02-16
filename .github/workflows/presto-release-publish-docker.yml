@@ -1,4 +1,4 @@
-name: Presto Stable - Publish Images
+name: Presto Stable - Publish Docker Images
 
 on:
   workflow_dispatch:

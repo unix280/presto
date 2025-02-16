@@ -1,4 +1,4 @@
-name: Cut Presto Stable Release
+name: Presto Stable - Cut Release Branch 
 
 on:
   workflow_dispatch:
