@@ -92,14 +92,14 @@ jobs:
           build-args: |
             PRESTO_VERSION=${{ env.VERSION }}
             JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
-          outputs: type=oci,dest=/tmp/presto-image.tar
+          outputs: type=oci,dest=presto-image.tar
           tags: ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
 
       - name: Upload Docker image
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
-          path: /tmp/presto-image.tar
+          path: presto-image.tar
           retention-days: 1
 
   dockerhub-publish:
@@ -117,7 +117,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: docker-image
-          path: ./
 
       - name: Load Docker image
         run: docker load --input presto-image.tar
@@ -152,10 +151,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: docker-image
-          path: ./
 
       - name: Load Docker image
-        run: docker load --input image.tar
+        run: docker load --input presto-image.tar
 
       - name: Tag and push to GitHub Packages
         run: |
