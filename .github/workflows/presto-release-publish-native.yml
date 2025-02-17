@@ -73,6 +73,10 @@ jobs:
             docker tag presto/prestissimo-dependency:centos9 ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
             docker push ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
           fi
+          docker images
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
 
       - name: Build Runtime Image
         working-directory: presto-native-execution
