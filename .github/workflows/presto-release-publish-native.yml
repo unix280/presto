@@ -66,11 +66,11 @@ jobs:
         run: |
           if docker pull ${{ env.DEPENDENCY_IMAGE }}; then
             echo "Using dependency image ${{ env.DEPENDENCY_IMAGE }}"
-            docker tag ${{ env.DEPENDENCY_IMAGE }} docker.io/presto/prestissimo-dependency:centos9
+            docker tag ${{ env.DEPENDENCY_IMAGE }} presto/prestissimo-dependency:centos9
           else
             echo "Building new depedency image"
             docker compose build centos-native-dependency
-            docker tag docker.io/presto/prestissimo-dependency:centos9 ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
+            docker tag presto/prestissimo-dependency:centos9 ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
             docker push ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
           fi
 
@@ -81,16 +81,16 @@ jobs:
             docker tag ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }} docker.io/presto/prestissimo-runtime:centos9
           else
             docker compose build centos-native-runtime
-            docker tag docker.io/presto/prestissimo-runtime:centos9 ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
+            docker tag presto/prestissimo-runtime:centos9 ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
             docker push ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
           fi
 
       - name: Add release tag
         working-directory: presto-native-execution
         run: |
-          docker tag docker.io/presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
           if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
-            docker tag docker.io/presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
+            docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
 
       - name: Push to DockerHub
