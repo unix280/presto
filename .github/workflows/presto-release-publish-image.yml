@@ -14,8 +14,7 @@ on:
 
 env:
   VERSION: ${{ github.event.inputs.version }}
-  DOCKER_REPO: unidevel/test
-
+  DOCKER_REPO: ${{ github.repository }}
 
 jobs:
   maven-build:
