@@ -107,12 +107,3 @@ jobs:
             ${{ github.event.inputs.publish_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
             ${{ github.event.inputs.publish_as_latest == 'true' && format('ghcr.io/{0}:latest', github.repository) || '' }}
-
-      # Remove the tmate session as it's not needed
-      # - name: Setup tmate session
-      #   uses: mxschmitt/action-tmate@v3
-
-      # Remove the unnecessary docker images command
-      # - name: Tag and push to GitHub Packages
-      #   run: |
-      #     docker images

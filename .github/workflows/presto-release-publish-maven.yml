@@ -1,4 +1,4 @@
-name: Publish Presto Stable Release
+name: Presto Stable - Publish Maven Artifacts
 
 on:
   workflow_dispatch:
