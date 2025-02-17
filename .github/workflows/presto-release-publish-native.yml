@@ -66,11 +66,11 @@ jobs:
         run: |
           if docker pull ${{ env.DEPENDENCY_IMAGE }}; then
             echo "Using dependency image ${{ env.DEPENDENCY_IMAGE }}"
-            docker tag ${{ env.DEPENDENCY_IMAGE }} prestissimo-centos-native-dependency:latest
+            docker tag ${{ env.DEPENDENCY_IMAGE }} docker.io/presto/prestissimo-dependency:centos9
           else
             echo "Building new depedency image"
             docker compose build centos-native-dependency
-            docker tag prestissimo-centos-native-dependency:latest ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
+            docker tag docker.io/presto/prestissimo-dependency:centos9 ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
             docker push ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
           fi
 
