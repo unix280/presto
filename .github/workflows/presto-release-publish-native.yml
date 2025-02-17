@@ -18,8 +18,8 @@ on:
 
 env:
   VERSION: ${{ github.event.inputs.version }}
-  ORG_NAME: unidevel
-  IMAGE_NAME: test2
+  ORG_NAME: ${{ github.repository_owner }}
+  IMAGE_NAME: presto-native
 
 jobs:
   build-images:
