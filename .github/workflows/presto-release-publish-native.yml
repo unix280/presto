@@ -19,11 +19,16 @@ on:
 env:
   VERSION: ${{ github.event.inputs.version }}
   ORG_NAME: unidevel
-  IMAGE_NAME: presto-native
+  IMAGE_NAME: test2
 
 jobs:
   build-images:
     runs-on: ubuntu-latest
+    permissions: 
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     environment: release
     steps:
       - name: Checkout
