@@ -77,9 +77,6 @@ jobs:
           fi
           docker images
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
       - name: Build Runtime Image
         working-directory: presto-native-execution
         run: |
