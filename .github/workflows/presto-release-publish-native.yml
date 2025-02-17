@@ -18,8 +18,9 @@ env:
   IMAGE_NAME: presto-native
 
 jobs:
-  build:
+  build-images:
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,46 +31,10 @@ jobs:
       - name: Initialize Prestissimo submodules
         run: |
           cd presto-native-execution && make submodules
+          echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Build Dependency Image
-        working-directory: presto-native-execution
-        run: |
-          docker compose build centos-native-dependency
-          docker save prestissimo-centos-native-dependency:latest -o /tmp/deps-image.tar
-
-      - name: Build Runtime Image
-        working-directory: presto-native-execution
-        run: |
-          docker compose build centos-native-runtime
-          docker save docker.io/presto/prestissimo-runtime:centos9 -o /tmp/runtime-image.tar
-
-      - name: Upload Docker images
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-images
-          path: |
-            /tmp/deps-image.tar
-            /tmp/runtime-image.tar
-          retention-days: 1
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: release
-    steps:
-      - name: Download Docker images
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-images
-          path: /tmp
-
-      - name: Load Docker images
-        run: |
-          docker load --input /tmp/deps-image.tar
-          docker load --input /tmp/runtime-image.tar
 
       - name: Login to DockerHub
         uses: docker/login-action@v3.3.0
@@ -84,8 +49,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Build Dependency Image
+        working-directory: presto-native-execution
+        run: |
+          if docker pull ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}; then
+            docker tag ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }} prestissimo-centos-native-dependency:latest
+          else
+            docker compose build centos-native-dependency
+            docker tag prestissimo-centos-native-dependency:latest ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
+            docker push ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
+          fi
+
+      - name: Build Runtime Image
+        working-directory: presto-native-execution
+        run: |
+          if docker pull ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }}; then
+            docker tag ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }} docker.io/presto/prestissimo-runtime:centos9
+          else
+            docker compose build centos-native-runtime
+            docker tag docker.io/presto/prestissimo-runtime:centos9 ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
+            docker push ghcr.io/${{ github.repository_owner }}/presto-native:${{ env.VERSION }}-${{ env.COMMIT_SHA }}
+          fi
 
       - name: Add release tag
         working-directory: presto-native-execution
