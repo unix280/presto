@@ -262,6 +262,16 @@ public class PrestoServer
                 config.getSharedSecret());
     }
 
+    public static ServiceAnnouncement getPrestoAnnouncement(Set<ServiceAnnouncement> announcements)
+    {
+        for (ServiceAnnouncement announcement : announcements) {
+            if (announcement.getType().equals("presto")) {
+                return announcement;
+            }
+        }
+        throw new IllegalArgumentException("Presto announcement not found: " + announcements);
+    }
+
     protected Iterable<? extends Module> getAdditionalModules()
     {
         return ImmutableList.of();
@@ -330,15 +340,5 @@ public class PrestoServer
         announcer.addServiceAnnouncement(serviceAnnouncement(announcement.getType()).addProperties(properties).build());
 
         announcer.forceAnnounce();
-    }
-
-    private static ServiceAnnouncement getPrestoAnnouncement(Set<ServiceAnnouncement> announcements)
-    {
-        for (ServiceAnnouncement announcement : announcements) {
-            if (announcement.getType().equals("presto")) {
-                return announcement;
-            }
-        }
-        throw new IllegalArgumentException("Presto announcement not found: " + announcements);
     }
 }
