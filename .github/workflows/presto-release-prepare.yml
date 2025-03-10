@@ -9,9 +9,6 @@ on:
         default: false
         required: false
 
-env:
-  UPSTREAM: prestodb/presto
-
 jobs:
   cut-release:
     if: ${{ !inputs.skip_release_cut }}
@@ -27,10 +24,6 @@ jobs:
       - name: Check for master branch
         if: ${{ github.ref != 'refs/heads/master' }}
         run: echo "Invalid branch. This action can only be run on the master branch." && exit 1
-
-      - name: Check for personal repository
-        if: ${{ github.repository == env.UPSTREAM }}
-        run: echo "Release cut can only be run on personal repository, please clone ${{ env.UPSTREAM }}, and run this action in your own repo" && exit 1
 
       - name: Checkout presto source
         uses: actions/checkout@v4
@@ -113,7 +106,7 @@ jobs:
 
       - name: Add git upstream
         run: |
-          git remote add upstream https://github.com/${{ env.UPSTREAM }}.git
+          git remote add upstream ${{ github.server_url }}/${{ github.repository }}.git
           git fetch upstream --tags
           git remote -v
 
