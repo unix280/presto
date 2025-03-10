@@ -9,9 +9,6 @@ on:
         default: false
         required: false
 
-env:
-  UPSTREAM: prestodb/presto
-
 jobs:
   cut-release:
     if: ${{ !inputs.skip_release_cut }}
@@ -27,10 +24,6 @@ jobs:
       - name: Check for master branch
         if: ${{ github.ref != 'refs/heads/master' }}
         run: echo "Invalid branch. This action can only be run on the master branch." && exit 1
-
-      - name: Check for personal repository
-        if: ${{ github.repository == env.UPSTREAM }}
-        run: echo "Release cut can only be run on personal repository, please clone ${{ env.UPSTREAM }}, and run this action in your own repo" && exit 1
 
       - name: Checkout presto source
         uses: actions/checkout@v4
@@ -111,12 +104,20 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
+      - name: Configure git
+        run: |
+          git config --global --add safe.directory ${{github.workspace}}
+          git config --global user.email "ci@lists.prestodb.io"
+          git config --global user.name "prestodb-ci"
+          git config pull.rebase false
+
+
       - name: Add git upstream
         run: |
-          git remote add upstream https://github.com/${{ env.UPSTREAM }}.git
+          git remote add upstream ${{ github.server_url }}/${{ github.repository }}.git
           git fetch upstream --tags
           git remote -v
 
       - name: Create release notes pull request
         run: |
-          ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.GITHUB_TOKEN }}
+          ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.PRESTODB_CI_TOKEN }}
