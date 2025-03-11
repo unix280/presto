@@ -6,8 +6,23 @@ on:
       RELEASE_VERSION:
         description: 'Release version (e.g., 0.290)'
         required: true
-      publish_as_latest:
-        description: 'Also publish as latest version'
+      publish_maven:
+        description: 'Publish Maven artifacts'
+        type: boolean
+        default: true
+        required: false
+      publish_docker:
+        description: 'Publish Docker images'
+        type: boolean
+        default: true
+        required: false
+      publish_native_docker:
+        description: 'Publish Native Docker images'
+        type: boolean
+        default: true
+        required: false
+      tag_image_as_latest:
+        description: 'Tag the image as latest version'
         type: boolean
         default: true
         required: false
@@ -15,6 +30,7 @@ on:
         description: 'Dependency image(e.g., prestodb/presto-native-dependency:0.290-20241014120930-e1fc090)'
         required: false
         default: ''
+
 env:
   VERSION: ${{ github.event.inputs.RELEASE_VERSION }}
   DOCKER_REPO: ${{ github.repository }}
@@ -49,6 +65,7 @@ jobs:
             presto-cli/target/presto-cli-*-executable.jar
 
   publish-maven-artifacts:
+    if: ${{ github.event.inputs.publish_maven == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 30
@@ -156,6 +173,7 @@ jobs:
             presto-cli/target/presto-cli-*-executable.jar
 
   publish-docker-images:
+    if: ${{ github.event.inputs.publish_docker == 'true' }}
     needs: [maven-build]
     runs-on: ubuntu-latest
     environment: release
@@ -215,11 +233,12 @@ jobs:
             JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
           tags: |
             ${{ env.DOCKER_REPO }}:${{ env.VERSION }}
-            ${{ github.event.inputs.publish_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
+            ${{ github.event.inputs.tag_image_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
-            ${{ github.event.inputs.publish_as_latest == 'true' && format('ghcr.io/{0}:latest', github.repository) || '' }}
+            ${{ github.event.inputs.tag_image_as_latest == 'true' && format('ghcr.io/{0}:latest', github.repository) || '' }}
 
   publish-native-image:
+    if: ${{ github.event.inputs.publish_native_docker == 'true' }}
     needs: [maven-build]
     runs-on: ubuntu-latest
     permissions: 
@@ -290,14 +309,14 @@ jobs:
         working-directory: presto-native-execution
         run: |
           docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
-          if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
+          if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
             docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
 
       - name: Push to DockerHub
         run: |
           docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
-          if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
+          if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
             docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
             docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
@@ -306,7 +325,7 @@ jobs:
         run: |
           docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
           docker push ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
-          if [[ "${{ github.event.inputs.publish_as_latest }}" == "true" ]]; then
+          if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
             docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
             docker push ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
           fi
