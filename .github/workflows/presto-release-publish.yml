@@ -79,9 +79,13 @@ jobs:
         run: |
           git cherry-pick ${{ env.RELEASE_NOTES_COMMIT }}
 
+      - name: Delete existing release tag
+        run: |
+          git push origin :${{ env.RELEASE_TAG }} || true
+          git tag -d ${{ env.RELEASE_TAG }} || true
+
       - name: Create new release tag
         run: |
-          echo "Please delete tag ${{ env.RELEASE_TAG }} manually if it exists"
           git tag -a ${{ env.RELEASE_TAG }} -m "release ${{ env.RELEASE_TAG }}"
           git push origin ${{ env.RELEASE_BRANCH }} --tags
 
@@ -178,7 +182,7 @@ jobs:
         env:
           GPG_TTY: $(tty)
           GPG_KEY_FILE: /tmp/gpg-key.txt
-      
+
       - name: Release Maven Artifacts
         if: ${{ github.event.inputs.publish_maven == 'true' }}
         run: |
@@ -267,7 +271,7 @@ jobs:
   publish-native-image:
     if: ${{ github.event.inputs.publish_native_docker == 'true' }}
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       contents: read
       packages: write
       attestations: write
