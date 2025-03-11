@@ -2626,17 +2626,15 @@
                     </configuration>
                 </plugin>
 
-                <plugin>
+                <!-- plugin>
                     <groupId>org.sonatype.plugins</groupId>
                     <artifactId>nexus-staging-maven-plugin</artifactId>
                     <version>${dep.nexus-staging-plugin.version}</version>
-                    <!-- This plugin is not registered as an extension because it will fail to activate
-                         concurrently with the Maven Provisio plugin, as that has its own deployment lifecycle -->
                     <configuration>
                         <serverId>ossrh</serverId>
                         <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                     </configuration>
-                </plugin>
+                </plugin -->
 
                 <plugin>
                     <groupId>com.facebook.presto</groupId>
@@ -2840,13 +2838,12 @@
                         <artifactId>maven-deploy-plugin</artifactId>
                         <configuration>
                             <skip>true</skip>
+                            <altDeploymentRepository>ossrh::https://m2.unidevel.cn/releases</altDeploymentRepository>
                         </configuration>
                     </plugin>
-                    <plugin>
+                    <!-- plugin>
                         <groupId>org.sonatype.plugins</groupId>
                         <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <!-- This plugin must be configured manually ("Maven 2" style in the docs) due to the usage of the
-                             Maven Provisio plugin, which includes its own deployment lifecycle -->
                         <executions>
                             <execution>
                                 <id>default-deploy</id>
@@ -2860,7 +2857,7 @@
                             <serverId>ossrh</serverId>
                             <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                         </configuration>
-                    </plugin>
+                    </plugin -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
