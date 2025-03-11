@@ -49,7 +49,7 @@ env:
   RELEASE_NOTES_COMMIT: ${{ github.event.inputs.release-notes-commit }}
 
 jobs:
-  finalize-release:
+  tag-release:
     if: ${{ github.event.inputs.create_release_tag == 'true' }}
     runs-on: ubuntu-latest
     environment: release
@@ -90,7 +90,7 @@ jobs:
           git push origin ${{ env.RELEASE_BRANCH }} --tags
 
   publish-maven-artifacts:
-    needs: [finalize-release]
+    needs: [tag-release]
     if: ${{ github.event.inputs.publish_maven == 'true' || github.event.inputs.publish_docker == 'true' }}
     runs-on: ubuntu-latest
     environment: release
@@ -269,6 +269,7 @@ jobs:
             ${{ github.event.inputs.tag_image_as_latest == 'true' && format('ghcr.io/{0}:latest', github.repository) || '' }}
 
   publish-native-image:
+    needs: [tag-release]
     if: ${{ github.event.inputs.publish_native_docker == 'true' }}
     runs-on: ubuntu-latest
     permissions:
