@@ -161,7 +161,7 @@ jobs:
 
   publish-docker-images:
     if: ${{ github.event.inputs.publish_docker == 'true' }}
-    needs: [maven-build]
+    needs: [publish-maven-artifacts]
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -226,7 +226,7 @@ jobs:
 
   publish-native-image:
     if: ${{ github.event.inputs.publish_native_docker == 'true' }}
-    needs: [maven-build]
+    needs: [publish-maven-artifacts]
     runs-on: ubuntu-latest
     permissions: 
       contents: read
