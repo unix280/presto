@@ -1,4 +1,4 @@
-name: Presto Stable - Release Publish
+name: Presto Stable - Publish Release
 
 on:
   workflow_dispatch:
@@ -217,7 +217,6 @@ jobs:
 
   publish-native-image:
     if: ${{ github.event.inputs.publish_native_docker == 'true' }}
-    needs: [publish-maven-artifacts]
     runs-on: ubuntu-latest
     permissions: 
       contents: read
