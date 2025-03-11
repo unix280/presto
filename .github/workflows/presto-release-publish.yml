@@ -6,13 +6,13 @@ on:
       RELEASE_VERSION:
         description: 'Release version (e.g., 0.290)'
         required: true
-      release_tag_created:
+      create_release_tag:
         description: 'Create release tag'
         type: boolean
         default: true
         required: false
       release-notes-commit:
-        description: 'Commit SHA of release notes(if release_tag_created is not checked, this is required)'
+        description: 'Commit SHA of release notes(required when create_release_tag is checked)'
         required: false
       publish_maven:
         description: 'Publish Maven artifacts'
@@ -50,10 +50,16 @@ env:
 
 jobs:
   finalize-release:
-    if: ${{ github.event.inputs.release_tag_created == 'true' }}
+    if: ${{ github.event.inputs.create_release_tag == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     steps:
+      - name: Validate release notes commit
+        if: ${{ github.event.inputs.release-notes-commit == '' }}
+        run: |
+          echo "Error: release-notes-commit is required when create_release_tag is true"
+          exit 1
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -73,13 +79,9 @@ jobs:
         run: |
           git cherry-pick ${{ env.RELEASE_NOTES_COMMIT }}
 
-      - name: Delete existing release tag
-        run: |
-          git push origin :${{ env.RELEASE_TAG }} || true
-          git tag -d ${{ env.RELEASE_TAG }} || true
-
       - name: Create new release tag
         run: |
+          echo "Please delete tag ${{ env.RELEASE_TAG }} manually if it exists"
           git tag -a ${{ env.RELEASE_TAG }} -m "release ${{ env.RELEASE_TAG }}"
           git push origin ${{ env.RELEASE_BRANCH }} --tags
 
