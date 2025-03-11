@@ -2837,7 +2837,7 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-deploy-plugin</artifactId>
                         <configuration>
-                            <skip>true</skip>
+                            <skip>false</skip>
                             <altDeploymentRepository>ossrh::https://m2.unidevel.cn/releases</altDeploymentRepository>
                         </configuration>
                     </plugin>
