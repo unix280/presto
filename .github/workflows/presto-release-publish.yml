@@ -90,8 +90,10 @@ jobs:
           git push origin ${{ env.RELEASE_BRANCH }} --tags
 
   publish-maven-artifacts:
-    needs: [tag-release]
-    if: ${{ github.event.inputs.publish_maven == 'true' || github.event.inputs.publish_docker == 'true' }}
+    needs: tag-release
+    if: |
+      (github.event.inputs.publish_maven == 'true' || github.event.inputs.publish_docker == 'true') &&
+      (github.event.inputs.create_release_tag != 'true' || success())
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 30
@@ -269,8 +271,10 @@ jobs:
             ${{ github.event.inputs.tag_image_as_latest == 'true' && format('ghcr.io/{0}:latest', github.repository) || '' }}
 
   publish-native-image:
-    needs: [tag-release]
-    if: ${{ github.event.inputs.publish_native_docker == 'true' }}
+    needs: tag-release
+    if: |
+      github.event.inputs.publish_native_docker == 'true' &&
+      (github.event.inputs.create_release_tag != 'true' || success())
     runs-on: ubuntu-latest
     permissions:
       contents: read
