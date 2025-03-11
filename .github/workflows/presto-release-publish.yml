@@ -6,6 +6,14 @@ on:
       RELEASE_VERSION:
         description: 'Release version (e.g., 0.290)'
         required: true
+      release_tag_created:
+        description: 'Create release tag'
+        type: boolean
+        default: true
+        required: false
+      release-notes-commit:
+        description: 'Commit SHA of release notes(if release_tag_created is not checked, this is required)'
+        required: false
       publish_maven:
         description: 'Publish Maven artifacts'
         type: boolean
@@ -36,9 +44,47 @@ env:
   DOCKER_REPO: ${{ github.repository }}
   ORG_NAME: ${{ github.repository_owner }}
   IMAGE_NAME: presto-native
+  RELEASE_BRANCH: release-${{ github.event.inputs.RELEASE_VERSION }}
+  RELEASE_TAG: ${{ github.event.inputs.RELEASE_VERSION }}
+  RELEASE_NOTES_COMMIT: ${{ github.event.inputs.release-notes-commit }}
 
 jobs:
+  finalize-release:
+    if: ${{ github.event.inputs.release_tag_created == 'true' }}
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_BRANCH }}
+          token: ${{ secrets.PRESTODB_CI_TOKEN }}
+          fetch-depth: 0
+          fetch-tags: true
+          show-progress: false
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "ci@lists.prestodb.io"
+          git config --global user.name "prestodb-ci"
+          git config pull.rebase false
+
+      - name: Cherry-pick release notes
+        run: |
+          git cherry-pick ${{ env.RELEASE_NOTES_COMMIT }}
+
+      - name: Delete existing release tag
+        run: |
+          git push origin :${{ env.RELEASE_TAG }} || true
+          git tag -d ${{ env.RELEASE_TAG }} || true
+
+      - name: Create new release tag
+        run: |
+          git tag -a ${{ env.RELEASE_TAG }} -m "release ${{ env.RELEASE_TAG }}"
+          git push origin ${{ env.RELEASE_BRANCH }} --tags
+
   publish-maven-artifacts:
+    needs: [finalize-release]
     if: ${{ github.event.inputs.publish_maven == 'true' || github.event.inputs.publish_docker == 'true' }}
     runs-on: ubuntu-latest
     environment: release
