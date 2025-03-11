@@ -38,34 +38,7 @@ env:
   IMAGE_NAME: presto-native
 
 jobs:
-  maven-build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.VERSION }}
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '11'
-          distribution: 'temurin'
-
-      - name: Maven build
-        run: mvn clean install -DskipTests
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: presto-artifacts-${{ env.VERSION }}
-          retention-days: 1
-          path: |
-            presto-server/target/presto-server-*.tar.gz
-            presto-cli/target/presto-cli-*-executable.jar
-
   publish-maven-artifacts:
-    if: ${{ github.event.inputs.publish_maven == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 30
@@ -145,7 +118,29 @@ jobs:
           </settings>
           EOL
 
+      - name: Maven build
+        run: mvn clean install -DskipTests
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: presto-artifacts-${{ env.VERSION }}
+          retention-days: 1
+          path: |
+            presto-server/target/presto-server-*.tar.gz
+            presto-cli/target/presto-cli-*-executable.jar
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: presto-artifacts-${{ env.VERSION }}
+          retention-days: 1
+          path: |
+            presto-server/target/presto-server-*.tar.gz
+            presto-cli/target/presto-cli-*-executable.jar
+
       - name: Release Maven Artifacts
+        if: ${{ github.event.inputs.publish_maven == 'true' }}
         run: |
           unset MAVEN_CONFIG
           ./mvnw -s ${{ github.workspace }}/settings.xml -V -B -U -e -T1C deploy \
@@ -163,14 +158,6 @@ jobs:
         env:
           GPG_TTY: $(tty)
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: presto-artifacts-${{ env.VERSION }}
-          retention-days: 1
-          path: |
-            presto-server/target/presto-server-*.tar.gz
-            presto-cli/target/presto-cli-*-executable.jar
 
   publish-docker-images:
     if: ${{ github.event.inputs.publish_docker == 'true' }}
