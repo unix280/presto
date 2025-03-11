@@ -2841,10 +2841,10 @@
                             <altDeploymentRepository>ossrh::https://m2.unidevel.cn/releases</altDeploymentRepository>
                         </configuration>
                     </plugin>
-                    <!-- plugin>
+                    <plugin>
                         <groupId>org.sonatype.plugins</groupId>
                         <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <executions>
+                        <!-- executions>
                             <execution>
                                 <id>default-deploy</id>
                                 <phase>deploy</phase>
@@ -2852,12 +2852,12 @@
                                     <goal>deploy</goal>
                                 </goals>
                             </execution>
-                        </executions>
+                        </executions -->
                         <configuration>
                             <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <nexusUrl>https://m2.unidevel.cn/releases</nexusUrl>
                         </configuration>
-                    </plugin -->
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
