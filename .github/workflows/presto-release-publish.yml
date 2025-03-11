@@ -1,4 +1,4 @@
-name: Presto Stable - Publish Release
+name: Presto Stable Release - Publish
 
 on:
   workflow_dispatch:
@@ -39,6 +39,7 @@ env:
 
 jobs:
   publish-maven-artifacts:
+    if: ${{ github.event.inputs.publish_maven == 'true' || github.event.inputs.publish_docker == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 30
@@ -149,12 +150,12 @@ jobs:
         env:
           GPG_TTY: $(tty)
 
-
   publish-docker-images:
     if: ${{ github.event.inputs.publish_docker == 'true' }}
     needs: [publish-maven-artifacts]
     runs-on: ubuntu-latest
     environment: release
+    timeout-minutes: 150
     permissions:
       packages: write
       contents: read
@@ -224,6 +225,7 @@ jobs:
       attestations: write
       id-token: write
     environment: release
+    timeout-minutes: 300
     steps:
       - name: Checkout
         uses: actions/checkout@v4

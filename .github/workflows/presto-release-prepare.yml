@@ -1,4 +1,4 @@
-name: Presto Stable - Prepare Release
+name: Presto Stable Release - Prepare
 
 on:
   workflow_dispatch:
