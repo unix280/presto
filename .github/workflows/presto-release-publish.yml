@@ -76,16 +76,6 @@ jobs:
           git config --global user.name "prestodb-ci"
           git config pull.rebase false
 
-      - name: Set up GPG key
-        run: |
-          echo "${{ secrets.GPG_SECRET }}" > ${{ env.GPG_KEY_FILE }}
-          chmod 600 ${{ env.GPG_KEY_FILE }}
-          gpg --import --batch ${{ env.GPG_KEY_FILE }}
-          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --sign ${{ env.GPG_KEY_FILE }}
-        env:
-          GPG_TTY: $(tty)
-          GPG_KEY_FILE: /tmp/gpg-key.txt
-      
       - name: Create Maven Settings
         run: |
           cat > ${{ github.workspace }}/settings.xml << 'EOL'
@@ -130,15 +120,16 @@ jobs:
             presto-server/target/presto-server-*.tar.gz
             presto-cli/target/presto-cli-*-executable.jar
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: presto-artifacts-${{ env.VERSION }}
-          retention-days: 1
-          path: |
-            presto-server/target/presto-server-*.tar.gz
-            presto-cli/target/presto-cli-*-executable.jar
-
+      - name: Set up GPG key
+        run: |
+          echo "${{ secrets.GPG_SECRET }}" > ${{ env.GPG_KEY_FILE }}
+          chmod 600 ${{ env.GPG_KEY_FILE }}
+          gpg --import --batch ${{ env.GPG_KEY_FILE }}
+          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --sign ${{ env.GPG_KEY_FILE }}
+        env:
+          GPG_TTY: $(tty)
+          GPG_KEY_FILE: /tmp/gpg-key.txt
+      
       - name: Release Maven Artifacts
         if: ${{ github.event.inputs.publish_maven == 'true' }}
         run: |
