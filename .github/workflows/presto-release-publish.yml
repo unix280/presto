@@ -205,7 +205,7 @@ jobs:
           GPG_TTY: $(tty)
 
   publish-docker-images:
-    if: ${{ github.event.inputs.publish_docker == 'true' && success() }}
+    if: ${{ github.event.inputs.publish_docker == 'true' && always() }}
     needs: publish-maven-artifacts
     runs-on: ubuntu-latest
     environment: release
