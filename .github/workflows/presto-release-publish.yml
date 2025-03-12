@@ -96,7 +96,7 @@ jobs:
       (github.event.inputs.create_release_tag != 'true' || success())
     runs-on: ubuntu-latest
     environment: release
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     env:
       NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
@@ -205,8 +205,8 @@ jobs:
           GPG_TTY: $(tty)
 
   publish-docker-images:
-    if: ${{ github.event.inputs.publish_docker == 'true' }}
-    needs: [publish-maven-artifacts]
+    if: ${{ github.event.inputs.publish_docker == 'true' && success() }}
+    needs: publish-maven-artifacts
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 150
@@ -270,7 +270,7 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
             ${{ github.event.inputs.tag_image_as_latest == 'true' && format('ghcr.io/{0}:latest', github.repository) || '' }}
 
-  publish-native-image:
+  publish-native-images:
     needs: tag-release
     if: |
       github.event.inputs.publish_native_docker == 'true' &&
