@@ -33,6 +33,18 @@
         <tag>HEAD</tag>
     </scm>
 
+    <distributionManagement>
+        <repository>
+            <id>ossrh</id>
+            <url>https://m2.unidevel.cn/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://m2.unidevel.cn/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+
     <properties>
         <air.main.basedir>${project.basedir}</air.main.basedir>
 
@@ -2836,10 +2848,10 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-deploy-plugin</artifactId>
-                        <configuration>
+                        <!-- configuration>
                             <skip>false</skip>
                             <altDeploymentRepository>ossrh::https://m2.unidevel.cn/releases</altDeploymentRepository>
-                        </configuration>
+                        </configuration -->
                     </plugin>
                     <plugin>
                         <groupId>org.sonatype.plugins</groupId>
