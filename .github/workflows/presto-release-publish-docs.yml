@@ -1,0 +1,91 @@
+name: Presto Release Docs Publisher
+
+on:
+  workflow_dispatch:
+    inputs:
+      RELEASE_VERSION:
+        description: 'The version of presto-docs to be released (e.g., 0.279)'
+        required: true
+        type: string
+
+jobs:
+  publish-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Dependencies
+        run: |
+          apt update
+          apt install -y curl git unzip
+
+      - name: Checkout Website Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/prestodb.github.io
+          path: prestodb.github.io
+          ref: source
+          token: ${{ secrets.PRESTODB_CI_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          cd ${{ github.workspace }}/prestodb.github.io
+          git config --global --add safe.directory ${{ github.workspace }}/prestodb.github.io
+          git config --global user.email "ci@lists.prestodb.io"
+          git config --global user.name "prestodb-ci"
+          git log --pretty="format:%ce: %s" -5
+
+      - name: Update Docs
+        env:
+          RELEASE_VERSION: ${{ inputs.RELEASE_VERSION }}
+        run: |
+          cd ${{ github.workspace }}/prestodb.github.io
+          ls -al
+          
+          LAST_RELEASE_VERSION="0.$((${RELEASE_VERSION#0.} - 1))"
+          echo "Last release version: ${LAST_RELEASE_VERSION}"
+
+          TARGET=website/static/docs/${RELEASE_VERSION}
+          CURRENT=website/static/docs/current
+
+          if [[ -e ${TARGET} ]]; then
+            echo "Error: ${TARGET} already exists"
+            exit 1
+          fi
+
+          curl -O https://repo1.maven.org/maven2/com/facebook/presto/presto-docs/${RELEASE_VERSION}/presto-docs-${RELEASE_VERSION}.zip
+          unzip presto-docs-${RELEASE_VERSION}.zip
+          mv html ${TARGET}
+          unlink ${CURRENT}
+          ln -sf ${RELEASE_VERSION} ${CURRENT}
+          git add ${TARGET} ${CURRENT}
+          git status
+
+          DATE=$(TZ=America/Los_Angeles date '+%B %d, %Y')
+          echo "Update the version number and stats in javascript for rendering across the site"
+          VERSION_JS=website/static/static/js/version.js
+
+          echo "const presto_latest_presto_version = '${RELEASE_VERSION}';" > ${VERSION_JS}
+          GIT_LOG="git -C ../presto log --use-mailmap ${LAST_RELEASE_VERSION}..${RELEASE_VERSION}"
+          NUM_COMMITS=$(${GIT_LOG} --format='%aE' | wc -l | awk '{$1=$1;print}')
+          NUM_CONTRIBUTORS=$(${GIT_LOG} --format='%aE' | sort | uniq | wc -l | awk '{$1=$1;print}')
+          NUM_COMMITTERS=$(${GIT_LOG} --format='%cE' | sort | uniq | wc -l | awk '{$1=$1;print}')
+          echo "const presto_latest_num_commits = ${NUM_COMMITS};" >> ${VERSION_JS}
+          echo "const presto_latest_num_contributors = ${NUM_CONTRIBUTORS};" >> ${VERSION_JS}
+          echo "const presto_latest_num_committers = ${NUM_COMMITTERS};" >> ${VERSION_JS}
+          echo "const presto_latest_date = '${DATE}';" >> ${VERSION_JS}
+          cat ${VERSION_JS}
+          git add ${VERSION_JS}
+          git status
+
+      - name: Push Updates
+        run: |
+          cd ${{ github.workspace }}/prestodb.github.io
+          git status
+          git commit -m "Add ${RELEASE_VERSION} docs"
+          git checkout -b "${RELEASE_VERSION}-docs"
+          git push origin "${RELEASE_VERSION}-docs"
+
+      - name: Create pull request
+        run: |
+          cd ${{ github.workspace }}/prestodb.github.io
+          gh pr create --title "Add ${RELEASE_VERSION} docs" --body "Add ${RELEASE_VERSION} docs" --base source --head "${RELEASE_VERSION}-docs"
