@@ -8,6 +8,9 @@ on:
         required: true
         type: string
 
+env:
+  RELEASE_VERSION: ${{ inputs.RELEASE_VERSION }}
+
 jobs:
   publish-docs:
     runs-on: ubuntu-latest
@@ -30,12 +33,10 @@ jobs:
           git log --pretty="format:%ce: %s" -5
 
       - name: Update Docs
-        env:
-          RELEASE_VERSION: ${{ inputs.RELEASE_VERSION }}
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
           ls -al
-          
+
           LAST_RELEASE_VERSION="0.$((${RELEASE_VERSION#0.} - 1))"
           echo "Last release version: ${LAST_RELEASE_VERSION}"
 
@@ -48,12 +49,12 @@ jobs:
           fi
 
           curl -O https://repo1.maven.org/maven2/com/facebook/presto/presto-docs/${RELEASE_VERSION}/presto-docs-${RELEASE_VERSION}.zip
-          unzip presto-docs-${RELEASE_VERSION}.zip
+          unzip presto-docs-${RELEASE_VERSION}.zip | head -n 5
           mv html ${TARGET}
           unlink ${CURRENT}
           ln -sf ${RELEASE_VERSION} ${CURRENT}
           git add ${TARGET} ${CURRENT}
-          git status
+          git status | head -n 5
 
           DATE=$(TZ=America/Los_Angeles date '+%B %d, %Y')
           echo "Update the version number and stats in javascript for rendering across the site"
@@ -70,12 +71,12 @@ jobs:
           echo "const presto_latest_date = '${DATE}';" >> ${VERSION_JS}
           cat ${VERSION_JS}
           git add ${VERSION_JS}
-          git status
+          git status | head -n 5
 
       - name: Push Updates
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
-          git status
+          git status | head -n 5
           git commit -m "Add ${RELEASE_VERSION} docs"
           git checkout -b "${RELEASE_VERSION}-docs"
           git push origin "${RELEASE_VERSION}-docs"
