@@ -14,6 +14,7 @@ env:
 jobs:
   publish-docs:
     runs-on: ubuntu-latest
+    environment: release
 
     steps:
       - name: Checkout Website Repository
@@ -82,6 +83,8 @@ jobs:
           git push origin "${RELEASE_VERSION}-docs"
 
       - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
           gh pr create --title "Add ${RELEASE_VERSION} docs" --body "Add ${RELEASE_VERSION} docs" --base source --head "${RELEASE_VERSION}-docs"
