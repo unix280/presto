@@ -372,6 +372,11 @@ jobs:
           ref: source
           token: ${{ secrets.PRESTODB_CI_TOKEN }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
       - name: Configure Git
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
@@ -390,7 +395,8 @@ jobs:
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
           ls -al
-
+          
+          cd website && yarn install && cd ..
           LAST_RELEASE_VERSION="0.$((${RELEASE_TAG#0.} - 1))"
           echo "Last release version: ${LAST_RELEASE_VERSION}"
 
