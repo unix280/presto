@@ -17,7 +17,17 @@ jobs:
     environment: release
 
     steps:
-      - name: Checkout Website Repository
+      - name: Checkout presto
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/presto
+          path: presto
+          ref: master
+          fetch-depth: 0
+          fetch-tags: true
+          show-progress: false
+
+      - name: Checkout prestodb.github.io
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/prestodb.github.io
@@ -78,7 +88,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
           git status | head -n 5
-          git commit -m "Add ${RELEASE_VERSION} docs"
+          git commit -m "Add ${RELEASE_VERSION} docs" | head -n 5
           git checkout -b "${RELEASE_VERSION}-docs"
           git push origin "${RELEASE_VERSION}-docs"
 
