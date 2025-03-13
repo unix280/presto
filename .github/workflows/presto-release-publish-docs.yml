@@ -13,11 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install Dependencies
-        run: |
-          apt update
-          apt install -y curl git unzip
-
       - name: Checkout Website Repository
         uses: actions/checkout@v4
         with:
