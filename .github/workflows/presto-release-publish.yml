@@ -391,10 +391,10 @@ jobs:
           cd ${{ github.workspace }}/prestodb.github.io
           ls -al
 
-          LAST_RELEASE_VERSION="0.$((${ RELEASE_TAG #0.} - 1))"
+          LAST_RELEASE_VERSION="0.$((${RELEASE_TAG#0.} - 1))"
           echo "Last release version: ${LAST_RELEASE_VERSION}"
 
-          TARGET=website/static/docs/${ RELEASE_TAG }
+          TARGET=website/static/docs/${RELEASE_TAG}
           CURRENT=website/static/docs/current
 
           if [[ -e ${TARGET} ]]; then
@@ -402,11 +402,11 @@ jobs:
             exit 1
           fi
 
-          mv ${{ github.workspace }}/build/presto-docs/target/presto-docs-${ RELEASE_TAG }.zip .
-          unzip presto-docs-${ RELEASE_TAG }.zip | head -n 5
+          mv ${{ github.workspace }}/build/presto-docs/target/presto-docs-${RELEASE_TAG}.zip .
+          unzip presto-docs-${RELEASE_TAG}.zip | head -n 5
           mv html ${TARGET}
           unlink ${CURRENT}
-          ln -sf ${ RELEASE_TAG } ${CURRENT}
+          ln -sf ${RELEASE_TAG} ${CURRENT}
           git add ${TARGET} ${CURRENT}
           git status | head -n 5
 
@@ -414,8 +414,8 @@ jobs:
           echo "Update the version number and stats in javascript for rendering across the site"
           VERSION_JS=website/static/static/js/version.js
 
-          echo "const presto_latest_presto_version = '${ RELEASE_TAG }';" > ${VERSION_JS}
-          GIT_LOG="git -C ../presto log --use-mailmap ${LAST_RELEASE_VERSION}..${ RELEASE_TAG }"
+          echo "const presto_latest_presto_version = '${RELEASE_TAG}';" > ${VERSION_JS}
+          GIT_LOG="git -C ../presto log --use-mailmap ${LAST_RELEASE_VERSION}..${RELEASE_TAG}"
           NUM_COMMITS=$(${GIT_LOG} --format='%aE' | wc -l | awk '{$1=$1;print}')
           NUM_CONTRIBUTORS=$(${GIT_LOG} --format='%aE' | sort | uniq | wc -l | awk '{$1=$1;print}')
           NUM_COMMITTERS=$(${GIT_LOG} --format='%cE' | sort | uniq | wc -l | awk '{$1=$1;print}')
@@ -431,13 +431,13 @@ jobs:
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
           git status | head -n 5
-          git commit -m "Add ${ RELEASE_TAG } docs" | head -n 5
-          git checkout -b "${ RELEASE_TAG }-docs"
-          git push origin "${ RELEASE_TAG }-docs"
+          git commit -m "Add ${RELEASE_TAG} docs" | head -n 5
+          git checkout -b "${RELEASE_TAG}-docs"
+          git push origin "${RELEASE_TAG}-docs"
 
       - name: Create pull request
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
         run: |
           cd ${{ github.workspace }}/prestodb.github.io
-          gh pr create --title "Add ${ RELEASE_TAG } docs" --body "Add ${ RELEASE_TAG } docs" --base source --head "${ RELEASE_TAG }-docs"
+          gh pr create --title "Add ${RELEASE_TAG} docs" --body "Add ${RELEASE_TAG} docs" --base source --head "${RELEASE_TAG}-docs"
