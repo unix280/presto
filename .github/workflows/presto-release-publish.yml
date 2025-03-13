@@ -54,12 +54,12 @@ env:
 
 jobs:
   tag-release:
-    if: ${{ inputs.create_release_tag == 'true' }}
+    if: ${{ github.event.inputs.create_release_tag == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     steps:
       - name: Validate release notes commit
-        if: ${{ inputs.release-notes-commit == '' }}
+        if: ${{ github.event.inputs.release-notes-commit == '' }}
         run: |
           echo "Error: release-notes-commit is required when create_release_tag is true"
           exit 1
@@ -96,8 +96,8 @@ jobs:
   publish-maven-artifacts:
     needs: tag-release
     if: |
-      (inputs.publish_maven == 'true' || inputs.publish_docker == 'true' || inputs.publish_docs == 'true') &&
-      (inputs.create_release_tag != 'true' || success())
+      (github.event.inputs.publish_maven == 'true' || github.event.inputs.publish_docker == 'true' || github.event.inputs.publish_docs == 'true') &&
+      (github.event.inputs.create_release_tag != 'true' || success())
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 60
@@ -191,7 +191,7 @@ jobs:
           GPG_KEY_FILE: /tmp/gpg-key.txt
 
       - name: Release Maven Artifacts
-        if: ${{ inputs.publish_maven == 'true' }}
+        if: ${{ github.event.inputs.publish_maven == 'true' }}
         run: |
           unset MAVEN_CONFIG
           ./mvnw -s ${{ github.workspace }}/settings.xml -V -B -U -e -T1C deploy \
@@ -210,7 +210,7 @@ jobs:
           GPG_TTY: $(tty)
 
   publish-docker-images:
-    if: ${{ inputs.publish_docker == 'true' && always() }}
+    if: ${{ github.event.inputs.publish_docker == 'true' && always() }}
     needs: publish-maven-artifacts
     runs-on: ubuntu-latest
     environment: release
@@ -264,13 +264,13 @@ jobs:
             JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
           tags: |
             ${{ env.DOCKER_REPO }}:${{ env.RELEASE_TAG }}
-            ${{ inputs.tag_image_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
+            ${{ github.event.inputs.tag_image_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
 
   publish-native-images:
     needs: tag-release
     if: |
-      inputs.publish_native_docker == 'true' &&
-      (inputs.create_release_tag != 'true' || success())
+      github.event.inputs.publish_native_docker == 'true' &&
+      (github.event.inputs.create_release_tag != 'true' || success())
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -306,8 +306,8 @@ jobs:
 
       - name: Set dependency image tag
         run: |
-          if [[ -n "${{ inputs.dependency_image }}" ]]; then
-            echo "DEPENDENCY_IMAGE=${{ inputs.dependency_image }}" >> $GITHUB_ENV
+          if [[ -n "${{ github.event.inputs.dependency_image }}" ]]; then
+            echo "DEPENDENCY_IMAGE=${{ github.event.inputs.dependency_image }}" >> $GITHUB_ENV
           else
             echo "DEPENDENCY_IMAGE=ghcr.io/${{ github.repository_owner }}/presto-native-dependency:${{ env.RELEASE_TAG }}-${{ env.COMMIT_SHA }}" >> $GITHUB_ENV
           fi
@@ -335,21 +335,21 @@ jobs:
         working-directory: presto-native-execution
         run: |
           docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }}
-          if [[ "${{ inputs.tag_image_as_latest }}" == "true" ]]; then
+          if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
             docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
 
       - name: Push to DockerHub
         run: |
           docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }}
-          if [[ "${{ inputs.tag_image_as_latest }}" == "true" ]]; then
+          if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
             docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }} ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
             docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
 
   publish-docs:
     needs: publish-maven-artifacts
-    if: ${{ inputs.publish_docs == 'true' && always() }}
+    if: ${{ github.event.inputs.publish_docs == 'true' && always() }}
     runs-on: ubuntu-latest
     environment: release
 
