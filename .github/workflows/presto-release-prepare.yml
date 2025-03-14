@@ -3,15 +3,20 @@ name: Presto Stable Release - Prepare
 on:
   workflow_dispatch:
     inputs:
-      skip_release_cut:
-        description: 'Skip cutting release branch'
+      prepare_release_branch:
+        description: 'Prepare release branch'
         type: boolean
-        default: false
+        default: true
+        required: false
+      generate_release_notes_pr:
+        description: 'Generate release notes pull request'
+        type: boolean
+        default: true
         required: false
 
 jobs:
   cut-release:
-    if: ${{ !inputs.skip_release_cut }}
+    if: ${{ inputs.prepare_release_branch }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -64,23 +69,20 @@ jobs:
             -DreleaseVersion=${{ env.PRESTO_RELEASE_VERSION }}
           grep -m 1 "<version>" pom.xml
           git log --pretty="format:%ce: %s" -5
-          git push --follow-tags origin master
 
       - name: Push release branch
         run: |
+          echo "In case this job failed, delete the tag ${{ env.PRESTO_RELEASE_VERSION }} and the branch release-${{ env.PRESTO_RELEASE_VERSION }}, and re-run the job"
           git checkout ${{ env.PRESTO_RELEASE_VERSION }}
           git switch -c release-${{ env.PRESTO_RELEASE_VERSION }}
           git log --pretty="format:%ce: %s" -3
-          git push origin release-${{ env.PRESTO_RELEASE_VERSION }}
-          echo "In case cut release failed, please fix manually by running the following commands:"
-          echo "git clone ${{ github.server_url }}/${{ github.repository }}.git"
-          echo "git checkout ${{ env.PRESTO_RELEASE_VERSION }}"
-          echo "git switch -c release-${{ env.PRESTO_RELEASE_VERSION }}"
-          echo "git push origin release-${{ env.PRESTO_RELEASE_VERSION }}"
+          git push origin release-${{ env.PRESTO_RELEASE_VERSION }} --tags
+          git checkout master
+          git push origin master
 
-  release-notes:
-    needs: [cut-release]
-    if: ${{ always() && (needs.cut-release.result == 'success' || inputs.skip_release_cut) }}
+  release-notes-pr:
+    needs: cut-release
+    if: ${{ inputs.generate_release_notes_pr && always() && (needs.cut-release.result == 'success' || !inputs.prepare_release_branch) }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
