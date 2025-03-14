@@ -8,7 +8,7 @@ on:
         type: boolean
         default: true
         required: false
-      prepare_release_notes_pr:
+      prepare_release_notes:
         description: 'Prepare release notes pull request'
         type: boolean
         default: true
@@ -80,9 +80,9 @@ jobs:
           git checkout master
           git push origin master
 
-  release-notes-pr:
+  prepare-release-notes:
     needs: prepare-release
-    if: ${{ inputs.prepare_release_notes_pr && always() && (needs.prepare-release.result == 'success' || !inputs.prepare_release) }}
+    if: ${{ inputs.prepare_release_notes && always() && (needs.prepare-release.result == 'success' || !inputs.prepare_release) }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
