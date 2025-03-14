@@ -15,7 +15,7 @@ on:
         required: false
 
 jobs:
-  prepare-release:
+  prepare-release-branch:
     if: ${{ inputs.prepare_release }}
     runs-on: ubuntu-latest
     environment: release
@@ -84,8 +84,8 @@ jobs:
           git push origin master
 
   prepare-release-notes:
-    needs: prepare-release
-    if: ${{ inputs.prepare_release_notes && always() && (needs.prepare-release.result == 'success' || !inputs.prepare_release) }}
+    needs: prepare-release-branch
+    if: ${{ inputs.prepare_release_notes && always() && (needs.prepare-release-branch.result == 'success' || !inputs.prepare_release) }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
