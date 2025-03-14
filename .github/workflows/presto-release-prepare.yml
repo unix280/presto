@@ -8,8 +8,8 @@ on:
         type: boolean
         default: true
         required: false
-      generate_release_notes_pr:
-        description: 'Generate release notes pull request'
+      prepare_release_notes_pr:
+        description: 'Prepare release notes pull request'
         type: boolean
         default: true
         required: false
@@ -72,7 +72,7 @@ jobs:
 
       - name: Push release branch
         run: |
-          echo "In case this job failed, delete the tag ${{ env.PRESTO_RELEASE_VERSION }} and the branch release-${{ env.PRESTO_RELEASE_VERSION }}, and re-run the job"
+          echo "In case this job failed, please delete the tag ${{ env.PRESTO_RELEASE_VERSION }} and the branch release-${{ env.PRESTO_RELEASE_VERSION }}, and re-run the job"
           git checkout ${{ env.PRESTO_RELEASE_VERSION }}
           git switch -c release-${{ env.PRESTO_RELEASE_VERSION }}
           git log --pretty="format:%ce: %s" -3
@@ -82,17 +82,13 @@ jobs:
 
   release-notes-pr:
     needs: prepare-release
-    if: ${{ inputs.generate_release_notes_pr && always() && (needs.cut-release.result == 'success' || !inputs.prepare_release) }}
+    if: ${{ inputs.prepare_release_notes_pr && always() && (needs.prepare-release.result == 'success' || !inputs.prepare_release) }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
       contents: write
 
     steps:
-      - name: Check for master branch
-        if: ${{ github.ref != 'refs/heads/master' }}
-        run: echo "Invalid branch. This action can only be run on the master branch." && exit 1
-
       - name: Checkout presto source
         uses: actions/checkout@v4
         with:
@@ -120,4 +116,5 @@ jobs:
 
       - name: Create release notes pull request
         run: |
+          echo "In case this job failed, please delete the branch release-notes-${{ env.PRESTO_RELEASE_VERSION }} in repository ${{ github.repository }}, and re-run the job"
           ./src/release/release-notes.sh ${{ github.repository_owner }} ${{ secrets.PRESTODB_CI_TOKEN }}
