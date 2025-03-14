@@ -3,8 +3,8 @@ name: Presto Stable Release - Prepare
 on:
   workflow_dispatch:
     inputs:
-      prepare_release_branch:
-        description: 'Prepare release branch'
+      prepare_release:
+        description: 'Prepare release branch and tag'
         type: boolean
         default: true
         required: false
@@ -15,8 +15,8 @@ on:
         required: false
 
 jobs:
-  cut-release:
-    if: ${{ inputs.prepare_release_branch }}
+  prepare-release:
+    if: ${{ inputs.prepare_release }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -81,8 +81,8 @@ jobs:
           git push origin master
 
   release-notes-pr:
-    needs: cut-release
-    if: ${{ inputs.generate_release_notes_pr && always() && (needs.cut-release.result == 'success' || !inputs.prepare_release_branch) }}
+    needs: prepare-release
+    if: ${{ inputs.generate_release_notes_pr && always() && (needs.cut-release.result == 'success' || !inputs.prepare_release) }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
