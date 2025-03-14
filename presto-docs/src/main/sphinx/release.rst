@@ -6,6 +6,7 @@ Release Notes
     :maxdepth: 1
 
     release/release-0.297
+    release/release-0.297
     release/release-0.296
     release/release-0.295
     Release-0.291 [2025-01-27] <release/release-0.291>
