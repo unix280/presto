@@ -75,8 +75,11 @@ jobs:
           echo "In case this job failed, please delete the tag ${{ env.PRESTO_RELEASE_VERSION }} and the branch release-${{ env.PRESTO_RELEASE_VERSION }}, and re-run the job"
           git checkout ${{ env.PRESTO_RELEASE_VERSION }}
           git switch -c release-${{ env.PRESTO_RELEASE_VERSION }}
+          echo "Pushing release branch release-${{ env.PRESTO_RELEASE_VERSION }} and tag ${{ env.PRESTO_RELEASE_VERSION }}"
           git log --pretty="format:%ce: %s" -3
           git push origin release-${{ env.PRESTO_RELEASE_VERSION }} --tags
+          echo "Pusing master branch"
+          git log --pretty="format:%ce: %s" -5
           git checkout master
           git push origin master
 
