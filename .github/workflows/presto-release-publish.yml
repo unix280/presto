@@ -211,7 +211,7 @@ jobs:
             -pl '!presto-test-coverage'
 
   publish-docker-images:
-    if: ${{ github.event.inputs.publish_docker == 'true' && always() }}
+    if: ${{ github.event.inputs.publish_docker == 'true' && success() }}
     needs: publish-maven-artifacts
     runs-on: ubuntu-latest
     environment: release
@@ -350,7 +350,7 @@ jobs:
 
   publish-docs:
     needs: publish-maven-artifacts
-    if: ${{ github.event.inputs.publish_docs == 'true' && always() }}
+    if: ${{ github.event.inputs.publish_docs == 'true' && success() }}
     runs-on: ubuntu-latest
     environment: release
 
