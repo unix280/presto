@@ -71,9 +71,9 @@ jobs:
             -DautoVersionSubmodules \
             -DdevelopmentVersion=${{ env.PRESTO_RELEASE_VERSION }} \
             -DreleaseVersion=${{ env.PRESTO_RELEASE_VERSION }}
-          grep -m 1 "<version>" pom.xml
+          grep -m 2 "<version>" pom.xml
           # list the latest 5 commits on the master branch (include 2 maven commit)
-          git log --pretty="format:%ce: %s" -5
+          git log --pretty="format:%ce: %s" -5 --all
 
       - name: Push release tag, branch and commits
         run: |
@@ -83,13 +83,13 @@ jobs:
           echo "Pushing release branch release-${{ env.PRESTO_RELEASE_VERSION }} and tag ${{ env.PRESTO_RELEASE_VERSION }}"
 
           # list the latest 4 commits on the release branch (include 1 maven commit)
-          git log --pretty="format:%ce: %s" -4
+          git log --pretty="format:%ce: %s" -4 --all
           git push origin release-${{ env.PRESTO_RELEASE_VERSION }} --tags
           echo "Pushing master branch"
 
-          # list the latest 5 commits on master branch (include 2 maven commits)
-          git log --pretty="format:%ce: %s" -5
           git checkout master
+          # list the latest 5 commits on master branch (include 2 maven commits)
+          git log --pretty="format:%ce: %s" -5 --all
           git push origin master
 
   prepare-release-notes:
