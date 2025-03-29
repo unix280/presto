@@ -8,6 +8,9 @@
 ## Impact
 <!---Describe any public API or user-facing feature change or any performance impact-->
 
+## Security Impact
+<!---Discuss any potential impacts this feature may have on Security-->
+
 ## Test Plan
 <!---Please fill in how you tested your change-->
 
@@ -28,12 +31,12 @@ Please follow [release notes guidelines](https://github.com/prestodb/presto/wiki
 == RELEASE NOTES ==
 
 General Changes
-* ... 
-* ... 
+* ...
+* ...
 
 Hive Connector Changes
-* ... 
-* ... 
+* ...
+* ...
 ```
 
 If release note is NOT required, use:
