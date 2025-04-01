@@ -274,7 +274,7 @@ jobs:
 
   publish-native-image:
     needs: publish-release-tag
-    if: (!failure() && !cancelled()) && github.event.inputs.publish_native_docker == 'true'
+    if: (!failure() && !cancelled()) && github.event.inputs.publish_native_image == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
