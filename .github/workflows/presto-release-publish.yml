@@ -1,6 +1,10 @@
 name: Presto Stable Release - Publish
 
 on:
+  push:
+    paths:
+      - '.release-inputs'
+
   workflow_dispatch:
     inputs:
       RELEASE_VERSION:
@@ -53,18 +57,77 @@ env:
   DOCKER_REPO: ${{ github.repository }}
   ORG_NAME: ${{ github.repository_owner }}
   IMAGE_NAME: presto-native
-  RELEASE_BRANCH: release-${{ inputs.RELEASE_VERSION }}
-  RELEASE_TAG: ${{ inputs.RELEASE_VERSION }}
-  RELEASE_NOTES_COMMIT: ${{ inputs.release-notes-commit }}
 
 jobs:
+  unified-inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      RELEASE_VERSION: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.RELEASE_VERSION || steps.set_inputs.outputs.RELEASE_VERSION }}
+      RELEASE_BRANCH: release-${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.RELEASE_VERSION || steps.set_inputs.outputs.RELEASE_VERSION }}
+      RELEASE_TAG: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.RELEASE_VERSION || steps.set_inputs.outputs.RELEASE_VERSION }}
+      RELEASE_NOTES_COMMIT: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.release-notes-commit || steps.set_inputs.outputs.release-notes-commit }}
+      publish_release_tag: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.publish_release_tag || steps.set_inputs.outputs.publish_release_tag }}
+      release-notes-commit: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.release-notes-commit || steps.set_inputs.outputs.release-notes-commit }}
+      publish_maven: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.publish_maven || steps.set_inputs.outputs.publish_maven }}
+      publish_image: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.publish_image || steps.set_inputs.outputs.publish_image }}
+      publish_native_image: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.publish_native_image || steps.set_inputs.outputs.publish_native_image }}
+      dependency_image: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.dependency_image || steps.set_inputs.outputs.dependency_image }}
+      publish_native_dep_image: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.publish_native_dep_image || steps.set_inputs.outputs.publish_native_dep_image }}
+      tag_image_as_latest: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.tag_image_as_latest || steps.set_inputs.outputs.tag_image_as_latest }}
+      publish_docs: ${{ github.event_name == 'push' && steps.set_inputs_by_file.outputs.publish_docs || steps.set_inputs.outputs.publish_docs }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set inputs by file
+        id: set_inputs_by_file
+        if: github.event_name == 'push'
+        run: |
+          if [ ! -f .release-inputs ]; then
+            echo "Error: .release-inputs file not found"
+            exit 1
+          fi
+
+          while read -r line; do
+            # Skip empty lines or comments
+            if [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]]; then
+              echo "$line" >> $GITHUB_OUTPUT
+            fi
+          done < .release-inputs
+
+      - name: Set inputs by workflow dispatch
+        if: github.event_name == 'workflow_dispatch'
+        id: set_inputs
+        run: |
+          if [[ -z "${{ github.event.inputs.RELEASE_VERSION }}" ]]; then
+            echo "Error: RELEASE_VERSION is required"
+            exit 1
+          fi
+
+          # Set all workflow dispatch inputs as environment variables
+          echo "RELEASE_VERSION=${{ github.event.inputs.RELEASE_VERSION }}" >> $GITHUB_ENV
+          echo "publish_release_tag=${{ github.event.inputs.publish_release_tag }}" >> $GITHUB_ENV
+          echo "release-notes-commit=${{ github.event.inputs.release-notes-commit }}" >> $GITHUB_ENV
+          echo "publish_maven=${{ github.event.inputs.publish_maven }}" >> $GITHUB_ENV
+          echo "publish_image=${{ github.event.inputs.publish_image }}" >> $GITHUB_ENV
+          echo "publish_native_image=${{ github.event.inputs.publish_native_image }}" >> $GITHUB_ENV
+          echo "dependency_image=${{ github.event.inputs.dependency_image }}" >> $GITHUB_ENV
+          echo "publish_native_dep_image=${{ github.event.inputs.publish_native_dep_image }}" >> $GITHUB_ENV
+          echo "tag_image_as_latest=${{ github.event.inputs.tag_image_as_latest }}" >> $GITHUB_ENV
+          echo "publish_docs=${{ github.event.inputs.publish_docs }}" >> $GITHUB_ENV
+
   publish-release-tag:
-    if: github.event.inputs.publish_release_tag == 'true'
+    needs: unified-inputs
+    if: ${{ needs.unified-inputs.outputs.publish_release_tag == 'true' }}
+    env:
+      RELEASE_TAG: ${{ needs.unified-inputs.outputs.RELEASE_TAG }}
+      RELEASE_BRANCH: ${{ needs.unified-inputs.outputs.RELEASE_BRANCH }}
+      RELEASE_NOTES_COMMIT: ${{ needs.unified-inputs.outputs.RELEASE_NOTES_COMMIT }}
     runs-on: ubuntu-latest
     environment: release
     steps:
       - name: Validate release notes commit
-        if: ${{ github.event.inputs.release-notes-commit == '' }}
+        if: ${{ needs.unified-inputs.outputs.release-notes-commit == '' }}
         run: |
           echo "Error: release-notes-commit is required when publish_release_tag is true"
           exit 1
@@ -72,7 +135,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_BRANCH }}
+          ref: ${{ needs.unified-inputs.outputs.RELEASE_BRANCH }}
           token: ${{ secrets.PRESTODB_CI_TOKEN }}
           fetch-depth: 0
           fetch-tags: true
@@ -86,7 +149,7 @@ jobs:
 
       - name: Cherry-pick release notes
         run: |
-          git cherry-pick ${{ env.RELEASE_NOTES_COMMIT }}
+          git cherry-pick ${{ needs.unified-inputs.outputs.RELEASE_NOTES_COMMIT }}
 
       - name: Delete existing release tag
         run: |
@@ -96,13 +159,13 @@ jobs:
       - name: Create new release tag
         run: |
           git tag -a ${{ env.RELEASE_TAG }} -m "release ${{ env.RELEASE_TAG }}"
-          git push origin ${{ env.RELEASE_BRANCH }} --tags
+          git push origin ${{ needs.unified-inputs.outputs.RELEASE_BRANCH }} --tags
 
   publish-maven-artifacts:
-    needs: publish-release-tag
+    needs: [unified-inputs, publish-release-tag]
     if: |
-      (!failure() &&!cancelled()) &&
-      (github.event.inputs.publish_maven == 'true' || github.event.inputs.publish_image == 'true' || github.event.inputs.publish_docs == 'true')
+      (!failure() && !cancelled()) &&
+      (needs.unified-inputs.outputs.publish_maven == 'true' || needs.unified-inputs.outputs.publish_image == 'true' || needs.unified-inputs.outputs.publish_docs == 'true')
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 60
@@ -110,6 +173,9 @@ jobs:
     env:
       NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      RELEASE_TAG: ${{ needs.unified-inputs.outputs.RELEASE_TAG }}
+      RELEASE_BRANCH: ${{ needs.unified-inputs.outputs.RELEASE_BRANCH }}
+      RELEASE_NOTES_COMMIT: ${{ needs.unified-inputs.outputs.RELEASE_NOTES_COMMIT }}
 
     steps:
       - name: Setup JDK 11
@@ -196,7 +262,7 @@ jobs:
           gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --sign ${{ env.GPG_KEY_FILE }}
 
       - name: Release Maven Artifacts
-        if: ${{ github.event.inputs.publish_maven == 'true' }}
+        if: ${{ needs.unified-inputs.outputs.publish_maven == 'true' }}
         env:
           GPG_TTY: $(tty)
           GPG_PASSPHRASE: "${{ secrets.GPG_PASSPHRASE }}"
@@ -216,11 +282,15 @@ jobs:
             -pl '!presto-test-coverage'
 
   publish-docker-image:
-    needs: publish-maven-artifacts
-    if: (!failure() && !cancelled()) && github.event.inputs.publish_image == 'true'
+    needs: [unified-inputs, publish-maven-artifacts]
+    if: (!failure() && !cancelled()) && needs.unified-inputs.outputs.publish_image == 'true'
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 150
+    env:
+      RELEASE_TAG: ${{ needs.unified-inputs.outputs.RELEASE_TAG }}
+      RELEASE_BRANCH: ${{ needs.unified-inputs.outputs.RELEASE_BRANCH }}
+      RELEASE_NOTES_COMMIT: ${{ needs.unified-inputs.outputs.RELEASE_NOTES_COMMIT }}
     permissions:
       packages: write
       contents: read
@@ -270,11 +340,11 @@ jobs:
             JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
           tags: |
             ${{ env.DOCKER_REPO }}:${{ env.RELEASE_TAG }}
-            ${{ github.event.inputs.tag_image_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
+            ${{ needs.unified-inputs.outputs.tag_image_as_latest == 'true' && format('{0}:latest', env.DOCKER_REPO) || '' }}
 
   publish-native-image:
-    needs: publish-release-tag
-    if: (!failure() && !cancelled()) && github.event.inputs.publish_native_image == 'true'
+    needs: [unified-inputs, publish-release-tag]
+    if: (!failure() && !cancelled()) && needs.unified-inputs.outputs.publish_native_image == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -282,6 +352,10 @@ jobs:
       attestations: write
       id-token: write
     environment: release
+    env:
+      RELEASE_TAG: ${{ needs.unified-inputs.outputs.RELEASE_TAG }}
+      RELEASE_BRANCH: ${{ needs.unified-inputs.outputs.RELEASE_BRANCH }}
+      RELEASE_NOTES_COMMIT: ${{ needs.unified-inputs.outputs.RELEASE_NOTES_COMMIT }}
     timeout-minutes: 300
     steps:
       - name: Checkout
@@ -303,8 +377,8 @@ jobs:
 
       - name: Set dependency image tag
         run: |
-          if [[ -n "${{ github.event.inputs.dependency_image }}" ]]; then
-            echo "DEPENDENCY_IMAGE=${{ github.event.inputs.dependency_image }}" >> $GITHUB_ENV
+          if [[ -n "${{ needs.unified-inputs.outputs.dependency_image }}" ]]; then
+            echo "DEPENDENCY_IMAGE=${{ needs.unified-inputs.outputs.dependency_image }}" >> $GITHUB_ENV
           else
             echo "DEPENDENCY_IMAGE=${{ github.repository_owner }}/presto-native-dependency:${{ env.RELEASE_TAG }}-${{ env.COMMIT_SHA }}" >> $GITHUB_ENV
           fi
@@ -318,11 +392,11 @@ jobs:
           else
             echo "Building new depedency image"
             docker compose build centos-native-dependency
-            if [[ "${{ github.event.inputs.publish_native_dep_image }}" == "true" ]]; then
+            if [[ "${{ needs.unified-inputs.outputs.publish_native_dep_image }}" == "true" ]]; then
               docker tag presto/prestissimo-dependency:centos9 ${{ github.repository_owner }}/presto-native-dependency:${{ env.RELEASE_TAG }}-${{ env.COMMIT_SHA }}
               docker push ${{ github.repository_owner }}/presto-native-dependency:${{ env.RELEASE_TAG }}-${{ env.COMMIT_SHA }}
               
-              if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
+              if [[ "${{ needs.unified-inputs.outputs.tag_image_as_latest }}" == "true" ]]; then
                 docker tag presto/prestissimo-dependency:centos9 ${{ github.repository_owner }}/presto-native-dependency:latest
                 docker push ${{ github.repository_owner }}/presto-native-dependency:latest
               fi
@@ -339,23 +413,27 @@ jobs:
         working-directory: presto-native-execution
         run: |
           docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }}
-          if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
+          if [[ "${{ needs.unified-inputs.outputs.tag_image_as_latest }}" == "true" ]]; then
             docker tag presto/prestissimo-runtime:centos9 ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
 
       - name: Push to DockerHub
         run: |
           docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }}
-          if [[ "${{ github.event.inputs.tag_image_as_latest }}" == "true" ]]; then
+          if [[ "${{ needs.unified-inputs.outputs.tag_image_as_latest }}" == "true" ]]; then
             docker tag ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }} ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
             docker push ${{ env.ORG_NAME }}/${{ env.IMAGE_NAME }}:latest
           fi
 
   publish-docs:
-    needs: publish-maven-artifacts
-    if: (!failure() && !cancelled()) && github.event.inputs.publish_docs == 'true'
+    needs: [unified-inputs, publish-maven-artifacts]
+    if: (!failure() && !cancelled()) && needs.unified-inputs.outputs.publish_docs == 'true'
     runs-on: ubuntu-latest
     environment: release
+    env:
+      RELEASE_TAG: ${{ needs.unified-inputs.outputs.RELEASE_TAG }}
+      RELEASE_BRANCH: ${{ needs.unified-inputs.outputs.RELEASE_BRANCH }}
+      RELEASE_NOTES_COMMIT: ${{ needs.unified-inputs.outputs.RELEASE_NOTES_COMMIT }}
 
     steps:
       - name: Checkout presto
