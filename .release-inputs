@@ -1,0 +1,21 @@
+# Release version (required)
+RELEASE_VERSION=0.298
+
+# Release tag settings
+publish_release_tag=false
+release-notes-commit=
+
+# Presto jars and docker images
+publish_maven=true
+publish_image=true
+
+# Prestissimo images
+publish_native_image=false
+dependency_image=
+publish_native_dep_image=false
+
+# Docker image options
+tag_image_as_latest=true
+
+# Documentation
+publish_docs=false
