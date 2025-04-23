@@ -72,7 +72,7 @@ jobs:
             -DdevelopmentVersion=${{ env.PRESTO_RELEASE_VERSION }} \
             -DreleaseVersion=${{ env.PRESTO_RELEASE_VERSION }}
           grep -m 2 "<version>" pom.xml
-          echo "commits on master branch"
+          echo "commits on branch ${{ github.ref_name }}"
           git ls -5
 
       - name: Push release tag, branch and commits
@@ -88,15 +88,15 @@ jobs:
           echo -e "\nPushed release tag to: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.PRESTO_RELEASE_VERSION }}"
           echo "Pushed release branch to: ${{ github.server_url }}/${{ github.repository }}/tree/release-${{ env.PRESTO_RELEASE_VERSION }}"
 
-          echo "Pushing master branch"
-          git checkout master
-          echo "commits on master branch"
+          echo "Pushing to branch ${{ github.ref_name }}"
+          git checkout ${{ github.ref_name }}
+          echo "commits on branch ${{ github.ref_name }}"
           git ls -5
-          git push origin master
+          git push origin ${{ github.ref_name }}
 
   prepare-release-notes:
     needs: prepare-release-branch
-    if: ${{ inputs.prepare_release_notes && always() && (needs.prepare-release-branch.result == 'success' || !inputs.prepare_release) }}
+    if: (!failure() && !cancelled()) && github.event.inputs.prepare_release_notes == 'true' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -106,7 +106,6 @@ jobs:
       - name: Checkout presto source
         uses: actions/checkout@v4
         with:
-          ref: master
           show-progress: false
 
       - name: Set up JDK $${{ env.JAVA_DISTRIBUTION }}/${{ env.JAVA_VERSION }}
