@@ -354,6 +354,7 @@ public class FeaturesConfig
     private boolean restrictCatalogEndpointsLocally = true;
 
     private String ibmLhSecretPropsFile;
+    private boolean aclBaseFilteringEnabled;
 
     public enum PartitioningPrecisionStrategy
     {
@@ -508,6 +509,19 @@ public class FeaturesConfig
          * to check if this function can operate on NULL inputs
          */
         USE_FUNCTION_METADATA
+    }
+
+    public boolean isAclBaseFilteringEnabled()
+    {
+        return aclBaseFilteringEnabled;
+    }
+
+    @Config("acl-based-filtering-enabled")
+    @ConfigDescription("Enable ACL based filtering for Unstructured tables")
+    public com.facebook.presto.sql.analyzer.FeaturesConfig setAclBaseFilteringEnabled(boolean aclBaseFilteringEnabled)
+    {
+        this.aclBaseFilteringEnabled = aclBaseFilteringEnabled;
+        return this;
     }
 
     // TODO: Implement cost based strategy
