@@ -339,6 +339,11 @@
             <artifactId>jackson-annotations</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+        </dependency>
+
         <!-- for testing -->
         <dependency>
             <groupId>com.facebook.presto</groupId>
@@ -556,6 +561,9 @@
                         <ignoredNonTestScopedDependency>software.amazon.awssdk:glue</ignoredNonTestScopedDependency>
                         <ignoredNonTestScopedDependency>software.amazon.awssdk:utils</ignoredNonTestScopedDependency>
                     </ignoredNonTestScopedDependencies>
+                    <ignoredUnusedDeclaredDependencies>
+                        <ignoredUnusedDeclaredDependency>net.java.dev.jna:jna</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
                 </configuration>
             </plugin>
         </plugins>
