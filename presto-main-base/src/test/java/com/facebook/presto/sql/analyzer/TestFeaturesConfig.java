@@ -61,6 +61,7 @@ public class TestFeaturesConfig
     public void testDefaults()
     {
         assertRecordedDefaults(ConfigAssertions.recordDefaults(FeaturesConfig.class)
+                .setSizeBasedJoinFlippingEnabled(true)
                 .setMaxPrefixesCount(100)
                 .setCpuCostWeight(75)
                 .setMemoryCostWeight(10)
@@ -313,6 +314,7 @@ public class TestFeaturesConfig
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
+                .put("optimizer.size-based-join-flipping-enabled", "false")
                 .put("max-prefixes-count", "1")
                 .put("cpu-cost-weight", "0.4")
                 .put("memory-cost-weight", "0.3")
@@ -560,6 +562,7 @@ public class TestFeaturesConfig
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
+                .setSizeBasedJoinFlippingEnabled(false)
                 .setMaxPrefixesCount(1)
                 .setCpuCostWeight(0.4)
                 .setMemoryCostWeight(0.3)
