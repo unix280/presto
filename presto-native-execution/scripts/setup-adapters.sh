@@ -22,6 +22,9 @@ JWT_VERSION="v0.6.0"
 PROMETHEUS_VERSION="v1.2.4"
 
 PRESTO_SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+# Make a copy of SCRIPT_DIR because it is changed when sourcing
+# setup-common.sh. Check if we need a fix in OSS.
+SCRIPT_DIR_COPY=${PRESTO_SCRIPT_DIR}
 if [ -f "${PRESTO_SCRIPT_DIR}/setup-common.sh" ]; then
   source "${PRESTO_SCRIPT_DIR}/setup-common.sh"
 else
@@ -54,6 +57,7 @@ function install_arrow_flight {
   if [ -z "$EXTRA_ARROW_PATCH" ]; then
     EXTRA_ARROW_PATCH="${PRESTO_SCRIPT_DIR}/../CMake/arrow/arrow-flight.patch"
   fi
+  source "${SCRIPT_DIR_COPY}/../velox/scripts/setup-rhel.sh"
   EXTRA_ARROW_OPTIONS=" -DARROW_FLIGHT=ON -DARROW_BUILD_BENCHMARKS=ON -Dabsl_SOURCE=BUNDLED -DgRPC_SOURCE=BUNDLED -DProtobuf_SOURCE=BUNDLED "
   install_arrow
 }
