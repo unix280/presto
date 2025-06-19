@@ -68,7 +68,6 @@ import com.facebook.presto.sql.planner.plan.TableFunctionNode;
 import com.facebook.presto.sql.planner.plan.TableFunctionProcessorNode;
 import com.facebook.presto.sql.planner.plan.TableWriterMergeNode;
 import com.facebook.presto.sql.planner.plan.UpdateNode;
-import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -88,6 +87,7 @@ import java.util.stream.Collectors;
 
 import static com.facebook.presto.SystemSessionProperties.isUtilizeUniquePropertyInQueryPlanningEnabled;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.FIXED_ARBITRARY_DISTRIBUTION;
+import static com.facebook.presto.sql.planner.iterative.rule.Util.invertAssignments;
 import static com.facebook.presto.sql.planner.optimizations.PropertyDerivations.extractFixedValuesToConstantExpressions;
 import static com.facebook.presto.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties.StreamDistribution.FIXED;
 import static com.facebook.presto.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties.StreamDistribution.MULTIPLE;
@@ -291,7 +291,7 @@ public final class StreamPropertyDerivations
         public StreamProperties visitTableScan(TableScanNode node, List<StreamProperties> inputProperties)
         {
             TableLayout layout = metadata.getLayout(session, node.getTable());
-            Map<ColumnHandle, VariableReferenceExpression> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
+            Map<ColumnHandle, VariableReferenceExpression> assignments = invertAssignments(node.getAssignments());
 
             // Globally constant assignments
             Set<ColumnHandle> constants = new HashSet<>();
