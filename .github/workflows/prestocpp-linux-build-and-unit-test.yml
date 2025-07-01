@@ -6,8 +6,8 @@ on:
   push:
     branches:
       - master
-    paths-ignore:
-      - 'presto-docs/**'
+    paths:
+      - '!presto-docs/**'
 
 jobs:
   prestocpp-linux-build-for-test:
