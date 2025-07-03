@@ -22,7 +22,6 @@ RUN --mount=type=cache,target=/var/cache/dnf \
     # clean cache jobs
     && mv /etc/yum/protected.d/systemd.conf /etc/yum/protected.d/systemd.conf.bak \
     #  mkdir for config
-    && mkdir -p $PRESTO_HOME/etc \
     && mkdir -p $PRESTO_HOME/etc/catalog \
     && mkdir -p /var/lib/presto/data \
         && mkdir -p /usr/lib/presto/utils \
@@ -36,5 +35,7 @@ COPY etc/catalog $PRESTO_HOME/etc/catalog
 COPY entrypoint.sh /opt
 
 EXPOSE 8080
+
+VOLUME ["/var/lib/presto/data"]
 
 ENTRYPOINT ["/opt/entrypoint.sh"]
