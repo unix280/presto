@@ -10,7 +10,8 @@ ENV PRESTO_HOME="/opt/presto-server"
 COPY $PRESTO_PKG .
 COPY --chmod=755 $PRESTO_CLI_JAR /opt/presto-cli
 
-RUN dnf install -y java-11-openjdk less procps python3 \
+RUN --mount=type=cache,target=/var/cache/dnf \
+    dnf install -y java-11-openjdk less procps python3 \
     && ln -s $(which python3) /usr/bin/python \
     # Download Presto and move \
     && tar -zxf $PRESTO_PKG \
@@ -20,7 +21,6 @@ RUN dnf install -y java-11-openjdk less procps python3 \
     && ln -s /opt/presto-cli /usr/local/bin/ \
     # clean cache jobs
     && mv /etc/yum/protected.d/systemd.conf /etc/yum/protected.d/systemd.conf.bak \
-    && dnf clean all \
     #  mkdir for config
     && mkdir -p $PRESTO_HOME/etc \
     && mkdir -p $PRESTO_HOME/etc/catalog \
