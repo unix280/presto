@@ -13,15 +13,12 @@ RUN --mount=type=cache,target=/var/cache/dnf \
     # clean cache jobs
     && mv /etc/yum/protected.d/systemd.conf /etc/yum/protected.d/systemd.conf.bak
 
-COPY $PRESTO_PKG .
 COPY --chmod=755 $PRESTO_CLI_JAR /opt/presto-cli
 
-RUN \
+RUN --mount=type=bind,source=$PRESTO_PKG,target=/$PRESTO_PKG \
     # Download Presto and move \
-    tar -zxf $PRESTO_PKG \
-    && mv ./presto-server-$PRESTO_VERSION $PRESTO_HOME \
-    && rm -rf $PRESTO_PKG \
-    && rm -rf ./presto-server-$PRESTO_VERSION \
+    mkdir -p "$PRESTO_HOME" && \
+    tar --strip-components=1 -C "$PRESTO_HOME" -zxf /$PRESTO_PKG \
     && ln -s /opt/presto-cli /usr/local/bin/ \
     #  mkdir for config
     && mkdir -p $PRESTO_HOME/etc/catalog \
