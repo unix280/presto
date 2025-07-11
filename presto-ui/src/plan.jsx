@@ -4,6 +4,8 @@ import lazy from "./lazy";
 import {PageTitle} from "./components/PageTitle";
 import {getFirstParameter} from "./utils";
 
+
+
 const LivePlan = lazy('LivePlan');
 
 ReactDOM.render(
