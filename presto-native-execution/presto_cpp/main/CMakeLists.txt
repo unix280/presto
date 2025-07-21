@@ -23,6 +23,7 @@ add_subdirectory(properties)
 add_library(
   presto_server_lib
   Announcer.cpp
+  CatalogRegisterer.cpp
   CPUMon.cpp
   CoordinatorDiscoverer.cpp
   PeriodicMemoryChecker.cpp
