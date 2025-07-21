@@ -838,6 +838,8 @@ class SystemConfig : public ConfigBase {
   /// Optional string containing the path to the plugin directory
   static constexpr std::string_view kPluginDir{"plugin.dir"};
 
+  static constexpr std::string_view kDynamicCatalogPath{"dynamic-catalog-path"};
+
   /// Uses legacy version of array_agg which ignores nulls.
   static constexpr std::string_view kUseLegacyArrayAgg{
       "deprecated.legacy-array-agg"};
@@ -1264,6 +1266,8 @@ class SystemConfig : public ConfigBase {
   int requestDataSizesMaxWaitSec() const;
 
   std::string pluginDir() const;
+
+  std::string dynamicCatalogPath() const;
 
   int32_t exchangeIoEvbViolationThresholdMs() const;
 

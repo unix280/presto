@@ -298,7 +298,14 @@ void PrestoServer::run() {
   initializeVeloxMemory();
   initializeThreadPools();
 
-  auto catalogNames = registerVeloxConnectors(fs::path(configDirectoryPath_));
+  std::vector<std::string> catalogNames =
+      registerVeloxConnectors(fs::path(configDirectoryPath_));
+  catalogRegisterer_.init(
+      connectorIoExecutor_.get(), connectorCpuExecutor_.get(), &catalogNames);
+  if (!systemConfig->dynamicCatalogPath().empty()) {
+    catalogRegisterer_.registerCatalogsFromPath(
+        systemConfig->dynamicCatalogPath());
+  }
 
   initializeHttpServer();
   initializeCoordinatorDiscoverer();
@@ -554,6 +561,15 @@ void PrestoServer::registerHttpEndpoints() {
                 proxygen::HTTP_HEADER_CONTENT_TYPE,
                 http::kMimeTypeApplicationJson)
             .sendWithEOM();
+      });
+  httpServer_->registerPost(
+      R"(/v1/catalog/([^/]+))",
+      [server = this](
+          proxygen::HTTPMessage* message,
+          const std::vector<std::unique_ptr<folly::IOBuf>>& body,
+          proxygen::ResponseHandler* downstream) {
+        server->catalogRegisterer_.registerCatalogFromJson(
+            message, body, downstream, server->announcer_.get());
       });
 
   if (systemConfig->enableRuntimeMetricsCollection()) {
