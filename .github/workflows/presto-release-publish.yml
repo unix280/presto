@@ -127,6 +127,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential git gpg python3 python3-venv
+          df -h
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -141,6 +142,7 @@ jobs:
           git config --global user.email "${{ env.GIT_CI_EMAIL }}"
           git config --global user.name "${{ env.GIT_CI_USER }}"
           git config pull.rebase false
+          df -h
 
       - name: Create Maven Settings
         run: |
@@ -197,6 +199,7 @@ jobs:
           chmod 600 ${{ env.GPG_KEY_FILE }}
           gpg --import --batch ${{ env.GPG_KEY_FILE }}
           gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --sign ${{ env.GPG_KEY_FILE }}
+          df -h
 
       - name: Release Maven Artifacts
         if: ${{ github.event.inputs.publish_maven == 'true' }}
