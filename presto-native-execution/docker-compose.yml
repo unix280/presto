@@ -35,6 +35,15 @@ services:
         - EXTRA_CMAKE_FLAGS=-DPRESTO_ENABLE_TESTING=OFF
                             -DPRESTO_ENABLE_PARQUET=ON
                             -DPRESTO_ENABLE_S3=ON
+                            -DPRESTO_ENABLE_GCS=ON
+                            -DPRESTO_ENABLE_ABFS=OFF
+                            -DPRESTO_ENABLE_HDFS=ON
+                            -DPRESTO_ENABLE_REMOTE_FUNCTIONS=ON
+                            -DPRESTO_ENABLE_JWT=ON
+                            -DPRESTO_STATS_REPORTER_TYPE=PROMETHEUS
+                            -DPRESTO_MEMORY_CHECKER_TYPE=LINUX_MEMORY_CHECKER
+                            -DPRESTO_ENABLE_SPATIAL=ON
+
       context: .
       dockerfile: scripts/dockerfiles/prestissimo-runtime.dockerfile
 
@@ -61,5 +70,13 @@ services:
                             -DPRESTO_ENABLE_PARQUET=ON
                             -DPRESTO_ENABLE_S3=ON
                             -DPRESTO_ENABLE_CUDF=${GPU:-OFF}
+                            -DPRESTO_ENABLE_GCS=ON
+                            -DPRESTO_ENABLE_ABFS=OFF
+                            -DPRESTO_ENABLE_HDFS=ON
+                            -DPRESTO_ENABLE_REMOTE_FUNCTIONS=ON
+                            -DPRESTO_ENABLE_JWT=ON
+                            -DPRESTO_STATS_REPORTER_TYPE=PROMETHEUS
+                            -DPRESTO_MEMORY_CHECKER_TYPE=LINUX_MEMORY_CHECKER
+                            -DPRESTO_ENABLE_SPATIAL=ON
       context: .
       dockerfile: scripts/dockerfiles/prestissimo-runtime.dockerfile
