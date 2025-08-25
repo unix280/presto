@@ -45,7 +45,7 @@
       "hostType": "maven",
       "userName": "lhdevuser@ibm.com",
       "encrypted": {
-        "token": "wcBMA7q1Z1/iO+gDAQf+L/WVRxyBYXYF0se6C4GlEOQh0XE+Ok/zSiBPx+DXIXrQtsC2xhWVNIRrVO4XYfW1+byzTZGNsuoIPcskdRffB4Br92TPg2wCjCJOoe8Y6GgYhg/apkBFN6qNdO3Yu7HIRQnbuN1aPpp+vyAPNQ9gYmzpZSPvd4sRdnG0n21lFjX6eAnfc14ilm1dQVI0Nzp1kxFP7IQRRL7R69aaydFoW1I976Ms0jQbVVGvaIDtNGg0NFzVNoMEyz/Ox+XOo95DN2BCYWE0zKKsuzgMZIpeD9kV2jqpurYs0lW7cOIuiy8sH3EMYpU5IXWqUJngsftE1b1jQMUrIehnnaNGQ29pdNKQAV69W4cSxSOg8S6oHAM/BHHJubcwn4q3EBy0rG6kINEmnfi9QqeU/+BCsVIkXwPSiu5+dkgh+or/9yukwz/U9cBjwKPZrFJDzOed+3dH0GMdj3ux+PImPEPyNanq2i3cyVgSbhR1+pbmSxhDUwdl8N/WtiHDW0jys1TviGaDaSANJDQhFIpWc8KWWAJxj4LA"
+        "token": "wcBMAy4eIajzSqzQAQgAlAXXygsQQnuCjCwNDXzVwDpIrlwhG8X6RQsl1mi79hQJiGtHNKpv/eIZt54N4+vTfJSS9GlPH6aGsFP/QFcjoQwSY1sQmQFfzdxCfGlpLr/dmSI705VM7EUNnFc0soT7ChMntjTwunafLX/WsdXKVwNImyt2A5qDukhzeumSV4q+hHDFoIs+F5T2HqAV0pI3ubcoSRYAXBLP2CB89vWFF7FSrEDiHMWqas7elzkVumSVCKicm2AkxwHQsU59BMlp5vs3yvwunVa4cYEleJFv1X2pWZiL+jodVL46y2xDPoPvOj0NGmorANK1u3qY+TCU2PpyPVdm1dl2SdiQzbfmNNKQAbechpOWA06z3Ckkfx1MyuzaKaVoNPIBDFUruwpdZIgoQtcWXZso2cVEIEBk9C1m5Kdo2lC8KdVY4vDEt8xQyDTZzksqhBbk1s2fBFF4BejtxFETdzRoUUGvfaDMEfP9BRTPsUGvfFOsqco0vk+1SFBmKXblRFaFyeQ5Kk7fBsTxIAOaXrdqSHa1U1zv93eu"
       }
     },
     {
@@ -53,7 +53,7 @@
       "hostType": "maven",
       "userName": "lhdevuser@ibm.com",
       "encrypted": {
-        "token": "wcBMA7q1Z1/iO+gDAQf+L/WVRxyBYXYF0se6C4GlEOQh0XE+Ok/zSiBPx+DXIXrQtsC2xhWVNIRrVO4XYfW1+byzTZGNsuoIPcskdRffB4Br92TPg2wCjCJOoe8Y6GgYhg/apkBFN6qNdO3Yu7HIRQnbuN1aPpp+vyAPNQ9gYmzpZSPvd4sRdnG0n21lFjX6eAnfc14ilm1dQVI0Nzp1kxFP7IQRRL7R69aaydFoW1I976Ms0jQbVVGvaIDtNGg0NFzVNoMEyz/Ox+XOo95DN2BCYWE0zKKsuzgMZIpeD9kV2jqpurYs0lW7cOIuiy8sH3EMYpU5IXWqUJngsftE1b1jQMUrIehnnaNGQ29pdNKQAV69W4cSxSOg8S6oHAM/BHHJubcwn4q3EBy0rG6kINEmnfi9QqeU/+BCsVIkXwPSiu5+dkgh+or/9yukwz/U9cBjwKPZrFJDzOed+3dH0GMdj3ux+PImPEPyNanq2i3cyVgSbhR1+pbmSxhDUwdl8N/WtiHDW0jys1TviGaDaSANJDQhFIpWc8KWWAJxj4LA"
+        "token": "wcBMAy4eIajzSqzQAQgAlAXXygsQQnuCjCwNDXzVwDpIrlwhG8X6RQsl1mi79hQJiGtHNKpv/eIZt54N4+vTfJSS9GlPH6aGsFP/QFcjoQwSY1sQmQFfzdxCfGlpLr/dmSI705VM7EUNnFc0soT7ChMntjTwunafLX/WsdXKVwNImyt2A5qDukhzeumSV4q+hHDFoIs+F5T2HqAV0pI3ubcoSRYAXBLP2CB89vWFF7FSrEDiHMWqas7elzkVumSVCKicm2AkxwHQsU59BMlp5vs3yvwunVa4cYEleJFv1X2pWZiL+jodVL46y2xDPoPvOj0NGmorANK1u3qY+TCU2PpyPVdm1dl2SdiQzbfmNNKQAbechpOWA06z3Ckkfx1MyuzaKaVoNPIBDFUruwpdZIgoQtcWXZso2cVEIEBk9C1m5Kdo2lC8KdVY4vDEt8xQyDTZzksqhBbk1s2fBFF4BejtxFETdzRoUUGvfaDMEfP9BRTPsUGvfFOsqco0vk+1SFBmKXblRFaFyeQ5Kk7fBsTxIAOaXrdqSHa1U1zv93eu"
       }
     },
     {
@@ -61,7 +61,7 @@
       "hostType": "maven",
       "userName": "lhdevuser@ibm.com",
       "encrypted": {
-        "token": "wcBMA7q1Z1/iO+gDAQf+L/WVRxyBYXYF0se6C4GlEOQh0XE+Ok/zSiBPx+DXIXrQtsC2xhWVNIRrVO4XYfW1+byzTZGNsuoIPcskdRffB4Br92TPg2wCjCJOoe8Y6GgYhg/apkBFN6qNdO3Yu7HIRQnbuN1aPpp+vyAPNQ9gYmzpZSPvd4sRdnG0n21lFjX6eAnfc14ilm1dQVI0Nzp1kxFP7IQRRL7R69aaydFoW1I976Ms0jQbVVGvaIDtNGg0NFzVNoMEyz/Ox+XOo95DN2BCYWE0zKKsuzgMZIpeD9kV2jqpurYs0lW7cOIuiy8sH3EMYpU5IXWqUJngsftE1b1jQMUrIehnnaNGQ29pdNKQAV69W4cSxSOg8S6oHAM/BHHJubcwn4q3EBy0rG6kINEmnfi9QqeU/+BCsVIkXwPSiu5+dkgh+or/9yukwz/U9cBjwKPZrFJDzOed+3dH0GMdj3ux+PImPEPyNanq2i3cyVgSbhR1+pbmSxhDUwdl8N/WtiHDW0jys1TviGaDaSANJDQhFIpWc8KWWAJxj4LA"
+        "token": "wcBMAy4eIajzSqzQAQgAlAXXygsQQnuCjCwNDXzVwDpIrlwhG8X6RQsl1mi79hQJiGtHNKpv/eIZt54N4+vTfJSS9GlPH6aGsFP/QFcjoQwSY1sQmQFfzdxCfGlpLr/dmSI705VM7EUNnFc0soT7ChMntjTwunafLX/WsdXKVwNImyt2A5qDukhzeumSV4q+hHDFoIs+F5T2HqAV0pI3ubcoSRYAXBLP2CB89vWFF7FSrEDiHMWqas7elzkVumSVCKicm2AkxwHQsU59BMlp5vs3yvwunVa4cYEleJFv1X2pWZiL+jodVL46y2xDPoPvOj0NGmorANK1u3qY+TCU2PpyPVdm1dl2SdiQzbfmNNKQAbechpOWA06z3Ckkfx1MyuzaKaVoNPIBDFUruwpdZIgoQtcWXZso2cVEIEBk9C1m5Kdo2lC8KdVY4vDEt8xQyDTZzksqhBbk1s2fBFF4BejtxFETdzRoUUGvfaDMEfP9BRTPsUGvfFOsqco0vk+1SFBmKXblRFaFyeQ5Kk7fBsTxIAOaXrdqSHa1U1zv93eu"
       }
     },
     {
@@ -69,7 +69,7 @@
       "hostType": "maven",
       "userName": "lhdevuser@ibm.com",
       "encrypted": {
-        "token": "wcBMA7q1Z1/iO+gDAQf+L/WVRxyBYXYF0se6C4GlEOQh0XE+Ok/zSiBPx+DXIXrQtsC2xhWVNIRrVO4XYfW1+byzTZGNsuoIPcskdRffB4Br92TPg2wCjCJOoe8Y6GgYhg/apkBFN6qNdO3Yu7HIRQnbuN1aPpp+vyAPNQ9gYmzpZSPvd4sRdnG0n21lFjX6eAnfc14ilm1dQVI0Nzp1kxFP7IQRRL7R69aaydFoW1I976Ms0jQbVVGvaIDtNGg0NFzVNoMEyz/Ox+XOo95DN2BCYWE0zKKsuzgMZIpeD9kV2jqpurYs0lW7cOIuiy8sH3EMYpU5IXWqUJngsftE1b1jQMUrIehnnaNGQ29pdNKQAV69W4cSxSOg8S6oHAM/BHHJubcwn4q3EBy0rG6kINEmnfi9QqeU/+BCsVIkXwPSiu5+dkgh+or/9yukwz/U9cBjwKPZrFJDzOed+3dH0GMdj3ux+PImPEPyNanq2i3cyVgSbhR1+pbmSxhDUwdl8N/WtiHDW0jys1TviGaDaSANJDQhFIpWc8KWWAJxj4LA"
+        "token": "wcBMAy4eIajzSqzQAQgAlAXXygsQQnuCjCwNDXzVwDpIrlwhG8X6RQsl1mi79hQJiGtHNKpv/eIZt54N4+vTfJSS9GlPH6aGsFP/QFcjoQwSY1sQmQFfzdxCfGlpLr/dmSI705VM7EUNnFc0soT7ChMntjTwunafLX/WsdXKVwNImyt2A5qDukhzeumSV4q+hHDFoIs+F5T2HqAV0pI3ubcoSRYAXBLP2CB89vWFF7FSrEDiHMWqas7elzkVumSVCKicm2AkxwHQsU59BMlp5vs3yvwunVa4cYEleJFv1X2pWZiL+jodVL46y2xDPoPvOj0NGmorANK1u3qY+TCU2PpyPVdm1dl2SdiQzbfmNNKQAbechpOWA06z3Ckkfx1MyuzaKaVoNPIBDFUruwpdZIgoQtcWXZso2cVEIEBk9C1m5Kdo2lC8KdVY4vDEt8xQyDTZzksqhBbk1s2fBFF4BejtxFETdzRoUUGvfaDMEfP9BRTPsUGvfFOsqco0vk+1SFBmKXblRFaFyeQ5Kk7fBsTxIAOaXrdqSHa1U1zv93eu"
       }
     }
   ]
