@@ -28,6 +28,8 @@ constexpr std::string_view kPropertiesExtension = ".properties";
 constexpr char const* kConnectorName = "connector.name";
 
 namespace {
+constexpr char const* kProtocolConnectorId = "protocol-connector.id";
+
 // Log only the catalog keys that are configured to avoid leaking
 // secret information. Some values represent secrets used to access
 // storage backends.
@@ -176,6 +178,17 @@ void CatalogRegisterer::registerCatalog(
           std::move(connectorConf));
 
   auto connectorName = util::requiredProperty(*properties, kConnectorName);
+
+  auto protocolConnectorId =
+      util::getOptionalProperty(*properties, kProtocolConnectorId, "");
+  if (!protocolConnectorId.empty() &&
+      !hasPrestoToVeloxConnector(protocolConnectorId)) {
+    PRESTO_STARTUP_LOG(INFO)
+        << "Registering PrestoToVeloxConnector " << protocolConnectorId
+        << " using connector " << connectorName;
+
+    registerPrestoToVeloxConnector(protocolConnectorId, connectorName);
+  }
 
   LOG(INFO) << "Registering catalog " << catalogName << " using connector "
             << connectorName;

@@ -119,6 +119,7 @@ constexpr char const* kLinuxSharedLibExt = ".so";
 constexpr char const* kMacOSSharedLibExt = ".dylib";
 constexpr char const* kOptimized = "OPTIMIZED";
 constexpr char const* kEvaluated = "EVALUATED";
+constexpr char const* kProtocolConnectorId = "protocol-connector.id";
 
 protocol::NodeState convertNodeState(presto::NodeState nodeState) {
   switch (nodeState) {
@@ -1517,6 +1518,16 @@ std::vector<std::string> PrestoServer::registerVeloxConnectors(
         PRESTO_STARTUP_LOG(INFO) << "Skipping registration of catalog "
                                << catalogName << " with connector " << connectorName;
         continue;
+      }
+      auto protocolConnectorId =
+          util::getOptionalProperty(*properties, kProtocolConnectorId, "");
+      if (!protocolConnectorId.empty() &&
+          !hasPrestoToVeloxConnector(protocolConnectorId)) {
+        PRESTO_STARTUP_LOG(INFO)
+            << "Registering PrestoToVeloxConnector " << protocolConnectorId
+            << " using connector " << connectorName;
+
+        registerPrestoToVeloxConnector(protocolConnectorId, connectorName);
       }
 
       catalogNames.emplace_back(catalogName);
