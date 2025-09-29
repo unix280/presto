@@ -177,6 +177,10 @@ public class CoordinatorModule
             webUIBinder(binder, "/ui", "nowebapp").withWelcomeFile("index.html");
         }
 
+        // UI timeout
+        jaxrsBinder(binder).bind(UITimeoutResource.class);
+        jsonCodecBinder(binder).bindJsonCodec(UITimeoutResource.TimeoutDto.class);
+
         // discovery server
         install(installModuleIf(EmbeddedDiscoveryConfig.class, EmbeddedDiscoveryConfig::isEnabled, new EmbeddedDiscoveryModule()));
 
