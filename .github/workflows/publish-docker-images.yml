@@ -40,6 +40,10 @@ on:
         default: true
         required: false
 
+concurrency:
+  group: publish-docker-images
+  cancel-in-progress: false
+
 env:
   JAVA_VERSION: ${{ vars.JAVA_VERSION || '17' }}
   JAVA_DISTRIBUTION: ${{ vars.JAVA_DISTRIBUTION || 'temurin' }}
@@ -48,9 +52,68 @@ env:
   GIT_CI_USER: ${{ vars.GIT_CI_USER || 'prestodb-ci' }}
   GIT_CI_EMAIL: ${{ vars.GIT_CI_EMAIL || 'ci@lists.prestodb.io' }}
   JMX_PROMETHEUS_JAVAAGENT_VERSION: 0.20.0
+  PRESTO_IMAGE_NAME: 'presto'
+  NATIVE_IMAGE_NAME: 'presto-native'
+  DEPENDENCY_IMAGE_NAME: 'presto-native-dependency'
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract-version.outputs.version }}
+      commit_sha: ${{ steps.extract-commit.outputs.commit_sha }}
+      presto_version: ${{ steps.extract-version.outputs.presto_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_or_tag }}
+          fetch-depth: 1
+
+      - name: Configure git
+        run: |
+          git config --global user.email "${{ env.GIT_CI_EMAIL }}"
+          git config --global user.name "${{ env.GIT_CI_USER }}"
+
+      - name: Extract commit SHA
+        id: extract-commit
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          echo "commit_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
+          echo "Commit SHA: ${COMMIT_SHA}"
+
+      - name: Set up JDK ${{ env.JAVA_DISTRIBUTION }}/${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Extract version
+        id: extract-version
+        run: |
+          VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Raw version: $VERSION"
+
+          if [ -z "$VERSION" ]; then
+            echo "Failed to extract project version with Maven"
+            exit 1
+          fi
+
+          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
+            # Remove -SNAPSHOT and append commit SHA
+            CLEAN_VERSION=${VERSION%-SNAPSHOT}
+            TAG_VERSION="${CLEAN_VERSION}-${{ steps.extract-commit.outputs.commit_sha }}"
+            echo "SNAPSHOT version detected, using: $TAG_VERSION"
+          else
+            TAG_VERSION="$VERSION"
+            echo "Release version detected, using: $TAG_VERSION"
+          fi
+
+          echo "version=${TAG_VERSION}" >> $GITHUB_OUTPUT
+          echo "presto_version=${VERSION}" >> $GITHUB_OUTPUT
+
   publish-dependency-image:
+    needs: prepare
     if: ( !failure() && !cancelled() && github.event.inputs.publish_dependency == 'true' )
     strategy:
       matrix:
@@ -58,7 +121,6 @@ jobs:
       fail-fast: false
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     environment: release
-    timeout-minutes: 150
     permissions:
       packages: write
       contents: read
@@ -80,17 +142,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch_or_tag }}
-          fetch-depth: 1
+          fetch-depth: 10
+
+      - name: Reset to specific commit
+        run: |
+          git reset --hard ${{ needs.prepare.outputs.commit_sha }}
+          echo "Using commit SHA: ${{ needs.prepare.outputs.commit_sha }}"
 
       - name: Configure git
-        if: ${{ inputs.publish_dependency == 'true' }}
         run: |
           git config --global user.email "${{ env.GIT_CI_EMAIL }}"
           git config --global user.name "${{ env.GIT_CI_USER }}"
-
-          echo "Currently on: $(git rev-parse --abbrev-ref HEAD)"
-          echo "Commit SHA: $(git rev-parse HEAD)"
-          echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Checkout submodules
         working-directory: presto-native-execution
@@ -98,27 +160,10 @@ jobs:
           df -h
           make submodules
 
-      - name: Extract version
+      - name: Set version
         run: |
-          VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Raw version: $VERSION"
-
-          if [ -z "$VERSION" ]; then
-            echo "Failed to extract project version with Maven"
-            exit 1
-          fi
-
-          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-            # Remove -SNAPSHOT and append commit SHA
-            CLEAN_VERSION=${VERSION%-SNAPSHOT}
-            TAG_VERSION="${CLEAN_VERSION}-${COMMIT_SHA}"
-            echo "SNAPSHOT version detected, using: $TAG_VERSION"
-          else
-            TAG_VERSION="$VERSION"
-            echo "Release version detected, using: $TAG_VERSION"
-          fi
-
-          echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
+          echo "VERSION=${{ needs.prepare.outputs.version }}" >> $GITHUB_ENV
+          echo "Using version: ${{ needs.prepare.outputs.version }}"
 
       - name: Login to DockerHub
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.0.0
@@ -126,21 +171,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.0.0
-
-      - name: Set up buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.0.0
-
-      - name: Set up builder
-        run: |
-          docker buildx create --name container --use
-          docker buildx inspect --bootstrap
-
       - name: Set image tag
         run: |
-          IMAGE_NAME="presto-native-dependency"
-          TAG_BASE="${{ env.ORG_NAME }}/${IMAGE_NAME}:${{ inputs.os }}-${{ env.VERSION }}-${{ matrix.arch }}"
+          TAG_BASE="${{ env.ORG_NAME }}/${{ env.DEPENDENCY_IMAGE_NAME }}:${{ inputs.os }}-${{ env.VERSION }}-${{ matrix.arch }}"
 
           if [[ -n "${{ inputs.tag_suffix }}" ]]; then
             echo "IMAGE_TAG=${TAG_BASE}-${{ inputs.tag_suffix }}" >> $GITHUB_ENV
@@ -181,7 +214,7 @@ jobs:
           docker push ${{ env.IMAGE_TAG }}
 
           if [[ "${{ inputs.tag_latest }}" == "true" ]]; then
-            LATEST_TAG="${{ env.ORG_NAME }}/presto-native-dependency:${{ inputs.os }}-${{ matrix.arch }}-latest"
+            LATEST_TAG="${{ env.ORG_NAME }}/${{ env.DEPENDENCY_IMAGE_NAME }}:${{ inputs.os }}-${{ matrix.arch }}-latest"
             docker tag ${{ env.LOCAL_IMAGE_TAG }} ${LATEST_TAG}
             docker push ${LATEST_TAG}
             echo "Tagged and pushed as latest: ${LATEST_TAG}"
@@ -189,7 +222,7 @@ jobs:
 
   create-dependency-manifest:
     if: ( !failure() && !cancelled() && github.event.inputs.publish_dependency == 'true' )
-    needs: publish-dependency-image
+    needs: [prepare, publish-dependency-image]
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -202,42 +235,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch_or_tag }}
-          fetch-depth: 1
-
-      - name: Extract version
+      - name: Set version
         run: |
-          VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Raw version: $VERSION"
-
-          if [ -z "$VERSION" ]; then
-            echo "Failed to extract project version with Maven"
-            exit 1
-          fi
-
-          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-            # Remove -SNAPSHOT and append commit SHA
-            CLEAN_VERSION=${VERSION%-SNAPSHOT}
-            COMMIT_SHA=$(git rev-parse --short HEAD)
-            TAG_VERSION="${CLEAN_VERSION}-${COMMIT_SHA}"
-            echo "SNAPSHOT version detected, using: $TAG_VERSION"
-          else
-            TAG_VERSION="$VERSION"
-            echo "Release version detected, using: $TAG_VERSION"
-          fi
-
-          echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
+          echo "VERSION=${{ needs.prepare.outputs.version }}" >> $GITHUB_ENV
+          echo "Using version: ${{ needs.prepare.outputs.version }}"
 
       - name: Create and push multi-arch manifest
+        env:
+          IMAGE_NAME: ${{ env.DEPENDENCY_IMAGE_NAME }}
+          ORG_NAME: ${{ github.repository_owner }}
+          OS: ${{ inputs.os }}
+          VERSION: ${{ env.VERSION }}
         run: |
-          ORG_NAME="${{ github.repository_owner }}"
-          IMAGE_NAME="presto-native-dependency"
-          OS="${{ inputs.os }}"
-          VERSION="${{ env.VERSION }}"
-
           # Determine tag suffix
           if [[ -n "${{ inputs.tag_suffix }}" ]]; then
             TAG_SUFFIX="-${{ inputs.tag_suffix }}"
@@ -276,17 +285,20 @@ jobs:
 
   publish-presto-image:
     if: (!failure() && !cancelled() && github.event.inputs.publish_presto == 'true')
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-      fail-fast: false
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    needs: prepare
+    runs-on: ubuntu-latest
     environment: release
-    timeout-minutes: 150
     permissions:
       packages: write
       contents: read
     steps:
+      - name: Check OS compatibility
+        run: |
+          if [[ "${{ inputs.os }}" == "ubuntu" ]]; then
+            echo "::error::Presto Docker image is only supported for CentOS. Ubuntu is not supported for the Presto server image."
+            exit 1
+          fi
+
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
@@ -304,39 +316,23 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch_or_tag }}
-          fetch-depth: 1
+          fetch-depth: 10
+
+      - name: Reset to specific commit
+        run: |
+          git reset --hard ${{ needs.prepare.outputs.commit_sha }}
+          echo "Using commit SHA: ${{ needs.prepare.outputs.commit_sha }}"
 
       - name: Configure git
         run: |
           git config --global user.email "${{ env.GIT_CI_EMAIL }}"
           git config --global user.name "${{ env.GIT_CI_USER }}"
 
-          echo "Currently on: $(git rev-parse --abbrev-ref HEAD)"
-          echo "Commit SHA: $(git rev-parse HEAD)"
-          echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Extract version
+      - name: Set version
         run: |
-          VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Raw version: $VERSION"
-
-          if [ -z "$VERSION" ]; then
-            echo "Failed to extract project version with Maven"
-            exit 1
-          fi
-
-          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-            # Remove -SNAPSHOT and append commit SHA
-            CLEAN_VERSION=${VERSION%-SNAPSHOT}
-            TAG_VERSION="${CLEAN_VERSION}-${COMMIT_SHA}"
-            echo "SNAPSHOT version detected, using: $TAG_VERSION"
-          else
-            TAG_VERSION="$VERSION"
-            echo "Release version detected, using: $TAG_VERSION"
-          fi
-
-          echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
-          echo "JAR_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=${{ needs.prepare.outputs.version }}" >> $GITHUB_ENV
+          echo "PRESTO_VERSION=${{ needs.prepare.outputs.presto_version }}" >> $GITHUB_ENV
+          echo "Using version: ${{ needs.prepare.outputs.version }}"
 
       - name: Build Presto Server
         run: |
@@ -350,10 +346,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set up qemu
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create and use builder
+        run: |
+          docker buildx create --name container --use
+          docker buildx inspect --bootstrap
+
       - name: Set image tag and base image
         run: |
-          IMAGE_NAME="presto"
-          TAG_BASE="${{ env.ORG_NAME }}/${IMAGE_NAME}:${{ env.VERSION }}-${{ matrix.arch }}"
+          TAG_BASE="${{ env.ORG_NAME }}/${{ env.PRESTO_IMAGE_NAME }}:${{ env.VERSION }}"
 
           if [[ -n "${{ inputs.tag_suffix }}" ]]; then
             echo "IMAGE_TAG=${TAG_BASE}-${{ inputs.tag_suffix }}" >> $GITHUB_ENV
@@ -367,109 +373,23 @@ jobs:
           cp presto-server/target/presto-server-*.tar.gz docker/
           cp presto-cli/target/presto-cli-*-executable.jar docker/
 
-      - name: Build and push Docker image
-        run: |
-          cd docker
-
-          # Build the Docker image
-          docker build \
-            --build-arg PRESTO_VERSION=${{ env.VERSION }} \
-            --build-arg PRESTO_PKG=presto-server-${{ env.JAR_VERSION }}.tar.gz \
-            --build-arg PRESTO_CLI_JAR=presto-cli-${{ env.JAR_VERSION }}-executable.jar \
-            --build-arg JMX_PROMETHEUS_JAVAAGENT_VERSION=${{ env.JMX_PROMETHEUS_JAVAAGENT_VERSION }} \
-            -t ${{ env.IMAGE_TAG }} .
-
-          # Push the image
-          docker push ${{ env.IMAGE_TAG }}
-
-          # Tag and push as latest if requested
-          if [[ "${{ inputs.tag_latest }}" == "true" ]]; then
-            LATEST_TAG="${{ env.ORG_NAME }}/presto:${{ matrix.arch }}-latest"
-            docker tag ${{ env.IMAGE_TAG }} ${LATEST_TAG}
-            docker push ${LATEST_TAG}
-            echo "Tagged and pushed as latest: ${LATEST_TAG}"
-          fi
-
-  create-presto-manifest:
-    if: (!failure() && !cancelled() && github.event.inputs.publish_presto == 'true')
-    needs: publish-presto-image
-    runs-on: ubuntu-latest
-    environment: release
-    permissions:
-      packages: write
-      contents: read
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+      - name: Build docker image and publish
+        uses: docker/build-push-action@v6
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch_or_tag }}
-          fetch-depth: 1
-
-      - name: Extract version
-        run: |
-          VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Raw version: $VERSION"
-
-          if [ -z "$VERSION" ]; then
-            echo "Failed to extract project version with Maven"
-            exit 1
-          fi
-
-          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-            # Remove -SNAPSHOT and append commit SHA
-            CLEAN_VERSION=${VERSION%-SNAPSHOT}
-            COMMIT_SHA=$(git rev-parse --short HEAD)
-            TAG_VERSION="${CLEAN_VERSION}-${COMMIT_SHA}"
-            echo "SNAPSHOT version detected, using: $TAG_VERSION"
-          else
-            TAG_VERSION="$VERSION"
-            echo "Release version detected, using: $TAG_VERSION"
-          fi
-
-          echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
-
-      - name: Create and push multi-arch manifest
-        run: |
-          ORG_NAME="${{ github.repository_owner }}"
-          IMAGE_NAME="presto"
-          VERSION="${{ env.VERSION }}"
-
-          # Determine tag suffix
-          if [[ -n "${{ inputs.tag_suffix }}" ]]; then
-            TAG_SUFFIX="-${{ inputs.tag_suffix }}"
-          else
-            TAG_SUFFIX=""
-          fi
-
-          # Create manifest for the versioned tag
-          MANIFEST_TAG="${ORG_NAME}/${IMAGE_NAME}:${VERSION}${TAG_SUFFIX}"
-          AMD64_TAG="${ORG_NAME}/${IMAGE_NAME}:${VERSION}-amd64${TAG_SUFFIX}"
-          ARM64_TAG="${ORG_NAME}/${IMAGE_NAME}:${VERSION}-arm64${TAG_SUFFIX}"
-
-          echo "Creating manifest: ${MANIFEST_TAG}"
-          docker manifest create ${MANIFEST_TAG} ${AMD64_TAG} ${ARM64_TAG}
-          docker manifest push ${MANIFEST_TAG}
-
-          # Create latest manifest if requested
-          if [[ "${{ inputs.tag_latest }}" == "true" ]]; then
-            LATEST_MANIFEST="${ORG_NAME}/${IMAGE_NAME}:latest"
-            LATEST_AMD64="${ORG_NAME}/${IMAGE_NAME}:amd64-latest"
-            LATEST_ARM64="${ORG_NAME}/${IMAGE_NAME}:arm64-latest"
-
-            echo "Creating latest manifest: ${LATEST_MANIFEST}"
-            docker manifest create ${LATEST_MANIFEST} ${LATEST_AMD64} ${LATEST_ARM64}
-            docker manifest push ${LATEST_MANIFEST}
-          fi
+          context: docker
+          platforms: linux/amd64,linux/arm64,linux/ppc64le
+          file: docker/Dockerfile
+          push: true
+          build-args: |
+            PRESTO_VERSION=${{ env.PRESTO_VERSION }}
+            JMX_PROMETHEUS_JAVAAGENT_VERSION=0.20.0
+          tags: |
+            ${{ env.IMAGE_TAG }}
+            ${{ github.event.inputs.tag_latest == 'true' && format('{0}/{1}:latest', env.ORG_NAME, env.PRESTO_IMAGE_NAME) || '' }}
 
   publish-prestissimo-image:
     if: (!failure() && !cancelled() && github.event.inputs.publish_prestissimo == 'true')
-    needs: [publish-dependency-image]
+    needs: [prepare, publish-dependency-image]
     strategy:
       matrix:
         arch: [amd64, arm64]
@@ -488,26 +408,21 @@ jobs:
           docker-images: false
           large-packages: false
 
-      - name: Set up JDK ${{ env.JAVA_DISTRIBUTION }}/${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: ${{ env.JAVA_DISTRIBUTION }}
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch_or_tag }}
-          fetch-depth: 1
+          fetch-depth: 10
+
+      - name: Reset to specific commit
+        run: |
+          git reset --hard ${{ needs.prepare.outputs.commit_sha }}
+          echo "Using commit SHA: ${{ needs.prepare.outputs.commit_sha }}"
 
       - name: Configure git
         run: |
           git config --global user.email "${{ env.GIT_CI_EMAIL }}"
           git config --global user.name "${{ env.GIT_CI_USER }}"
-
-          echo "Currently on: $(git rev-parse --abbrev-ref HEAD)"
-          echo "Commit SHA: $(git rev-parse HEAD)"
-          echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Checkout submodules
         working-directory: presto-native-execution
@@ -515,27 +430,11 @@ jobs:
           df -h
           make submodules
 
-      - name: Extract version
+      # Use version from prepare job
+      - name: Set version
         run: |
-          VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Raw version: $VERSION"
-
-          if [ -z "$VERSION" ]; then
-            echo "Failed to extract project version with Maven"
-            exit 1
-          fi
-
-          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-            # Remove -SNAPSHOT and append commit SHA
-            CLEAN_VERSION=${VERSION%-SNAPSHOT}
-            TAG_VERSION="${CLEAN_VERSION}-${COMMIT_SHA}"
-            echo "SNAPSHOT version detected, using: $TAG_VERSION"
-          else
-            TAG_VERSION="$VERSION"
-            echo "Release version detected, using: $TAG_VERSION"
-          fi
-
-          echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
+          echo "VERSION=${{ needs.prepare.outputs.version }}" >> $GITHUB_ENV
+          echo "Using version: ${{ needs.prepare.outputs.version }}"
 
       - name: Login to DockerHub
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.0.0
@@ -545,8 +444,7 @@ jobs:
 
       - name: Set image tag and base image
         run: |
-          IMAGE_NAME="prestissimo"
-          TAG_BASE="${{ env.ORG_NAME }}/${IMAGE_NAME}:${{ inputs.os }}-${{ env.VERSION }}-${{ matrix.arch }}"
+          TAG_BASE="${{ env.ORG_NAME }}/${{ env.NATIVE_IMAGE_NAME }}:${{ inputs.os }}-${{ env.VERSION }}-${{ matrix.arch }}"
 
           if [[ -n "${{ inputs.tag_suffix }}" ]]; then
             echo "IMAGE_TAG=${TAG_BASE}-${{ inputs.tag_suffix }}" >> $GITHUB_ENV
@@ -622,7 +520,7 @@ jobs:
           docker push ${{ env.IMAGE_TAG }}
 
           if [[ "${{ inputs.tag_latest }}" == "true" ]]; then
-            LATEST_TAG="${{ env.ORG_NAME }}/prestissimo:${{ inputs.os }}-${{ matrix.arch }}-latest"
+            LATEST_TAG="${{ env.ORG_NAME }}/${{ env.NATIVE_IMAGE_NAME }}:${{ inputs.os }}-${{ matrix.arch }}-latest"
             docker tag ${{ env.IMAGE_TAG }} ${LATEST_TAG}
             docker push ${LATEST_TAG}
             echo "Tagged and pushed as latest: ${LATEST_TAG}"
@@ -630,7 +528,7 @@ jobs:
 
   create-prestissimo-manifest:
     if: (!failure() && !cancelled() && github.event.inputs.publish_prestissimo == 'true')
-    needs: publish-prestissimo-image
+    needs: [prepare, publish-prestissimo-image]
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -643,42 +541,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch_or_tag }}
-          fetch-depth: 1
-
-      - name: Extract version
+      - name: Set version
         run: |
-          VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Raw version: $VERSION"
-
-          if [ -z "$VERSION" ]; then
-            echo "Failed to extract project version with Maven"
-            exit 1
-          fi
-
-          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-            # Remove -SNAPSHOT and append commit SHA
-            CLEAN_VERSION=${VERSION%-SNAPSHOT}
-            COMMIT_SHA=$(git rev-parse --short HEAD)
-            TAG_VERSION="${CLEAN_VERSION}-${COMMIT_SHA}"
-            echo "SNAPSHOT version detected, using: $TAG_VERSION"
-          else
-            TAG_VERSION="$VERSION"
-            echo "Release version detected, using: $TAG_VERSION"
-          fi
-
-          echo "VERSION=$TAG_VERSION" >> $GITHUB_ENV
+          echo "VERSION=${{ needs.prepare.outputs.version }}" >> $GITHUB_ENV
+          echo "Using version: ${{ needs.prepare.outputs.version }}"
 
       - name: Create and push multi-arch manifest
+        env:
+          ORG_NAME: ${{ github.repository_owner }}
+          IMAGE_NAME: ${{ env.NATIVE_IMAGE_NAME }}
+          OS: ${{ inputs.os }}
+          VERSION: ${{ env.VERSION }}
         run: |
-          ORG_NAME="${{ github.repository_owner }}"
-          IMAGE_NAME="prestissimo"
-          OS="${{ inputs.os }}"
-          VERSION="${{ env.VERSION }}"
-
           # Determine tag suffix
           if [[ -n "${{ inputs.tag_suffix }}" ]]; then
             TAG_SUFFIX="-${{ inputs.tag_suffix }}"
