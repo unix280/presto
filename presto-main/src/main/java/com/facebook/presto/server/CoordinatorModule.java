@@ -148,8 +148,8 @@ public class CoordinatorModule
         extends AbstractConfigurationAwareModule
 {
     private static final String DEFAULT_WEBUI_CSP =
-            "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-                    "font-src 'self' https://fonts.gstatic.com; frame-ancestors 'self'; img-src 'self' data:; form-action 'self'";
+            "default-src 'self'; style-src 'self' 'nonce-cHJlc3RvLXVpCg==' https://fonts.googleapis.com; " +
+                    "font-src 'self' https://fonts.gstatic.com; frame-ancestors 'self'; img-src 'self' http: https: data:; form-action 'self'";
 
     private final boolean isWebUIEnabled;
 
@@ -162,7 +162,9 @@ public class CoordinatorModule
     {
         return httpServerBinder(binder).bindResource(path, classPathResourceBase)
                 .withExtraHeader(HttpHeaders.X_CONTENT_TYPE_OPTIONS, "nosniff")
-                .withExtraHeader(HttpHeaders.CONTENT_SECURITY_POLICY, DEFAULT_WEBUI_CSP);
+                .withExtraHeader(HttpHeaders.CONTENT_SECURITY_POLICY, DEFAULT_WEBUI_CSP)
+                .withExtraHeader(HttpHeaders.STRICT_TRANSPORT_SECURITY,
+                        "max-age=31536000; includeSubDomains; preload");
     }
 
     @Override
