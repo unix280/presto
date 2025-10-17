@@ -51,6 +51,8 @@ public class PrestoS3ConfigurationUpdater
     private boolean skipGlacierObjects;
     private final boolean webIdentityEnabled;
     private final boolean chunkedEncodingEnabled;
+    private final boolean mrapEnabled;
+    private final String s3AccountId;
 
     @Inject
     public PrestoS3ConfigurationUpdater(HiveS3Config config)
@@ -83,6 +85,8 @@ public class PrestoS3ConfigurationUpdater
         this.skipGlacierObjects = config.isSkipGlacierObjects();
         this.webIdentityEnabled = config.isS3WebIdentityEnabled();
         this.chunkedEncodingEnabled = config.isS3ChunkedEncodingEnabled();
+        this.mrapEnabled = config.isMrapEnabled();
+        this.s3AccountId = config.getS3AccountId();
     }
 
     @Override
@@ -133,5 +137,10 @@ public class PrestoS3ConfigurationUpdater
         config.set(S3_USER_AGENT_PREFIX, userAgentPrefix);
         config.set(S3_ACL_TYPE, aclType.name());
         config.setBoolean(S3_SKIP_GLACIER_OBJECTS, skipGlacierObjects);
+
+        config.setBoolean(S3_MRAP_ENABLED, mrapEnabled);
+        if (s3AccountId != null) {
+            config.set(S3_ACCOUNT_ID, s3AccountId);
+        }
     }
 }
