@@ -63,6 +63,8 @@ public class HiveS3Config
     private boolean skipGlacierObjects;
     private boolean s3WebIdentityEnabled;
     private boolean s3ChunkedEncodingEnabled = true;
+    private boolean mrapEnabled;
+    private String s3AccountId;
 
     public boolean isS3WebIdentityEnabled()
     {
@@ -450,6 +452,32 @@ public class HiveS3Config
     public HiveS3Config setS3ChunkedEncodingEnabled(boolean s3ChunkedEncodingEnabled)
     {
         this.s3ChunkedEncodingEnabled = s3ChunkedEncodingEnabled;
+        return this;
+    }
+
+    public boolean isMrapEnabled()
+    {
+        return mrapEnabled;
+    }
+
+    @Config("hive.s3.mrap-enabled")
+    @ConfigDescription("Enable S3 Multi Region Access Point")
+    public HiveS3Config setMrapEnabled(boolean mrapEnabled)
+    {
+        this.mrapEnabled = mrapEnabled;
+        return this;
+    }
+
+    public String getS3AccountId()
+    {
+        return s3AccountId;
+    }
+
+    @Config("hive.s3.account-id")
+    @ConfigDescription("AWS S3 Account ID")
+    public HiveS3Config setS3AccountId(String s3AccountId)
+    {
+        this.s3AccountId = s3AccountId;
         return this;
     }
 }

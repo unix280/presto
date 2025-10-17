@@ -114,6 +114,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.facebook.airlift.units.DataSize.Unit.MEGABYTE;
 import static com.facebook.presto.hive.RetryDriver.retry;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ACCESS_KEY;
+import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ACCOUNT_ID;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ACL_TYPE;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_CHUNKED_ENCODING_ENABLED;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_CONNECT_TIMEOUT;
@@ -126,6 +127,7 @@ import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MAX_BACKOFF_
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MAX_CLIENT_RETRIES;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MAX_ERROR_RETRIES;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MAX_RETRY_TIME;
+import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MRAP_ENABLED;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MULTIPART_MIN_FILE_SIZE;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MULTIPART_MIN_PART_SIZE;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_PATH_STYLE_ACCESS;
@@ -212,6 +214,8 @@ public class PrestoS3FileSystem
     private boolean skipGlacierObjects;
     private PrestoS3StorageClass s3StorageClass;
     private boolean webIdentityEnabled;
+    private boolean mrapEnabled;
+    private String mrapS3ArnPrefix;
 
     @Override
     public void initialize(URI uri, Configuration conf)
@@ -247,6 +251,15 @@ public class PrestoS3FileSystem
         this.s3AclType = PrestoS3AclType.valueOf(conf.get(S3_ACL_TYPE, defaults.getS3AclType().name()));
         this.skipGlacierObjects = conf.getBoolean(S3_SKIP_GLACIER_OBJECTS, defaults.isSkipGlacierObjects());
         this.s3StorageClass = conf.getEnum(S3_STORAGE_CLASS, defaults.getS3StorageClass());
+        this.mrapEnabled = conf.getBoolean(S3_MRAP_ENABLED, defaults.isMrapEnabled());
+
+        if (mrapEnabled) {
+            checkArgument(conf.get(S3_ACCOUNT_ID, defaults.getS3AccountId()) != null,
+                    "hive.s3.account-id must be set when hive.s3.mrap-enabled is set to true");
+
+            this.mrapS3ArnPrefix = String.format("arn:aws:s3::%s:accesspoint", conf.get(S3_ACCOUNT_ID, defaults.getS3AccountId()));
+        }
+
         this.webIdentityEnabled = conf.getBoolean(S3_WEB_IDENTITY_ENABLED, false);
 
         checkArgument(!(webIdentityEnabled && isNullOrEmpty(s3IamRole)),
@@ -417,7 +430,7 @@ public class PrestoS3FileSystem
     {
         return new FSDataInputStream(
                 new BufferedFSInputStream(
-                        new PrestoS3InputStream(s3SyncClient, getBucketName(uri), path, maxAttempts, maxBackoffTime, maxRetryTime),
+                        new PrestoS3InputStream(s3SyncClient, mrapEnabled ? makeMrapArn(getBucketName(uri)) : getBucketName(uri), path, maxAttempts, maxBackoffTime, maxRetryTime),
                         bufferSize));
     }
 
@@ -443,7 +456,7 @@ public class PrestoS3FileSystem
         return new FSDataOutputStream(
                 new PrestoS3OutputStream(
                         s3AsyncClient,
-                        getBucketName(uri),
+                        mrapEnabled ? makeMrapArn(getBucketName(uri)) : getBucketName(uri),
                         key,
                         tempFile,
                         sseEnabled,
@@ -496,9 +509,9 @@ public class PrestoS3FileSystem
         }
         else {
             CopyObjectRequest copyRequest = CopyObjectRequest.builder()
-                    .sourceBucket(getBucketName(uri))
+                    .sourceBucket(mrapEnabled ? makeMrapArn(getBucketName(uri)) : getBucketName(uri))
                     .sourceKey(keyFromPath(src))
-                    .destinationBucket(getBucketName(uri))
+                    .destinationBucket(mrapEnabled ? makeMrapArn(getBucketName(uri)) : getBucketName(uri))
                     .destinationKey(keyFromPath(dst))
                     .build();
             s3SyncClient.copyObject(copyRequest);
@@ -550,7 +563,7 @@ public class PrestoS3FileSystem
     {
         try {
             DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
-                    .bucket(getBucketName(uri))
+                    .bucket(mrapEnabled ? makeMrapArn(getBucketName(uri)) : getBucketName(uri))
                     .key(key)
                     .build();
             s3SyncClient.deleteObject(deleteRequest);
@@ -580,7 +593,7 @@ public class PrestoS3FileSystem
         }
 
         ListObjectsV2Request.Builder requestBuilder = ListObjectsV2Request.builder()
-                .bucket(getBucketName(uri))
+                .bucket(mrapEnabled ? makeMrapArn(getBucketName(uri)) : getBucketName(uri))
                 .prefix(key)
                 .delimiter(mode == ListingMode.RECURSIVE_FILES_ONLY ? null : PATH_SEPARATOR);
 
@@ -705,13 +718,13 @@ public class PrestoS3FileSystem
 
                             if (key.isEmpty()) {
                                 HeadBucketRequest request = HeadBucketRequest.builder()
-                                        .bucket(bucketName)
+                                        .bucket(mrapEnabled ? makeMrapArn(bucketName) : bucketName)
                                         .build();
                                 return s3SyncClient.headBucket(request);
                             }
 
                             HeadObjectRequest request = HeadObjectRequest.builder()
-                                    .bucket(bucketName)
+                                    .bucket(mrapEnabled ? makeMrapArn(bucketName) : bucketName)
                                     .key(key)
                                     .build();
                             return s3SyncClient.headObject(request);
@@ -1705,6 +1718,11 @@ public class PrestoS3FileSystem
         }
 
         throw new IllegalArgumentException("Unable to determine S3 bucket from URI.");
+    }
+
+    public String makeMrapArn(String bucket)
+    {
+        return String.format("%s/%s", mrapS3ArnPrefix, bucket);
     }
 
     public static PrestoS3FileSystemStats getFileSystemStats()
