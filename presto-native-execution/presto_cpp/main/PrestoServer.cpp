@@ -311,6 +311,7 @@ void PrestoServer::run() {
       registerVeloxConnectors(fs::path(configDirectoryPath_));
   catalogRegisterer_.init(
       connectorIoExecutor_.get(), connectorCpuExecutor_.get(), &catalogNames);
+  const auto* systemConfig = SystemConfig::instance();
   if (!systemConfig->dynamicCatalogPath().empty()) {
     catalogRegisterer_.registerCatalogsFromPath(
         systemConfig->dynamicCatalogPath());
