@@ -136,6 +136,7 @@ void ping(
     proxygen::ResponseHandler* downstream) {
   proxygen::ResponseBuilder(downstream)
       .status(facebook::presto::http::kHttpOk, "")
+      .header(proxygen::HTTP_HEADER_STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains; preload")
       .sendWithEOM();
 }
 
@@ -165,6 +166,7 @@ void echo(
   if (body.empty()) {
     proxygen::ResponseBuilder(downstream)
         .status(facebook::presto::http::kHttpOk, "")
+        .header(proxygen::HTTP_HEADER_STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains; preload")
         .body(
             folly::IOBuf::wrapBuffer(
                 message->getURL().c_str(), message->getURL().size()))
@@ -174,6 +176,7 @@ void echo(
 
   proxygen::ResponseBuilder(downstream)
       .status(facebook::presto::http::kHttpOk, "")
+      .header(proxygen::HTTP_HEADER_STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains; preload")
       .header(proxygen::HTTP_HEADER_CONTENT_TYPE, "text/plain")
       .body(facebook::presto::util::extractMessageBody(body))
       .sendWithEOM();
@@ -298,6 +301,7 @@ facebook::presto::http::EndpointRequestHandlerFactory asyncMsg(
                   request->requestStatus = kStatusValid;
                   proxygen::ResponseBuilder(downstream)
                       .status(facebook::presto::http::kHttpOk, "")
+                      .header(proxygen::HTTP_HEADER_STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains; preload")
                       .header(proxygen::HTTP_HEADER_CONTENT_TYPE, "text/plain")
                       .body(msg)
                       .sendWithEOM();
@@ -314,6 +318,8 @@ facebook::presto::http::EndpointRequestHandlerFactory asyncMsg(
                           .status(
                               facebook::presto::http::kHttpInternalServerError,
                               "")
+                          .header(
+                              proxygen::HTTP_HEADER_STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains; preload")
                           .header(
                               proxygen::HTTP_HEADER_CONTENT_TYPE, "text/plain")
                           .body(e.what())
