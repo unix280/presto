@@ -568,6 +568,9 @@ void PrestoServer::registerHttpEndpoints() {
         proxygen::ResponseBuilder(downstream)
             .status(http::kHttpOk, "OK")
             .header(
+                proxygen::HTTP_HEADER_STRICT_TRANSPORT_SECURITY,
+                "max-age=31536000; includeSubDomains; preload")
+            .header(
                 proxygen::HTTP_HEADER_CONTENT_TYPE,
                 http::kMimeTypeApplicationJson)
             .sendWithEOM();
