@@ -373,7 +373,7 @@ relationPrimary
     | UNNEST '(' expression (',' expression)* ')' (WITH ORDINALITY)?  #unnest
     | LATERAL '(' query ')'                                           #lateral
     | '(' relation ')'                                                #parenthesizedRelation
-    | TABLE '(' tableFunctionCall ')'                                 #tableFunctionInvocation
+    | (TABLE '(' tableFunctionCall ')' | tableFunctionCall)           #tableFunctionInvocation
     ;
 
 expression
