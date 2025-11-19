@@ -92,6 +92,7 @@ public class SessionDefinitionExecution<T extends Statement>
         public SessionDefinitionExecution<?> createQueryExecution(
                 AnalyzerProvider analyzerProvider,
                 PreparedQuery preparedQuery,
+                PreparedQuery originalPreparedQuery,
                 QueryStateMachine stateMachine,
                 String slug,
                 int retryCount,
