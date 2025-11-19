@@ -115,7 +115,7 @@ public class AnalyzerUtil
         checkAccessPermissionsForColumns(accessControlReferences);
     }
 
-    private static void checkAccessPermissionsForColumns(AccessControlReferences accessControlReferences)
+    public static void checkAccessPermissionsForColumns(AccessControlReferences accessControlReferences)
     {
         accessControlReferences.getTableColumnAndSubfieldReferencesForAccessControl()
                 .forEach((accessControlInfo, tableColumnReferences) ->
@@ -131,7 +131,7 @@ public class AnalyzerUtil
                         }));
     }
 
-    private static void checkAccessPermissionsForTable(AccessControlReferences accessControlReferences)
+    public static void checkAccessPermissionsForTable(AccessControlReferences accessControlReferences)
     {
         accessControlReferences.getTableReferences().forEach((accessControlRole, accessControlInfoForTables) -> accessControlInfoForTables.forEach(accessControlInfoForTable -> {
             AccessControlInfo accessControlInfo = accessControlInfoForTable.getAccessControlInfo();

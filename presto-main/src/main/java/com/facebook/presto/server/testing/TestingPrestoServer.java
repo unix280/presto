@@ -41,6 +41,7 @@ import com.facebook.presto.connector.ConnectorManager;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.dispatcher.DispatchManager;
 import com.facebook.presto.dispatcher.QueryPrerequisitesManagerModule;
+import com.facebook.presto.dispatcher.QueryRewriterManager;
 import com.facebook.presto.eventlistener.EventListenerManager;
 import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryManager;
@@ -66,6 +67,7 @@ import com.facebook.presto.server.PluginManager;
 import com.facebook.presto.server.ServerInfoResource;
 import com.facebook.presto.server.ServerMainModule;
 import com.facebook.presto.server.ShutdownAction;
+import com.facebook.presto.server.security.PasswordAuthenticatorManager;
 import com.facebook.presto.server.security.ServerSecurityModule;
 import com.facebook.presto.spi.ClientRequestFilterFactory;
 import com.facebook.presto.spi.ConnectorId;
@@ -191,6 +193,8 @@ public class TestingPrestoServer
     private final NodeManager pluginNodeManager;
     private final ClientRequestFilterManager clientRequestFilterManager;
     private final AuthClientConfigs authClientConfigs;
+    private final QueryRewriterManager queryRewriterManager;
+    private final PasswordAuthenticatorManager passwordAuthenticatorManager;
 
     public static class TestShutdownAction
             implements ShutdownAction
@@ -423,6 +427,8 @@ public class TestingPrestoServer
                 createAuthClientConfigs(
                         injector.getInstance(InternalCommunicationConfig.class),
                         injector.getInstance(NodeInfo.class));
+        queryRewriterManager = injector.getInstance(QueryRewriterManager.class);
+        passwordAuthenticatorManager = injector.getInstance(PasswordAuthenticatorManager.class);
         if (coordinator) {
             dispatchManager = injector.getInstance(DispatchManager.class);
             queryManager = injector.getInstance(QueryManager.class);
@@ -611,6 +617,16 @@ public class TestingPrestoServer
     public QueryManager getQueryManager()
     {
         return queryManager;
+    }
+
+    public QueryRewriterManager getQueryRewriterManager()
+    {
+        return queryRewriterManager;
+    }
+
+    public PasswordAuthenticatorManager getPasswordAuthenticatorManager()
+    {
+        return passwordAuthenticatorManager;
     }
 
     public Plan getQueryPlan(QueryId queryId)

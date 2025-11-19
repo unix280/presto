@@ -154,6 +154,7 @@ public class SqlQueryExecution
     private SqlQueryExecution(
             QueryAnalyzer queryAnalyzer,
             PreparedQuery preparedQuery,
+            PreparedQuery originalPreparedQuery,
             QueryStateMachine stateMachine,
             String slug,
             int retryCount,
@@ -217,7 +218,7 @@ public class SqlQueryExecution
                     getQueryAnalyzerTimeout(getSession()))) {
                 this.queryAnalysis = getSession()
                         .getRuntimeStats()
-                        .recordWallAndCpuTime(ANALYZE_TIME_NANOS, () -> queryAnalyzer.analyze(analyzerContext, preparedQuery));
+                        .recordWallAndCpuTime(ANALYZE_TIME_NANOS, () -> queryAnalyzer.analyze(analyzerContext, preparedQuery, originalPreparedQuery));
             }
 
             stateMachine.setUpdateInfo(queryAnalysis.getUpdateInfo());
@@ -991,6 +992,7 @@ public class SqlQueryExecution
         public QueryExecution createQueryExecution(
                 AnalyzerProvider analyzerProvider,
                 PreparedQuery preparedQuery,
+                PreparedQuery originalPreparedQuery,
                 QueryStateMachine stateMachine,
                 String slug,
                 int retryCount,
@@ -1006,6 +1008,7 @@ public class SqlQueryExecution
             return new SqlQueryExecution(
                     analyzerProvider.getQueryAnalyzer(),
                     preparedQuery,
+                    originalPreparedQuery,
                     stateMachine,
                     slug,
                     retryCount,
