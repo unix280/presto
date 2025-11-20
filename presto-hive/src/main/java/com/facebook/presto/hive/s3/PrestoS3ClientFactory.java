@@ -36,6 +36,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import java.net.URI;
 import java.util.Optional;
 
+import static com.facebook.presto.hive.s3.PrestoS3FileSystem.getFileSystemStats;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ENDPOINT;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.String.format;
@@ -100,6 +101,7 @@ public class PrestoS3ClientFactory
 
         ClientOverrideConfiguration clientOverrideConfiguration = ClientOverrideConfiguration.builder()
                 .retryStrategy(strategy)
+                .addMetricPublisher(getFileSystemStats().newRequestMetricPublisher())
                 .putAdvancedOption(USER_AGENT_PREFIX, userAgentPrefix)
                 .putAdvancedOption(USER_AGENT_SUFFIX, s3UserAgentSuffix)
                 .build();
