@@ -105,6 +105,10 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3-transfer-manager</artifactId>
         </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>metrics-spi</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.facebook.airlift</groupId>

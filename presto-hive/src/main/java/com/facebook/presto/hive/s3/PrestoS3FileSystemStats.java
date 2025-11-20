@@ -14,16 +14,15 @@
 package com.facebook.presto.hive.s3;
 
 import com.facebook.airlift.stats.CounterStat;
-import com.facebook.airlift.stats.TimeStat;
-import com.facebook.airlift.units.Duration;
+import com.facebook.presto.hive.aws.metrics.AwsSdkClientStats;
+import org.weakref.jmx.Flatten;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 import software.amazon.awssdk.core.exception.AbortedException;
+import software.amazon.awssdk.metrics.MetricPublisher;
 
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class PrestoS3FileSystemStats
 {
@@ -45,13 +44,7 @@ public class PrestoS3FileSystemStats
     private final CounterStat getMetadataRetries = new CounterStat();
     private final CounterStat readRetries = new CounterStat();
 
-    // see AWSRequestMetrics
-    private final CounterStat awsRequestCount = new CounterStat();
-    private final CounterStat awsRetryCount = new CounterStat();
-    private final CounterStat awsThrottleExceptions = new CounterStat();
-    private final TimeStat awsRequestTime = new TimeStat(MILLISECONDS);
-    private final TimeStat awsClientExecuteTime = new TimeStat(MILLISECONDS);
-    private final TimeStat awsClientRetryPauseTime = new TimeStat(MILLISECONDS);
+    private final AwsSdkClientStats awsSdkClientStats = new AwsSdkClientStats();
 
     @Managed
     @Nested
@@ -152,45 +145,10 @@ public class PrestoS3FileSystemStats
     }
 
     @Managed
-    @Nested
-    public CounterStat getAwsRequestCount()
+    @Flatten
+    public AwsSdkClientStats getAwsSdkClientStats()
     {
-        return awsRequestCount;
-    }
-
-    @Managed
-    @Nested
-    public CounterStat getAwsRetryCount()
-    {
-        return awsRetryCount;
-    }
-
-    @Managed
-    @Nested
-    public CounterStat getAwsThrottleExceptions()
-    {
-        return awsThrottleExceptions;
-    }
-
-    @Managed
-    @Nested
-    public TimeStat getAwsRequestTime()
-    {
-        return awsRequestTime;
-    }
-
-    @Managed
-    @Nested
-    public TimeStat getAwsClientExecuteTime()
-    {
-        return awsClientExecuteTime;
-    }
-
-    @Managed
-    @Nested
-    public TimeStat getAwsClientRetryPauseTime()
-    {
-        return awsClientRetryPauseTime;
+        return awsSdkClientStats;
     }
 
     @Managed
@@ -212,6 +170,11 @@ public class PrestoS3FileSystemStats
     public CounterStat getReadRetries()
     {
         return readRetries;
+    }
+
+    public MetricPublisher newRequestMetricPublisher()
+    {
+        return awsSdkClientStats.newRequestMetricsPublisher();
     }
 
     public void connectionOpened()
@@ -283,36 +246,6 @@ public class PrestoS3FileSystemStats
     public void newGetMetadataError()
     {
         getMetadataErrors.update(1);
-    }
-
-    public void updateAwsRequestCount(long requestCount)
-    {
-        awsRequestCount.update(requestCount);
-    }
-
-    public void updateAwsRetryCount(long retryCount)
-    {
-        awsRetryCount.update(retryCount);
-    }
-
-    public void updateAwsThrottleExceptionsCount(long throttleExceptionsCount)
-    {
-        awsThrottleExceptions.update(throttleExceptionsCount);
-    }
-
-    public void addAwsRequestTime(Duration duration)
-    {
-        awsRequestTime.add(duration);
-    }
-
-    public void addAwsClientExecuteTime(Duration duration)
-    {
-        awsClientExecuteTime.add(duration);
-    }
-
-    public void addAwsClientRetryPauseTime(Duration duration)
-    {
-        awsClientRetryPauseTime.add(duration);
     }
 
     public void newGetObjectRetry()

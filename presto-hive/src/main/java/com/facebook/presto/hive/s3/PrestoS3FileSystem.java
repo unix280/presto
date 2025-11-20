@@ -51,6 +51,7 @@ import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
+import software.amazon.awssdk.metrics.MetricPublisher;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.retries.StandardRetryStrategy;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
@@ -171,6 +172,8 @@ public class PrestoS3FileSystem
 {
     private static final Logger log = Logger.get(PrestoS3FileSystem.class);
     private static final PrestoS3FileSystemStats STATS = new PrestoS3FileSystemStats();
+    private static volatile MetricPublisher metricPublisher = STATS.newRequestMetricPublisher();
+
     private static final String DIRECTORY_SUFFIX = "_$folder$";
     private static final DataSize BLOCK_SIZE = new DataSize(32, MEGABYTE);
     private static final DataSize MAX_SKIP_SIZE = new DataSize(1, MEGABYTE);
@@ -912,6 +915,7 @@ public class PrestoS3FileSystem
 
         ClientOverrideConfiguration clientOverrideConfiguration = ClientOverrideConfiguration.builder()
                 .retryStrategy(strategy)
+                .addMetricPublisher(metricPublisher)
                 .putAdvancedOption(USER_AGENT_PREFIX, userAgentPrefix)
                 .putAdvancedOption(USER_AGENT_SUFFIX, S3_USER_AGENT_SUFFIX)
                 .build();
@@ -976,6 +980,7 @@ public class PrestoS3FileSystem
                 .serviceConfiguration(s3Configuration)
                 .overrideConfiguration(builder -> {
                     builder.retryStrategy(strategy)
+                            .addMetricPublisher(metricPublisher)
                             .putAdvancedOption(USER_AGENT_PREFIX, userAgentPrefix)
                             .putAdvancedOption(USER_AGENT_SUFFIX, S3_USER_AGENT_SUFFIX);
                 });
