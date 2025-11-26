@@ -255,6 +255,7 @@ jobs:
             presto-cli/target/presto-cli-*-executable.jar
             presto-benchmark-driver/target/presto-benchmark-driver-*-executable.jar
             presto-testing-server-launcher/target/presto-testing-server-launcher-*-executable.jar
+            presto-function-server/target/presto-function-server-*-executable.jar
 
   publish-github-release:
     needs: publish-maven-artifacts
