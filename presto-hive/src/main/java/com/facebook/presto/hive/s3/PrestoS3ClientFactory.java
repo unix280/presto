@@ -37,6 +37,7 @@ import java.net.URI;
 import java.util.Optional;
 
 import static com.facebook.presto.hive.s3.PrestoS3FileSystem.getFileSystemStats;
+import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_CHUNKED_ENCODING_ENABLED;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ENDPOINT;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.String.format;
@@ -82,6 +83,8 @@ public class PrestoS3ClientFactory
     private S3AsyncClient buildS3AsyncClient(Configuration config, HiveClientConfig clientConfig)
     {
         HiveS3Config defaults = new HiveS3Config();
+
+        boolean chunkedEncodingEnabled = config.getBoolean(S3_CHUNKED_ENCODING_ENABLED, defaults.isS3ChunkedEncodingEnabled());
         String userAgentPrefix = config.get(S3_USER_AGENT_PREFIX, defaults.getS3UserAgentPrefix());
         int maxErrorRetries = config.getInt(S3_MAX_ERROR_RETRIES, defaults.getS3MaxErrorRetries());
         Duration connectTimeout = Duration.valueOf(config.get(S3_CONNECT_TIMEOUT, defaults.getS3ConnectTimeout().toString()));
@@ -136,6 +139,7 @@ public class PrestoS3ClientFactory
         final boolean disableChecksums = isHttpEndpoint;
         S3Configuration s3Configuration = S3Configuration.builder()
                 .checksumValidationEnabled(!disableChecksums)
+                .chunkedEncodingEnabled(chunkedEncodingEnabled)
                 .build();
 
         S3AsyncClientBuilder clientBuilder = S3AsyncClient.builder()

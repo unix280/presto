@@ -557,6 +557,12 @@ Property Name                                Description
                                              ``AWS_REGION`` are set for proper authentication. Since this
                                              implementation uses AWS SDK 1.x, setting these environment
                                              variables is necessary.
+
+``hive.s3.chunked-encoding-enabled``         Enable chunked encoding for S3 uploads. Set to ``false`` for
+                                             S3-compatible storage systems that don't support AWS chunked
+                                             encoding (e.g., IBM COS). When disabled, uploads use
+                                             standard content-length based transfers instead of chunked
+                                             transfer encoding. Defaults to ``true``.
 ============================================ =================================================================
 
 S3 Credentials
