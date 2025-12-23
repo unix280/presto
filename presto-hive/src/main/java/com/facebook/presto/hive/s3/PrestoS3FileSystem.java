@@ -44,6 +44,8 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
 import software.amazon.awssdk.awscore.retry.AwsRetryStrategy;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.core.exception.SdkClientException;
@@ -113,6 +115,7 @@ import static com.facebook.airlift.units.DataSize.Unit.MEGABYTE;
 import static com.facebook.presto.hive.RetryDriver.retry;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ACCESS_KEY;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ACL_TYPE;
+import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_CHUNKED_ENCODING_ENABLED;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_CONNECT_TIMEOUT;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_CREDENTIALS_PROVIDER;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_ENDPOINT;
@@ -784,6 +787,7 @@ public class PrestoS3FileSystem
     {
         HiveS3Config defaults = new HiveS3Config();
 
+        boolean chunkedEncodingEnabled = hadoopConfig.getBoolean(S3_CHUNKED_ENCODING_ENABLED, defaults.isS3ChunkedEncodingEnabled());
         Duration connectTimeout = Duration.valueOf(hadoopConfig.get(S3_CONNECT_TIMEOUT, defaults.getS3ConnectTimeout().toString()));
         Duration socketTimeout = Duration.valueOf(hadoopConfig.get(S3_SOCKET_TIMEOUT, defaults.getS3SocketTimeout().toString()));
         int maxConnections = hadoopConfig.getInt(S3_WRITE_MAX_CONNECTIONS, defaults.getS3WriteMaxConnections());
@@ -821,18 +825,17 @@ public class PrestoS3FileSystem
             }
         }
 
-        final boolean disableChecksums = isHttpEndpoint;
         S3Configuration s3Configuration = S3Configuration.builder()
-                .checksumValidationEnabled(!disableChecksums)
+                .chunkedEncodingEnabled(chunkedEncodingEnabled)
                 .build();
 
         String kmsKeyId = hadoopConfig.get(S3_KMS_KEY_ID);
         if (!isNullOrEmpty(kmsKeyId)) {
             log.debug("Creating S3 client with client-side encryption");
-            return createS3AsyncEncryptionClient(hadoopConfig, httpClientBuilder, s3Configuration, kmsKeyId, endpointUri);
+            return createS3AsyncEncryptionClient(hadoopConfig, httpClientBuilder, s3Configuration, kmsKeyId, endpointUri, chunkedEncodingEnabled);
         }
 
-        S3AsyncClientBuilder clientBuilder = configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri);
+        S3AsyncClientBuilder clientBuilder = configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
         return clientBuilder.build();
     }
 
@@ -840,6 +843,7 @@ public class PrestoS3FileSystem
     {
         HiveS3Config defaults = new HiveS3Config();
 
+        boolean chunkedEncodingEnabled = hadoopConfig.getBoolean(S3_CHUNKED_ENCODING_ENABLED, defaults.isS3ChunkedEncodingEnabled());
         Duration connectTimeout = Duration.valueOf(hadoopConfig.get(S3_CONNECT_TIMEOUT, defaults.getS3ConnectTimeout().toString()));
         Duration socketTimeout = Duration.valueOf(hadoopConfig.get(S3_SOCKET_TIMEOUT, defaults.getS3SocketTimeout().toString()));
         int maxConnections = hadoopConfig.getInt(S3_READ_MAX_CONNECTIONS, defaults.getS3ReadMaxConnections());
@@ -879,6 +883,7 @@ public class PrestoS3FileSystem
         final boolean disableChecksums = isHttpEndpoint;
         S3Configuration s3Configuration = S3Configuration.builder()
                 .checksumValidationEnabled(!disableChecksums)
+                .chunkedEncodingEnabled(chunkedEncodingEnabled)
                 .build();
 
         String kmsKeyId = hadoopConfig.get(S3_KMS_KEY_ID);
@@ -891,7 +896,7 @@ public class PrestoS3FileSystem
                     .readTimeout(ofMillis(socketTimeout.toMillis()))
                     .writeTimeout(ofMillis(socketTimeout.toMillis()));
 
-            return createS3EncryptionClient(hadoopConfig, httpClientBuilder, httpAsyncClientBuilder, s3Configuration, kmsKeyId, endpointUri);
+            return createS3EncryptionClient(hadoopConfig, httpClientBuilder, httpAsyncClientBuilder, s3Configuration, kmsKeyId, endpointUri, chunkedEncodingEnabled);
         }
 
         S3ClientBuilder clientBuilder = configureS3ClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri);
@@ -902,7 +907,8 @@ public class PrestoS3FileSystem
             Configuration hadoopConfig,
             SdkAsyncHttpClient.Builder httpClientBuilder,
             S3Configuration s3Configuration,
-            URI endpointUri)
+            URI endpointUri,
+            boolean chunkedEncodingEnabled)
     {
         HiveS3Config defaults = new HiveS3Config();
         int maxErrorRetries = hadoopConfig.getInt(S3_MAX_ERROR_RETRIES, defaults.getS3MaxErrorRetries());
@@ -956,6 +962,13 @@ public class PrestoS3FileSystem
             log.debug("No region or endpoint specified, defaulting to US_EAST_1");
         }
 
+        // Workaround for disabling chunked encoding with S3 Async Client
+        // See: https://github.com/aws/aws-sdk-java-v2/discussions/5802#discussion-7829283
+        if (!chunkedEncodingEnabled) {
+            clientBuilder
+                    .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                    .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
+        }
         return clientBuilder;
     }
 
@@ -1019,9 +1032,10 @@ public class PrestoS3FileSystem
             SdkAsyncHttpClient.Builder httpClientBuilder,
             S3Configuration s3Configuration,
             String kmsKeyId,
-            URI endpointUri)
+            URI endpointUri,
+            boolean chunkedEncodingEnabled)
     {
-        S3AsyncClientBuilder baseClientBuilder = configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri);
+        S3AsyncClientBuilder baseClientBuilder = configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
 
         return S3AsyncEncryptionClient.builder()
                 .wrappedClient(baseClientBuilder.build())
@@ -1039,10 +1053,11 @@ public class PrestoS3FileSystem
             SdkAsyncHttpClient.Builder asyncHttpClientBuilder,
             S3Configuration s3Configuration,
             String kmsKeyId,
-            URI endpointUri)
+            URI endpointUri,
+            boolean chunkedEncodingEnabled)
     {
         S3ClientBuilder baseClientBuilder = configureS3ClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri);
-        S3AsyncClientBuilder baseAsyncClientBuilder = configureS3AsyncClientBuilder(hadoopConfig, asyncHttpClientBuilder, s3Configuration, endpointUri);
+        S3AsyncClientBuilder baseAsyncClientBuilder = configureS3AsyncClientBuilder(hadoopConfig, asyncHttpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
 
         return S3EncryptionClient.builder()
                 .wrappedClient(baseClientBuilder.build())

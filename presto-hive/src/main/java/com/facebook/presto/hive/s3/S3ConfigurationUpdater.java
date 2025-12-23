@@ -27,6 +27,7 @@ public interface S3ConfigurationUpdater
     String S3_USE_INSTANCE_CREDENTIALS = "presto.s3.use-instance-credentials";
     String S3_IAM_ROLE = "presto.hive.s3.iam-role";
     String S3_WEB_IDENTITY_ENABLED = "presto.hive.s3.web.identity.auth.enabled";
+    String S3_CHUNKED_ENCODING_ENABLED = "presto.hive.s3.chunked-encoding-enabled";
     String S3_IAM_ROLE_SESSION_NAME = "presto.hive.s3.iam-role-session-name";
     String S3_MULTIPART_MIN_PART_SIZE = "presto.s3.multipart.min-part-size";
     String S3_MULTIPART_MIN_FILE_SIZE = "presto.s3.multipart.min-file-size";

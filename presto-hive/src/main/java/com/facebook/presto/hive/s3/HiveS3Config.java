@@ -62,6 +62,7 @@ public class HiveS3Config
     private PrestoS3AclType s3AclType = PrestoS3AclType.PRIVATE;
     private boolean skipGlacierObjects;
     private boolean s3WebIdentityEnabled;
+    private boolean s3ChunkedEncodingEnabled = true;
 
     public boolean isS3WebIdentityEnabled()
     {
@@ -436,6 +437,19 @@ public class HiveS3Config
     public HiveS3Config setSkipGlacierObjects(boolean skipGlacierObjects)
     {
         this.skipGlacierObjects = skipGlacierObjects;
+        return this;
+    }
+
+    public boolean isS3ChunkedEncodingEnabled()
+    {
+        return s3ChunkedEncodingEnabled;
+    }
+
+    @Config("hive.s3.chunked-encoding-enabled")
+    @ConfigDescription("Use chunked encoding for S3 uploads. Disable for S3-compatible storage that doesn't support AWS chunked encoding")
+    public HiveS3Config setS3ChunkedEncodingEnabled(boolean s3ChunkedEncodingEnabled)
+    {
+        this.s3ChunkedEncodingEnabled = s3ChunkedEncodingEnabled;
         return this;
     }
 }
