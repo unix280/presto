@@ -43,7 +43,9 @@ import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvide
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
 import software.amazon.awssdk.awscore.retry.AwsRetryStrategy;
+import software.amazon.awssdk.core.FileRequestBodyConfiguration;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
@@ -61,8 +63,17 @@ import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.S3CrtAsyncClientBuilder;
+import software.amazon.awssdk.services.s3.crt.S3CrtHttpConfiguration;
+import software.amazon.awssdk.services.s3.crt.S3CrtRetryConfiguration;
+import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CommonPrefix;
+import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
+import software.amazon.awssdk.services.s3.model.CompletedPart;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
@@ -78,6 +89,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.S3Response;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 import software.amazon.awssdk.services.s3.model.StorageClass;
+import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.multipart.MultipartConfiguration;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
@@ -99,16 +111,20 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.facebook.airlift.units.DataSize.Unit.MEGABYTE;
@@ -153,6 +169,7 @@ import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.toArray;
 import static java.lang.Math.max;
 import static java.lang.String.format;
@@ -453,18 +470,35 @@ public class PrestoS3FileSystem
 
         String key = keyFromPath(qualifiedPath(path));
 
-        return new FSDataOutputStream(
-                new PrestoS3OutputStream(
-                        s3AsyncClient,
-                        mrapEnabled ? makeMrapArn(getBucketName(uri)) : getBucketName(uri),
-                        key,
-                        tempFile,
-                        sseEnabled,
-                        sseType,
-                        sseKmsKeyId,
-                        s3AclType,
-                        s3StorageClass),
-                statistics);
+        OutputStream outputStream;
+        if (mrapEnabled) {
+            outputStream = new PrestoS3MultipartOutputStream(
+                    s3AsyncClient,
+                    makeMrapArn(getBucketName(uri)),
+                    key,
+                    tempFile,
+                    sseEnabled,
+                    sseType,
+                    sseKmsKeyId,
+                    s3AclType,
+                    s3StorageClass,
+                    multiPartUploadMinPartSize,
+                    multiPartUploadMinFileSize);
+        }
+        else {
+            outputStream = new PrestoS3TransferManagerOutputStream(
+                    s3AsyncClient,
+                    getBucketName(uri),
+                    key,
+                    tempFile,
+                    sseEnabled,
+                    sseType,
+                    sseKmsKeyId,
+                    s3AclType,
+                    s3StorageClass);
+        }
+
+        return new FSDataOutputStream(outputStream, statistics);
     }
 
     @Override
@@ -851,8 +885,7 @@ public class PrestoS3FileSystem
             return createS3AsyncEncryptionClient(hadoopConfig, httpClientBuilder, s3Configuration, kmsKeyId, endpointUri, chunkedEncodingEnabled);
         }
 
-        S3AsyncClientBuilder clientBuilder = configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
-        return clientBuilder.build();
+        return configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
     }
 
     private S3Client createS3Client(Configuration hadoopConfig)
@@ -919,7 +952,7 @@ public class PrestoS3FileSystem
         return clientBuilder.build();
     }
 
-    private S3AsyncClientBuilder configureS3AsyncClientBuilder(
+    private S3AsyncClient configureS3AsyncClientBuilder(
             Configuration hadoopConfig,
             SdkAsyncHttpClient.Builder httpClientBuilder,
             S3Configuration s3Configuration,
@@ -927,65 +960,135 @@ public class PrestoS3FileSystem
             boolean chunkedEncodingEnabled)
     {
         HiveS3Config defaults = new HiveS3Config();
+
         int maxErrorRetries = hadoopConfig.getInt(S3_MAX_ERROR_RETRIES, defaults.getS3MaxErrorRetries());
+        int maxConnections = hadoopConfig.getInt(S3_WRITE_MAX_CONNECTIONS, defaults.getS3WriteMaxConnections());
+        Duration connectTimeout = Duration.valueOf(hadoopConfig.get(S3_CONNECT_TIMEOUT, defaults.getS3ConnectTimeout().toString()));
         String userAgentPrefix = hadoopConfig.get(S3_USER_AGENT_PREFIX, defaults.getS3UserAgentPrefix());
 
-        StandardRetryStrategy strategy = AwsRetryStrategy.standardRetryStrategy()
+        if (mrapEnabled) {
+            // MRAP requires CRT-based async client due to SigV4a
+            return buildCrtAsyncClient(endpointUri, maxConnections, maxErrorRetries, connectTimeout);
+        }
+
+        return buildNettyAsyncClient(httpClientBuilder, s3Configuration, endpointUri, maxErrorRetries, userAgentPrefix, chunkedEncodingEnabled);
+    }
+
+    private S3AsyncClient buildCrtAsyncClient(
+            URI endpointUri,
+            int maxConnections,
+            int maxErrorRetries,
+            Duration connectTimeout)
+    {
+        // The CRT-based S3 client does not currently support SDK metrics collection
+        // S3CrtAsyncClientBuilder has limited support for some of the customisations
+        S3CrtAsyncClientBuilder builder = S3AsyncClient.crtBuilder()
+                .credentialsProvider(credentialsProvider)
+                .maxConcurrency(maxConnections)
+                .minimumPartSizeInBytes(multiPartUploadMinPartSize)
+                .thresholdInBytes(multiPartUploadMinFileSize)
+                .retryConfiguration(S3CrtRetryConfiguration.builder()
+                        .numRetries(maxErrorRetries)
+                        .build())
+                .httpConfiguration(S3CrtHttpConfiguration.builder()
+                        .connectionTimeout(ofMillis(connectTimeout.toMillis()))
+                        .build());
+
+        applyEndpointAndRegion(builder, endpointUri);
+
+        if (isPathStyleAccess) {
+            builder.forcePathStyle(true);
+        }
+
+        return builder.build();
+    }
+
+    private S3AsyncClient buildNettyAsyncClient(
+            SdkAsyncHttpClient.Builder httpClientBuilder,
+            S3Configuration s3Configuration,
+            URI endpointUri,
+            int maxErrorRetries,
+            String userAgentPrefix,
+            boolean chunkedEncodingEnabled)
+    {
+        StandardRetryStrategy retryStrategy = AwsRetryStrategy.standardRetryStrategy()
                 .toBuilder()
                 .maxAttempts(maxErrorRetries)
                 .build();
 
-        ClientOverrideConfiguration clientOverrideConfiguration = ClientOverrideConfiguration.builder()
-                .retryStrategy(strategy)
-                .addMetricPublisher(metricPublisher)
-                .putAdvancedOption(USER_AGENT_PREFIX, userAgentPrefix)
-                .putAdvancedOption(USER_AGENT_SUFFIX, S3_USER_AGENT_SUFFIX)
-                .build();
+        ClientOverrideConfiguration overrideConfiguration =
+                ClientOverrideConfiguration.builder()
+                        .retryStrategy(retryStrategy)
+                        .addMetricPublisher(metricPublisher)
+                        .putAdvancedOption(USER_AGENT_PREFIX, userAgentPrefix)
+                        .putAdvancedOption(USER_AGENT_SUFFIX, S3_USER_AGENT_SUFFIX)
+                        .build();
 
-        S3AsyncClientBuilder clientBuilder = S3AsyncClient.builder()
+        S3AsyncClientBuilder builder = S3AsyncClient.builder()
                 .credentialsProvider(credentialsProvider)
                 .httpClientBuilder(httpClientBuilder)
                 .serviceConfiguration(s3Configuration)
-                .overrideConfiguration(clientOverrideConfiguration)
+                .overrideConfiguration(overrideConfiguration)
                 .multipartConfiguration(MultipartConfiguration.builder()
                         .minimumPartSizeInBytes(multiPartUploadMinPartSize)
                         .thresholdInBytes(multiPartUploadMinFileSize)
                         .build());
 
-        // Handle endpoint and region configuration
-        boolean regionOrEndpointSet = false;
-
-        if (endpointUri != null) {
-            clientBuilder.endpointOverride(endpointUri);
-
-            // Defaulting to the us-east-1 region.
-            // In AWS SDK V1, Presto would automatically use us-east-1 if no region was specified.
-            // However, AWS SDK V2 determines the region using the DefaultAwsRegionProviderChain,
-            // which may not be available when Presto is not running on EC2.
-            clientBuilder.region(Region.US_EAST_1);
-            log.debug("Using custom endpoint: %s", endpointUri);
-            regionOrEndpointSet = true;
-        }
+        applyEndpointAndRegion(builder, endpointUri);
 
         if (isPathStyleAccess) {
-            clientBuilder.forcePathStyle(true);
-            log.debug("Using path-style access");
-        }
-
-        if (!regionOrEndpointSet) {
-            clientBuilder.region(Region.US_EAST_1);
-            clientBuilder.crossRegionAccessEnabled(true);
-            log.debug("No region or endpoint specified, defaulting to US_EAST_1");
+            builder.forcePathStyle(true);
         }
 
         // Workaround for disabling chunked encoding with S3 Async Client
         // See: https://github.com/aws/aws-sdk-java-v2/discussions/5802#discussion-7829283
         if (!chunkedEncodingEnabled) {
-            clientBuilder
+            builder
                     .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
                     .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
         }
-        return clientBuilder;
+
+        return builder.build();
+    }
+
+    private void applyEndpointAndRegion(S3AsyncClientBuilder builder, URI endpointUri)
+    {
+        if (endpointUri != null) {
+            builder.endpointOverride(endpointUri);
+
+            // Defaulting to the us-east-1 region.
+            // In AWS SDK V1, Presto would automatically use us-east-1 if no region was specified.
+            // However, AWS SDK V2 determines the region using the DefaultAwsRegionProviderChain,
+            // which may not be available when Presto is not running on EC2.
+            builder.region(Region.US_EAST_1);
+            log.debug("Using custom endpoint: %s", endpointUri);
+            return;
+        }
+
+        // Default behavior to match AWS SDK v1 semantics
+        builder.region(Region.US_EAST_1);
+        builder.crossRegionAccessEnabled(true);
+        log.debug("No region or endpoint specified, defaulting to US_EAST_1");
+    }
+
+    private void applyEndpointAndRegion(S3CrtAsyncClientBuilder builder, URI endpointUri)
+    {
+        if (endpointUri != null) {
+            builder.endpointOverride(endpointUri);
+
+            // Defaulting to the us-east-1 region.
+            // In AWS SDK V1, Presto would automatically use us-east-1 if no region was specified.
+            // However, AWS SDK V2 determines the region using the DefaultAwsRegionProviderChain,
+            // which may not be available when Presto is not running on EC2.
+            builder.region(Region.US_EAST_1);
+            log.debug("Using custom endpoint: %s", endpointUri);
+            return;
+        }
+
+        // Default behavior to match AWS SDK v1 semantics
+        builder.region(Region.US_EAST_1);
+        builder.crossRegionAccessEnabled(true);
+        log.debug("No region or endpoint specified, defaulting to US_EAST_1");
     }
 
     private S3ClientBuilder configureS3ClientBuilder(
@@ -1051,10 +1154,10 @@ public class PrestoS3FileSystem
             URI endpointUri,
             boolean chunkedEncodingEnabled)
     {
-        S3AsyncClientBuilder baseClientBuilder = configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
+        S3AsyncClient baseClient = configureS3AsyncClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
 
         return S3AsyncEncryptionClient.builder()
-                .wrappedClient(baseClientBuilder.build())
+                .wrappedClient(baseClient)
                 .kmsKeyId(kmsKeyId)
                 // The legacy decryption modes are designed to be a temporary fix.
                 // After Presto users re-encrypt all of their objects with fully supported algorithms, this can be eliminated from the code.
@@ -1073,11 +1176,11 @@ public class PrestoS3FileSystem
             boolean chunkedEncodingEnabled)
     {
         S3ClientBuilder baseClientBuilder = configureS3ClientBuilder(hadoopConfig, httpClientBuilder, s3Configuration, endpointUri);
-        S3AsyncClientBuilder baseAsyncClientBuilder = configureS3AsyncClientBuilder(hadoopConfig, asyncHttpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
+        S3AsyncClient baseAsyncClient = configureS3AsyncClientBuilder(hadoopConfig, asyncHttpClientBuilder, s3Configuration, endpointUri, chunkedEncodingEnabled);
 
         return S3EncryptionClient.builder()
                 .wrappedClient(baseClientBuilder.build())
-                .wrappedAsyncClient(baseAsyncClientBuilder.build())
+                .wrappedAsyncClient(baseAsyncClient)
                 .kmsKeyId(kmsKeyId)
                 // The legacy decryption modes are designed to be a temporary fix.
                 // After Presto users re-encrypt all of their objects with fully supported algorithms, this can be eliminated from the code.
@@ -1511,7 +1614,239 @@ public class PrestoS3FileSystem
         }
     }
 
-    private static class PrestoS3OutputStream
+    private static class PrestoS3MultipartOutputStream
+            extends FilterOutputStream
+    {
+        private static final int MAX_CONCURRENCY = 8;
+
+        private final S3AsyncClient s3;
+        private final String bucket;
+        private final String key;
+        private final File tempFile;
+
+        private final boolean sseEnabled;
+        private final PrestoS3SseType sseType;
+        private final String sseKmsKeyId;
+        private final ObjectCannedACL aclType;
+        private final StorageClass storageClass;
+        private final long multipartUploadMinPartSize;
+        private final long multipartUploadMinFileSize;
+
+        private boolean closed;
+
+        public PrestoS3MultipartOutputStream(
+                S3AsyncClient s3,
+                String bucket,
+                String key,
+                File tempFile,
+                boolean sseEnabled,
+                PrestoS3SseType sseType,
+                String sseKmsKeyId,
+                PrestoS3AclType aclType,
+                PrestoS3StorageClass storageClass,
+                long multipartUploadMinPartSize,
+                long multipartUploadMinFileSize)
+                throws IOException
+        {
+            super(new BufferedOutputStream(Files.newOutputStream(requireNonNull(tempFile, "tempFile is null").toPath())));
+
+            this.s3 = requireNonNull(s3, "s3 is null");
+            this.bucket = requireNonNull(bucket, "bucket is null");
+            this.key = requireNonNull(key, "key is null");
+            this.tempFile = requireNonNull(tempFile, "tempFile is null");
+            this.sseEnabled = sseEnabled;
+            this.sseType = requireNonNull(sseType, "sseType is null");
+            this.sseKmsKeyId = sseKmsKeyId;
+            this.aclType = requireNonNull(aclType, "aclType is null").getCannedACL();
+            this.storageClass = requireNonNull(storageClass, "storageClass is null").getS3StorageClass();
+            this.multipartUploadMinPartSize = multipartUploadMinPartSize;
+            this.multipartUploadMinFileSize = multipartUploadMinFileSize;
+
+            log.debug("Created S3 multipart output stream for %s/%s using temp file %s", bucket, key, tempFile);
+        }
+
+        @Override
+        public void close() throws IOException
+        {
+            if (closed) {
+                return;
+            }
+            closed = true;
+
+            try {
+                super.close();
+                upload();
+            }
+            finally {
+                if (!tempFile.delete()) {
+                    log.warn("Could not delete temporary file: %s", tempFile);
+                }
+            }
+        }
+
+        private void upload() throws IOException
+        {
+            long size = tempFile.length();
+            STATS.uploadStarted();
+
+            try {
+                if (size < multipartUploadMinFileSize) {
+                    uploadSinglePart();
+                }
+                else {
+                    uploadMultipart();
+                }
+                STATS.uploadSuccessful();
+            }
+            catch (Exception e) {
+                STATS.uploadFailed();
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new InterruptedIOException();
+                }
+                throw new IOException("Upload failed for s3://" + bucket + "/" + key, e);
+            }
+        }
+
+        private void uploadSinglePart()
+        {
+            PutObjectRequest request = basePutRequest().build();
+            s3.putObject(request, tempFile.toPath()).join();
+        }
+
+        private void uploadMultipart()
+        {
+            CreateMultipartUploadRequest.Builder createRequestBuilder =
+                    CreateMultipartUploadRequest.builder()
+                            .bucket(bucket)
+                            .key(key)
+                            .storageClass(storageClass)
+                            .acl(aclType);
+
+            if (sseEnabled) {
+                createRequestBuilder.serverSideEncryption(serverSideEncryption());
+                createRequestBuilder.ssekmsKeyId(sseKmsKeyId);
+            }
+
+            CreateMultipartUploadRequest createRequest = createRequestBuilder.build();
+
+            CreateMultipartUploadResponse createResponse =
+                    s3.createMultipartUpload(createRequest).join();
+
+            String uploadId = createResponse.uploadId();
+
+            try {
+                List<CompletedPart> parts = uploadParts(uploadId);
+
+                CompleteMultipartUploadRequest completeRequest =
+                        CompleteMultipartUploadRequest.builder()
+                                .bucket(bucket)
+                                .key(key)
+                                .uploadId(uploadId)
+                                .multipartUpload(
+                                        CompletedMultipartUpload.builder()
+                                                .parts(parts)
+                                                .build())
+                                .build();
+
+                s3.completeMultipartUpload(completeRequest).join();
+            }
+            catch (Exception e) {
+                abortMultipartUpload(uploadId);
+                throw e;
+            }
+        }
+
+        private List<CompletedPart> uploadParts(String uploadId)
+        {
+            long fileSize = tempFile.length();
+            Semaphore semaphore = new Semaphore(MAX_CONCURRENCY);
+            List<CompletableFuture<CompletedPart>> futures = new ArrayList<>();
+
+            int partNumber = 1;
+            for (long position = 0; position < fileSize; position += multipartUploadMinPartSize) {
+                long size = Math.min(multipartUploadMinPartSize, fileSize - position);
+                int currentPart = partNumber++;
+
+                semaphore.acquireUninterruptibly();
+
+                UploadPartRequest request =
+                        UploadPartRequest.builder()
+                                .bucket(bucket)
+                                .key(key)
+                                .uploadId(uploadId)
+                                .partNumber(currentPart)
+                                .contentLength(size)
+                                .build();
+
+                AsyncRequestBody body =
+                        AsyncRequestBody.fromFile(FileRequestBodyConfiguration.builder()
+                                .path(tempFile.toPath())
+                                .position(position)
+                                .numBytesToRead(size)
+                                .build());
+
+                CompletableFuture<CompletedPart> future =
+                        s3.uploadPart(request, body)
+                                .whenComplete((r, t) -> semaphore.release())
+                                .thenApply(response ->
+                                        CompletedPart.builder()
+                                                .partNumber(currentPart)
+                                                .eTag(response.eTag())
+                                                .build());
+
+                futures.add(future);
+            }
+
+            return futures.stream()
+                    .map(CompletableFuture::join)
+                    .sorted(Comparator.comparingInt(CompletedPart::partNumber))
+                    .collect(toImmutableList());
+        }
+
+        private void abortMultipartUpload(String uploadId)
+        {
+            try {
+                s3.abortMultipartUpload(
+                        AbortMultipartUploadRequest.builder()
+                                .bucket(bucket)
+                                .key(key)
+                                .uploadId(uploadId)
+                                .build()).join();
+            }
+            catch (Exception e) {
+                log.warn("Failed to abort multipart upload %s for %s/%s", uploadId, bucket, key, e);
+            }
+        }
+
+        private PutObjectRequest.Builder basePutRequest()
+        {
+            PutObjectRequest.Builder builder = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .storageClass(storageClass)
+                    .acl(aclType);
+
+            if (sseEnabled) {
+                builder.serverSideEncryption(serverSideEncryption());
+                builder.ssekmsKeyId(sseKmsKeyId);
+            }
+
+            return builder;
+        }
+
+        private ServerSideEncryption serverSideEncryption()
+        {
+            if (!sseEnabled) {
+                return null;
+            }
+            return sseType == PrestoS3SseType.KMS
+                    ? ServerSideEncryption.AWS_KMS
+                    : ServerSideEncryption.AES256;
+        }
+    }
+
+    private static class PrestoS3TransferManagerOutputStream
             extends FilterOutputStream
     {
         private final S3TransferManager transferManager;
@@ -1525,7 +1860,7 @@ public class PrestoS3FileSystem
         private final StorageClass s3StorageClass;
         private boolean closed;
 
-        public PrestoS3OutputStream(
+        public PrestoS3TransferManagerOutputStream(
                 S3AsyncClient s3,
                 String host,
                 String key,
