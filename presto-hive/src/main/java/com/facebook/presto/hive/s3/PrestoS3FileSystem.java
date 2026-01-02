@@ -151,6 +151,7 @@ import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MULTIPART_MI
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_MULTIPART_MIN_PART_SIZE;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_PATH_STYLE_ACCESS;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_READ_MAX_CONNECTIONS;
+import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_REGION;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SECRET_KEY;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SKIP_GLACIER_OBJECTS;
 import static com.facebook.presto.hive.s3.S3ConfigurationUpdater.S3_SOCKET_TIMEOUT;
@@ -968,20 +969,22 @@ public class PrestoS3FileSystem
         int maxConnections = hadoopConfig.getInt(S3_WRITE_MAX_CONNECTIONS, defaults.getS3WriteMaxConnections());
         Duration connectTimeout = Duration.valueOf(hadoopConfig.get(S3_CONNECT_TIMEOUT, defaults.getS3ConnectTimeout().toString()));
         String userAgentPrefix = hadoopConfig.get(S3_USER_AGENT_PREFIX, defaults.getS3UserAgentPrefix());
+        String region = hadoopConfig.get(S3_REGION);
 
         if (mrapEnabled) {
             // MRAP requires CRT-based async client due to SigV4a
-            return buildCrtAsyncClient(endpointUri, maxConnections, maxErrorRetries, connectTimeout);
+            return buildCrtAsyncClient(endpointUri, maxConnections, maxErrorRetries, connectTimeout, region);
         }
 
-        return buildNettyAsyncClient(httpClientBuilder, s3Configuration, endpointUri, maxErrorRetries, userAgentPrefix, chunkedEncodingEnabled);
+        return buildNettyAsyncClient(httpClientBuilder, s3Configuration, endpointUri, maxErrorRetries, userAgentPrefix, chunkedEncodingEnabled, region);
     }
 
     private S3AsyncClient buildCrtAsyncClient(
             URI endpointUri,
             int maxConnections,
             int maxErrorRetries,
-            Duration connectTimeout)
+            Duration connectTimeout,
+            String region)
     {
         // The CRT-based S3 client does not currently support SDK metrics collection
         // S3CrtAsyncClientBuilder has limited support for some of the customisations
@@ -997,7 +1000,7 @@ public class PrestoS3FileSystem
                         .connectionTimeout(ofMillis(connectTimeout.toMillis()))
                         .build());
 
-        applyEndpointAndRegion(builder, endpointUri);
+        applyEndpointAndRegion(builder, endpointUri, region);
 
         if (isPathStyleAccess) {
             builder.forcePathStyle(true);
@@ -1012,7 +1015,8 @@ public class PrestoS3FileSystem
             URI endpointUri,
             int maxErrorRetries,
             String userAgentPrefix,
-            boolean chunkedEncodingEnabled)
+            boolean chunkedEncodingEnabled,
+            String region)
     {
         StandardRetryStrategy retryStrategy = AwsRetryStrategy.standardRetryStrategy()
                 .toBuilder()
@@ -1037,7 +1041,7 @@ public class PrestoS3FileSystem
                         .thresholdInBytes(multiPartUploadMinFileSize)
                         .build());
 
-        applyEndpointAndRegion(builder, endpointUri);
+        applyEndpointAndRegion(builder, endpointUri, region);
 
         if (isPathStyleAccess) {
             builder.forcePathStyle(true);
@@ -1054,7 +1058,7 @@ public class PrestoS3FileSystem
         return builder.build();
     }
 
-    private void applyEndpointAndRegion(S3AsyncClientBuilder builder, URI endpointUri)
+    private void applyEndpointAndRegion(S3AsyncClientBuilder builder, URI endpointUri, String region)
     {
         if (endpointUri != null) {
             builder.endpointOverride(endpointUri);
@@ -1068,13 +1072,20 @@ public class PrestoS3FileSystem
             return;
         }
 
+        if (region != null) {
+            builder.region(Region.of(region));
+
+            log.debug("Using configured region: %s", region);
+            return;
+        }
+
         // Default behavior to match AWS SDK v1 semantics
         builder.region(Region.US_EAST_1);
         builder.crossRegionAccessEnabled(true);
         log.debug("No region or endpoint specified, defaulting to US_EAST_1");
     }
 
-    private void applyEndpointAndRegion(S3CrtAsyncClientBuilder builder, URI endpointUri)
+    private void applyEndpointAndRegion(S3CrtAsyncClientBuilder builder, URI endpointUri, String region)
     {
         if (endpointUri != null) {
             builder.endpointOverride(endpointUri);
@@ -1085,6 +1096,13 @@ public class PrestoS3FileSystem
             // which may not be available when Presto is not running on EC2.
             builder.region(Region.US_EAST_1);
             log.debug("Using custom endpoint: %s", endpointUri);
+            return;
+        }
+
+        if (region != null) {
+            builder.region(Region.of(region));
+
+            log.debug("Using configured region: %s", region);
             return;
         }
 
@@ -1133,6 +1151,14 @@ public class PrestoS3FileSystem
             clientBuilder.region(Region.US_EAST_1);
             log.debug("Using custom endpoint: %s", endpointUri);
             regionOrEndpointSet = true;
+        }
+
+        String region = hadoopConfig.get(S3_REGION);
+        if (region != null) {
+            clientBuilder.region(Region.of(region));
+            regionOrEndpointSet = true;
+
+            log.debug("Using configured region: %s", region);
         }
 
         if (isPathStyleAccess) {
