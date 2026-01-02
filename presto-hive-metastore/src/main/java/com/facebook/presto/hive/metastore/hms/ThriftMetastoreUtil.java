@@ -62,6 +62,8 @@ import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
+import org.apache.hadoop.hive.metastore.api.Timestamp;
+import org.apache.hadoop.hive.metastore.api.TimestampColumnStatsData;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
@@ -82,6 +84,7 @@ import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -96,6 +99,7 @@ import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDeci
 import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDoubleColumnStatistics;
 import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createIntegerColumnStatistics;
 import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createStringColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createTimestampColumnStatistics;
 import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.HivePrivilege.DELETE;
 import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.HivePrivilege.INSERT;
 import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.HivePrivilege.OWNERSHIP;
@@ -129,6 +133,7 @@ import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.decimalS
 import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.doubleStats;
 import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.longStats;
 import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.stringStats;
+import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.timestampStats;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category.PRIMITIVE;
 
 public final class ThriftMetastoreUtil
@@ -562,6 +567,14 @@ public final class ThriftMetastoreUtil
             OptionalLong distinctValuesCount = dateStatsData.isSetNumDVs() ? OptionalLong.of(dateStatsData.getNumDVs()) : OptionalLong.empty();
             return createDateColumnStatistics(min, max, nullsCount, fromMetastoreDistinctValuesCount(distinctValuesCount, nullsCount, rowCount));
         }
+        if (columnStatistics.getStatsData().isSetTimestampStats()) {
+            TimestampColumnStatsData timestampStatsData = columnStatistics.getStatsData().getTimestampStats();
+            Optional<java.sql.Timestamp> min = timestampStatsData.isSetLowValue() ? fromMetastoreTimestamp(timestampStatsData.getLowValue()) : Optional.empty();
+            Optional<java.sql.Timestamp> max = timestampStatsData.isSetHighValue() ? fromMetastoreTimestamp(timestampStatsData.getHighValue()) : Optional.empty();
+            OptionalLong nullsCount = timestampStatsData.isSetNumNulls() ? fromMetastoreNullsCount(timestampStatsData.getNumNulls()) : OptionalLong.empty();
+            OptionalLong distinctValuesCount = timestampStatsData.isSetNumDVs() ? OptionalLong.of(timestampStatsData.getNumDVs()) : OptionalLong.empty();
+            return createTimestampColumnStatistics(min, max, nullsCount, fromMetastoreDistinctValuesCount(distinctValuesCount, nullsCount, rowCount));
+        }
         if (columnStatistics.getStatsData().isSetBooleanStats()) {
             BooleanColumnStatsData booleanStatsData = columnStatistics.getStatsData().getBooleanStats();
             return createBooleanColumnStatistics(
@@ -602,6 +615,15 @@ public final class ThriftMetastoreUtil
             return Optional.empty();
         }
         return Optional.of(LocalDate.ofEpochDay(date.getDaysSinceEpoch()));
+    }
+
+    public static Optional<java.sql.Timestamp> fromMetastoreTimestamp(Timestamp timestamp)
+    {
+        if (timestamp == null) {
+            return Optional.empty();
+        }
+        long millisSinceEpoch = TimeUnit.SECONDS.toMillis(timestamp.getSecondsSinceEpoch());
+        return Optional.of(new java.sql.Timestamp(millisSinceEpoch));
     }
 
     /**
@@ -776,7 +798,7 @@ public final class ThriftMetastoreUtil
             case DATE:
                 return createDateStatistics(columnName, columnType, statistics);
             case TIMESTAMP:
-                return createLongStatistics(columnName, columnType, statistics);
+                return createTimestampStatistics(columnName, columnType, statistics);
             case BINARY:
                 return createBinaryStatistics(columnName, columnType, statistics, rowCount);
             case DECIMAL:
@@ -843,6 +865,18 @@ public final class ThriftMetastoreUtil
         return new ColumnStatisticsObj(columnName, columnType.toString(), dateStats(data));
     }
 
+    private static ColumnStatisticsObj createTimestampStatistics(String columnName, HiveType columnType, HiveColumnStatistics statistics)
+    {
+        TimestampColumnStatsData data = new TimestampColumnStatsData();
+        statistics.getTimestampStatistics().ifPresent(timestampStatistics -> {
+            timestampStatistics.getMin().ifPresent(value -> data.setLowValue(toMetastoreTimestamp(value)));
+            timestampStatistics.getMax().ifPresent(value -> data.setHighValue(toMetastoreTimestamp(value)));
+        });
+        statistics.getNullsCount().ifPresent(data::setNumNulls);
+        toMetastoreDistinctValuesCount(statistics.getDistinctValuesCount(), statistics.getNullsCount()).ifPresent(data::setNumDVs);
+        return new ColumnStatisticsObj(columnName, columnType.toString(), timestampStats(data));
+    }
+
     private static ColumnStatisticsObj createBinaryStatistics(String columnName, HiveType columnType, HiveColumnStatistics statistics, OptionalLong rowCount)
     {
         BinaryColumnStatsData data = new BinaryColumnStatsData();
@@ -867,6 +901,11 @@ public final class ThriftMetastoreUtil
     public static Date toMetastoreDate(LocalDate date)
     {
         return new Date(date.toEpochDay());
+    }
+
+    public static Timestamp toMetastoreTimestamp(java.sql.Timestamp timestamp)
+    {
+        return new Timestamp(TimeUnit.MILLISECONDS.toSeconds(timestamp.getTime()));
     }
 
     public static Decimal toMetastoreDecimal(BigDecimal decimal)

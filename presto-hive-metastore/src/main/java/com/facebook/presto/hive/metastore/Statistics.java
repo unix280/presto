@@ -106,6 +106,7 @@ public final class Statistics
                 mergeDoubleStatistics(first.getDoubleStatistics(), second.getDoubleStatistics()),
                 mergeDecimalStatistics(first.getDecimalStatistics(), second.getDecimalStatistics()),
                 mergeDateStatistics(first.getDateStatistics(), second.getDateStatistics()),
+                mergeTimestampStatistics(first.getTimestampStatistics(), second.getTimestampStatistics()),
                 mergeBooleanStatistics(first.getBooleanStatistics(), second.getBooleanStatistics()),
                 reduce(first.getMaxValueSizeInBytes(), second.getMaxValueSizeInBytes(), MAX, true),
                 reduce(first.getTotalSizeInBytes(), second.getTotalSizeInBytes(), ADD, true),
@@ -151,6 +152,17 @@ public final class Statistics
         // normally, either both or none is present
         if (first.isPresent() && second.isPresent()) {
             return Optional.of(new DateStatistics(
+                    reduce(first.get().getMin(), second.get().getMin(), MIN, true),
+                    reduce(first.get().getMax(), second.get().getMax(), MAX, true)));
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<TimestampStatistics> mergeTimestampStatistics(Optional<TimestampStatistics> first, Optional<TimestampStatistics> second)
+    {
+        // normally, either both or none is present
+        if (first.isPresent() && second.isPresent()) {
+            return Optional.of(new TimestampStatistics(
                     reduce(first.get().getMin(), second.get().getMin(), MIN, true),
                     reduce(first.get().getMax(), second.get().getMax(), MAX, true)));
         }

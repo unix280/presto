@@ -49,6 +49,8 @@ import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -77,6 +79,7 @@ import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDate
 import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDecimalColumnStatistics;
 import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDoubleColumnStatistics;
 import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createIntegerColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createTimestampColumnStatistics;
 import static com.facebook.presto.hive.statistics.MetastoreHiveStatisticsProvider.calculateAverageRowsPerPartition;
 import static com.facebook.presto.hive.statistics.MetastoreHiveStatisticsProvider.calculateAverageSizePerPartition;
 import static com.facebook.presto.hive.statistics.MetastoreHiveStatisticsProvider.calculateDataSize;
@@ -238,6 +241,12 @@ public class TestMetastoreHiveStatisticsProvider
                         .setColumnStatistics(ImmutableMap.of(COLUMN, createDateColumnStatistics(Optional.of(LocalDate.ofEpochDay(1)), Optional.of(LocalDate.ofEpochDay(-1)), OptionalLong.empty(), OptionalLong.empty())))
                         .build(),
                 invalidColumnStatistics("dateStatistics.min must be less than or equal to dateStatistics.max. dateStatistics.min: 1970-01-02. dateStatistics.max: 1969-12-31."));
+        assertInvalidStatistics(
+                PartitionStatistics.builder()
+                        .setBasicStatistics(new HiveBasicStatistics(0, 0, 0, 0))
+                        .setColumnStatistics(ImmutableMap.of(COLUMN, createTimestampColumnStatistics(Optional.of(Timestamp.from(Instant.ofEpochSecond(999))), Optional.of(Timestamp.from(Instant.ofEpochSecond(1))), OptionalLong.empty(), OptionalLong.empty())))
+                        .build(),
+                invalidColumnStatistics("timestampStatistics.min must be less than or equal to timestampStatistics.max. timestampStatistics.min: 1969-12-31 16:16:39.0. timestampStatistics.max: 1969-12-31 16:00:01.0."));
         assertInvalidStatistics(
                 PartitionStatistics.builder()
                         .setBasicStatistics(new HiveBasicStatistics(0, 0, 0, 0))
