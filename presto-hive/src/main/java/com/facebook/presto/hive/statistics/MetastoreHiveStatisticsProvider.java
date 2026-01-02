@@ -30,6 +30,7 @@ import com.facebook.presto.hive.metastore.IntegerStatistics;
 import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
+import com.facebook.presto.hive.metastore.TimestampStatistics;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
@@ -48,6 +49,7 @@ import com.google.common.primitives.SignedBytes;
 import io.airlift.slice.Slice;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -373,6 +375,20 @@ public class MetastoreHiveStatisticsProvider
                         partition,
                         column,
                         "dateStatistics.min must be less than or equal to dateStatistics.max. dateStatistics.min: %s. dateStatistics.max: %s.",
+                        min.get(),
+                        max.get());
+            }
+        });
+        columnStatistics.getTimestampStatistics().ifPresent(timestampStatistics -> {
+            Optional<Timestamp> min = timestampStatistics.getMin();
+            Optional<Timestamp> max = timestampStatistics.getMax();
+            if (min.isPresent() && max.isPresent()) {
+                checkStatistics(
+                        min.get().compareTo(max.get()) <= 0,
+                        table,
+                        partition,
+                        column,
+                        "timestampStatistics.min must be less than or equal to timestampStatistics.max. timestampStatistics.min: %s. timestampStatistics.max: %s.",
                         min.get(),
                         max.get());
             }
@@ -896,6 +912,14 @@ public class MetastoreHiveStatisticsProvider
     {
         if (statistics.getMin().isPresent() && statistics.getMax().isPresent()) {
             return Optional.of(new DoubleRange(statistics.getMin().get().toEpochDay(), statistics.getMax().get().toEpochDay()));
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<DoubleRange> createTimestampRange(TimestampStatistics statistics)
+    {
+        if (statistics.getMin().isPresent() && statistics.getMax().isPresent()) {
+            return Optional.of(new DoubleRange(statistics.getMin().get().getTime(), statistics.getMax().get().getTime()));
         }
         return Optional.empty();
     }

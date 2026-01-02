@@ -131,6 +131,7 @@ public class TestRecordingHiveMetastore
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
+                    Optional.empty(),
                     OptionalLong.of(1234),
                     OptionalLong.of(1235),
                     OptionalLong.of(1),

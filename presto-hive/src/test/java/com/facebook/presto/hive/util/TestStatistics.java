@@ -20,10 +20,13 @@ import com.facebook.presto.hive.metastore.DecimalStatistics;
 import com.facebook.presto.hive.metastore.DoubleStatistics;
 import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.IntegerStatistics;
+import com.facebook.presto.hive.metastore.TimestampStatistics;
 import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Optional;
@@ -135,6 +138,23 @@ public class TestStatistics
                 HiveColumnStatistics.builder().setDateStatistics(new DateStatistics(Optional.of(LocalDate.ofEpochDay(1)), Optional.of(LocalDate.ofEpochDay(2)))).build(),
                 HiveColumnStatistics.builder().setDateStatistics(new DateStatistics(Optional.of(LocalDate.ofEpochDay(0)), Optional.of(LocalDate.ofEpochDay(3)))).build(),
                 HiveColumnStatistics.builder().setDateStatistics(new DateStatistics(Optional.of(LocalDate.ofEpochDay(0)), Optional.of(LocalDate.ofEpochDay(3)))).build());
+    }
+
+    @Test
+    public void testMergeTimestampColumnStatistics()
+    {
+        assertMergeHiveColumnStatistics(
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.empty(), Optional.empty())).build(),
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.empty(), Optional.empty())).build(),
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.empty(), Optional.empty())).build());
+        assertMergeHiveColumnStatistics(
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.of(Timestamp.from(Instant.ofEpochSecond(1))), Optional.of(Timestamp.from(Instant.ofEpochSecond(2))))).build(),
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.empty(), Optional.empty())).build(),
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.of(Timestamp.from(Instant.ofEpochSecond(1))), Optional.of(Timestamp.from(Instant.ofEpochSecond(2))))).build());
+        assertMergeHiveColumnStatistics(
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.of(Timestamp.from(Instant.ofEpochSecond(1))), Optional.of(Timestamp.from(Instant.ofEpochSecond(2))))).build(),
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.of(Timestamp.from(Instant.ofEpochSecond(0))), Optional.of(Timestamp.from(Instant.ofEpochSecond(3))))).build(),
+                HiveColumnStatistics.builder().setTimestampStatistics(new TimestampStatistics(Optional.of(Timestamp.from(Instant.ofEpochSecond(0))), Optional.of(Timestamp.from(Instant.ofEpochSecond(3))))).build());
     }
 
     @Test

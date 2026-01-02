@@ -37,6 +37,7 @@ import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
 import com.facebook.presto.hive.metastore.StorageFormat;
 import com.facebook.presto.hive.metastore.Table;
+import com.facebook.presto.hive.metastore.TimestampStatistics;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplitSource;
@@ -929,6 +930,23 @@ public class HiveSplitManager
         }
         if (hiveColumnStatistics.getMax().isPresent()) {
             result = result.intersect(SortedRangeSet.copyOf(type, ImmutableList.of(Range.lessThanOrEqual(type, hiveColumnStatistics.getMax().get().toEpochDay()))));
+        }
+        return Optional.of(result);
+    }
+
+    private Optional<ValueSet> getTimestampColumnStatisticsValueSet(HiveColumnStatistics statistics, Type type)
+    {
+        if (!statistics.getTimestampStatistics().isPresent()) {
+            return Optional.empty();
+        }
+
+        TimestampStatistics hiveColumnStatistics = statistics.getTimestampStatistics().get();
+        ValueSet result = ValueSet.all(type);
+        if (hiveColumnStatistics.getMin().isPresent()) {
+            result = result.intersect(SortedRangeSet.copyOf(type, ImmutableList.of(Range.greaterThanOrEqual(type, hiveColumnStatistics.getMin().get().getTime()))));
+        }
+        if (hiveColumnStatistics.getMax().isPresent()) {
+            result = result.intersect(SortedRangeSet.copyOf(type, ImmutableList.of(Range.lessThanOrEqual(type, hiveColumnStatistics.getMax().get().getTime()))));
         }
         return Optional.of(result);
     }

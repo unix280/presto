@@ -92,6 +92,7 @@ public class PartitionQuickStats
                         Optional.empty(),
                         Optional.empty(),
                         Optional.empty(),
+                        Optional.empty(),
                         OptionalLong.empty(),
                         OptionalLong.empty(),
                         OptionalLong.of(nullsCount),

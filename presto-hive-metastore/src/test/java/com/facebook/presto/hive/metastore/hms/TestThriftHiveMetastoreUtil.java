@@ -20,6 +20,7 @@ import com.facebook.presto.hive.metastore.DecimalStatistics;
 import com.facebook.presto.hive.metastore.DoubleStatistics;
 import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.IntegerStatistics;
+import com.facebook.presto.hive.metastore.TimestampStatistics;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
@@ -31,9 +32,12 @@ import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
+import org.apache.hadoop.hive.metastore.api.Timestamp;
+import org.apache.hadoop.hive.metastore.api.TimestampColumnStatsData;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -50,6 +54,7 @@ import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.decimalS
 import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.doubleStats;
 import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.longStats;
 import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.stringStats;
+import static org.apache.hadoop.hive.metastore.api.ColumnStatisticsData.timestampStats;
 import static org.apache.hadoop.hive.serde.serdeConstants.BIGINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BINARY_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BOOLEAN_TYPE_NAME;
@@ -57,6 +62,7 @@ import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.DECIMAL_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.DOUBLE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.TIMESTAMP_TYPE_NAME;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
@@ -95,6 +101,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -117,6 +124,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.of(new DoubleStatistics(OptionalDouble.of(0), OptionalDouble.of(100))));
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -135,6 +143,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.of(new DoubleStatistics(OptionalDouble.empty(), OptionalDouble.empty())));
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -159,6 +168,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.of(new DecimalStatistics(Optional.of(low), Optional.of(high))));
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -177,6 +187,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.of(new DecimalStatistics(Optional.empty(), Optional.empty())));
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -198,6 +209,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.of(new BooleanStatistics(OptionalLong.of(100), OptionalLong.of(10))));
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -216,6 +228,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.of(new BooleanStatistics(OptionalLong.empty(), OptionalLong.empty())));
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -238,6 +251,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.of(new DateStatistics(Optional.of(LocalDate.ofEpochDay(1000)), Optional.of(LocalDate.ofEpochDay(2000)))));
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -256,6 +270,55 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.of(new DateStatistics(Optional.empty(), Optional.empty())));
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
+        assertEquals(actual.getBooleanStatistics(), Optional.empty());
+        assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
+        assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
+        assertEquals(actual.getNullsCount(), OptionalLong.empty());
+        assertEquals(actual.getDistinctValuesCount(), OptionalLong.empty());
+    }
+
+    @Test
+    public void testTimestampStatsToColumnStatistics()
+    {
+        long lowSeconds = 86400 * 7;
+        long highSeconds = 1000 + 86400 * 31;
+        java.sql.Timestamp expectedLow = java.sql.Timestamp.from(Instant.ofEpochSecond(lowSeconds));
+        java.sql.Timestamp expectedHigh = java.sql.Timestamp.from(Instant.ofEpochSecond(highSeconds));
+        TimestampColumnStatsData timestampColumnStatsData = new TimestampColumnStatsData();
+        timestampColumnStatsData.setLowValue(new Timestamp(lowSeconds));
+        timestampColumnStatsData.setHighValue(new Timestamp(highSeconds));
+        timestampColumnStatsData.setNumNulls(1);
+        timestampColumnStatsData.setNumDVs(20);
+
+        ColumnStatisticsObj columnStatisticsObj = new ColumnStatisticsObj("my_col", TIMESTAMP_TYPE_NAME, timestampStats(timestampColumnStatsData));
+        HiveColumnStatistics actual = fromMetastoreApiColumnStatistics(columnStatisticsObj, OptionalLong.of(1000));
+
+        assertEquals(actual.getIntegerStatistics(), Optional.empty());
+        assertEquals(actual.getDoubleStatistics(), Optional.empty());
+        assertEquals(actual.getDecimalStatistics(), Optional.empty());
+        assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.of(new TimestampStatistics(Optional.of(expectedLow), Optional.of(expectedHigh))));
+        assertEquals(actual.getBooleanStatistics(), Optional.empty());
+        assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
+        assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
+        assertEquals(actual.getNullsCount(), OptionalLong.of(1));
+        assertEquals(actual.getDistinctValuesCount(), OptionalLong.of(19));
+    }
+
+    @Test
+    public void testEmptyTimestampStatsToColumnStatistics()
+    {
+        TimestampColumnStatsData timestampColumnStatsData = new TimestampColumnStatsData();
+
+        ColumnStatisticsObj columnStatisticsObj = new ColumnStatisticsObj("my_col", TIMESTAMP_TYPE_NAME, timestampStats(timestampColumnStatsData));
+        HiveColumnStatistics actual = fromMetastoreApiColumnStatistics(columnStatisticsObj, OptionalLong.of(1000));
+
+        assertEquals(actual.getIntegerStatistics(), Optional.empty());
+        assertEquals(actual.getDoubleStatistics(), Optional.empty());
+        assertEquals(actual.getDecimalStatistics(), Optional.empty());
+        assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.of(new TimestampStatistics(Optional.empty(), Optional.empty())));
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -278,6 +341,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.of(100));
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.of(23));
@@ -296,6 +360,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());
@@ -317,6 +382,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.of(100));
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.of(44));
@@ -335,6 +401,7 @@ public class TestThriftHiveMetastoreUtil
         assertEquals(actual.getDoubleStatistics(), Optional.empty());
         assertEquals(actual.getDecimalStatistics(), Optional.empty());
         assertEquals(actual.getDateStatistics(), Optional.empty());
+        assertEquals(actual.getTimestampStatistics(), Optional.empty());
         assertEquals(actual.getBooleanStatistics(), Optional.empty());
         assertEquals(actual.getMaxValueSizeInBytes(), OptionalLong.empty());
         assertEquals(actual.getTotalSizeInBytes(), OptionalLong.empty());

@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.errorprone.annotations.Immutable;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +40,7 @@ public class HiveColumnStatistics
     private final Optional<DoubleStatistics> doubleStatistics;
     private final Optional<DecimalStatistics> decimalStatistics;
     private final Optional<DateStatistics> dateStatistics;
+    private final Optional<TimestampStatistics> timestampStatistics;
     private final Optional<BooleanStatistics> booleanStatistics;
     private final OptionalLong maxValueSizeInBytes;
     private final OptionalLong totalSizeInBytes;
@@ -56,6 +58,7 @@ public class HiveColumnStatistics
             @JsonProperty("doubleStatistics") Optional<DoubleStatistics> doubleStatistics,
             @JsonProperty("decimalStatistics") Optional<DecimalStatistics> decimalStatistics,
             @JsonProperty("dateStatistics") Optional<DateStatistics> dateStatistics,
+            @JsonProperty("timestampStatistics") Optional<TimestampStatistics> timestampStatistics,
             @JsonProperty("booleanStatistics") Optional<BooleanStatistics> booleanStatistics,
             @JsonProperty("maxValueSizeInBytes") OptionalLong maxValueSizeInBytes,
             @JsonProperty("totalSizeInBytes") OptionalLong totalSizeInBytes,
@@ -66,6 +69,7 @@ public class HiveColumnStatistics
         this.doubleStatistics = requireNonNull(doubleStatistics, "doubleStatistics is null");
         this.decimalStatistics = requireNonNull(decimalStatistics, "decimalStatistics is null");
         this.dateStatistics = requireNonNull(dateStatistics, "dateStatistics is null");
+        this.timestampStatistics = requireNonNull(timestampStatistics, "timestampStatistics is null");
         this.booleanStatistics = requireNonNull(booleanStatistics, "booleanStatistics is null");
         this.maxValueSizeInBytes = requireNonNull(maxValueSizeInBytes, "maxValueSizeInBytes is null");
         this.totalSizeInBytes = requireNonNull(totalSizeInBytes, "totalSizeInBytes is null");
@@ -77,6 +81,7 @@ public class HiveColumnStatistics
         doubleStatistics.ifPresent(s -> presentStatistics.add("doubleStatistics"));
         decimalStatistics.ifPresent(s -> presentStatistics.add("decimalStatistics"));
         dateStatistics.ifPresent(s -> presentStatistics.add("dateStatistics"));
+        timestampStatistics.ifPresent(s -> presentStatistics.add("timestampStatistics"));
         booleanStatistics.ifPresent(s -> presentStatistics.add("booleanStatistics"));
         checkArgument(presentStatistics.size() <= 1, "multiple type specific statistic objects are present: %s", presentStatistics);
     }
@@ -103,6 +108,12 @@ public class HiveColumnStatistics
     public Optional<DateStatistics> getDateStatistics()
     {
         return dateStatistics;
+    }
+
+    @JsonProperty
+    public Optional<TimestampStatistics> getTimestampStatistics()
+    {
+        return timestampStatistics;
     }
 
     @JsonProperty
@@ -149,6 +160,7 @@ public class HiveColumnStatistics
                 Objects.equals(doubleStatistics, that.doubleStatistics) &&
                 Objects.equals(decimalStatistics, that.decimalStatistics) &&
                 Objects.equals(dateStatistics, that.dateStatistics) &&
+                Objects.equals(timestampStatistics, that.timestampStatistics) &&
                 Objects.equals(booleanStatistics, that.booleanStatistics) &&
                 Objects.equals(maxValueSizeInBytes, that.maxValueSizeInBytes) &&
                 Objects.equals(totalSizeInBytes, that.totalSizeInBytes) &&
@@ -164,6 +176,7 @@ public class HiveColumnStatistics
                 doubleStatistics,
                 decimalStatistics,
                 dateStatistics,
+                timestampStatistics,
                 booleanStatistics,
                 maxValueSizeInBytes,
                 totalSizeInBytes,
@@ -179,6 +192,7 @@ public class HiveColumnStatistics
                 .add("doubleStatistics", doubleStatistics)
                 .add("decimalStatistics", decimalStatistics)
                 .add("dateStatistics", dateStatistics)
+                .add("timestampStatistics", timestampStatistics)
                 .add("booleanStatistics", booleanStatistics)
                 .add("maxValueSizeInBytes", maxValueSizeInBytes)
                 .add("totalSizeInBytes", totalSizeInBytes)
@@ -218,6 +232,15 @@ public class HiveColumnStatistics
     {
         return builder()
                 .setDateStatistics(new DateStatistics(min, max))
+                .setNullsCount(nullsCount)
+                .setDistinctValuesCount(distinctValuesCount)
+                .build();
+    }
+
+    public static HiveColumnStatistics createTimestampColumnStatistics(Optional<Timestamp> min, Optional<Timestamp> max, OptionalLong nullsCount, OptionalLong distinctValuesCount)
+    {
+        return builder()
+                .setTimestampStatistics(new TimestampStatistics(min, max))
                 .setNullsCount(nullsCount)
                 .setDistinctValuesCount(distinctValuesCount)
                 .build();
@@ -270,6 +293,7 @@ public class HiveColumnStatistics
         private Optional<DoubleStatistics> doubleStatistics = Optional.empty();
         private Optional<DecimalStatistics> decimalStatistics = Optional.empty();
         private Optional<DateStatistics> dateStatistics = Optional.empty();
+        private Optional<TimestampStatistics> timestampStatistics = Optional.empty();
         private Optional<BooleanStatistics> booleanStatistics = Optional.empty();
         private OptionalLong maxValueSizeInBytes = OptionalLong.empty();
         private OptionalLong totalSizeInBytes = OptionalLong.empty();
@@ -284,6 +308,7 @@ public class HiveColumnStatistics
             this.doubleStatistics = other.getDoubleStatistics();
             this.decimalStatistics = other.getDecimalStatistics();
             this.dateStatistics = other.getDateStatistics();
+            this.timestampStatistics = other.getTimestampStatistics();
             this.booleanStatistics = other.getBooleanStatistics();
             this.maxValueSizeInBytes = other.getMaxValueSizeInBytes();
             this.totalSizeInBytes = other.getTotalSizeInBytes();
@@ -336,6 +361,18 @@ public class HiveColumnStatistics
         public Builder setDateStatistics(DateStatistics dateStatistics)
         {
             this.dateStatistics = Optional.of(dateStatistics);
+            return this;
+        }
+
+        public Builder setTimestampStatistics(Optional<TimestampStatistics> timestampStatistics)
+        {
+            this.timestampStatistics = timestampStatistics;
+            return this;
+        }
+
+        public Builder setTimestampStatistics(TimestampStatistics timestampStatistics)
+        {
+            this.timestampStatistics = Optional.of(timestampStatistics);
             return this;
         }
 
@@ -406,6 +443,7 @@ public class HiveColumnStatistics
                     doubleStatistics,
                     decimalStatistics,
                     dateStatistics,
+                    timestampStatistics,
                     booleanStatistics,
                     maxValueSizeInBytes,
                     totalSizeInBytes,
