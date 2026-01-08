@@ -19,6 +19,11 @@ add_subdirectory(connectors)
 add_subdirectory(functions)
 add_subdirectory(tool)
 add_subdirectory(properties)
+add_subdirectory(tvf)
+
+add_library(presto_session_properties SessionProperties.cpp)
+
+target_link_libraries(presto_session_properties ${FOLLY_WITH_DEPENDENCIES})
 
 add_library(
   presto_server_lib
@@ -71,6 +76,8 @@ target_link_libraries(
   presto_hive_functions
   presto_theta_sketch_functions
   presto_magen
+  presto_tvf_exec
+  presto_tvf_functions
   velox_abfs
   velox_aggregates
   velox_caching
