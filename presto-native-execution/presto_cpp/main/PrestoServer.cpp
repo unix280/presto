@@ -49,6 +49,8 @@
 #include "presto_cpp/main/operators/ShuffleRead.h"
 #include "presto_cpp/main/operators/ShuffleWrite.h"
 #include "presto_cpp/main/properties/session/SessionProperties.h"
+#include "presto_cpp/main/tvf/exec/TableFunctionTranslator.h"
+#include "presto_cpp/main/tvf/functions/TableFunctionsRegistration.h"
 #include "presto_cpp/main/types/ExpressionOptimizer.h"
 #include "presto_cpp/main/types/PrestoToVeloxQueryPlan.h"
 #include "presto_cpp/main/types/VeloxPlanConversion.h"
@@ -600,6 +602,18 @@ void PrestoServer::registerHttpEndpoints() {
         http::sendOkResponse(
             downstream,
             getAnalyzedTableValueFunction(
+                util::extractMessageBody(body),
+                server->nativeWorkerPool_.get()));
+      });
+  httpServer_->registerPost(
+      "/v1/tvf/splits",
+      [server = this](
+          proxygen::HTTPMessage* message,
+          const std::vector<std::unique_ptr<folly::IOBuf>>& body,
+          proxygen::ResponseHandler* downstream) {
+        http::sendOkResponse(
+            downstream,
+            getSplits(
                 util::extractMessageBody(body),
                 server->nativeWorkerPool_.get()));
       });
@@ -1550,6 +1564,10 @@ void PrestoServer::registerCustomOperators() {
   // This enables RPCOperator to be created from RPCNode plan nodes
   // when fb_llm_inference is detected.
   velox::exec::rpc::registerRPCPlanNodeTranslator();
+
+  // Table functions translator.
+  velox::exec::Operator::registerOperator(
+      std::make_unique<tvf::TableFunctionTranslator>());
 }
 
 void PrestoServer::registerFunctions() {
@@ -1559,7 +1577,7 @@ void PrestoServer::registerFunctions() {
       prestoBuiltinFunctionPrefix_);
   velox::window::prestosql::registerAllWindowFunctions(
       prestoBuiltinFunctionPrefix_);
-      
+
   facebook::presto::governance::registerQaagFunctions(
       prestoBuiltinFunctionPrefix_);
 
@@ -1584,6 +1602,8 @@ void PrestoServer::registerFunctions() {
             << velox::exec::rpc::AsyncRPCFunctionRegistry::registeredFunctions()
                    .size()
             << " RPC function(s).";
+
+  tvf::registerAllTableFunctions(prestoBuiltinFunctionPrefix_);
 }
 
 void PrestoServer::registerRemoteFunctions() {
