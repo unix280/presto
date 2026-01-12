@@ -32,7 +32,6 @@ class TableFunctionInvocationTest : public OperatorTestBase {
 
  public:
   TableFunctionInvocationTest() {
-    registerSimpleTableFunction("simple_table_function");
     registerIdentityFunction("identity_table_function");
     registerRepeatFunction("repeat_table_function");
     parse::registerTypeResolver();
@@ -50,28 +49,7 @@ class TableFunctionInvocationTest : public OperatorTestBase {
     velox::exec::Operator::registerOperator(
         std::make_unique<TableFunctionTranslator>());
   };
-
- protected:
-  std::unordered_map<std::string, std::shared_ptr<Argument>>
-  simpleTableFunctionArgs(const std::string& column) {
-    std::unordered_map<std::string, std::shared_ptr<Argument>> args;
-    args.emplace(
-        "COLUMN",
-        std::make_shared<ScalarArgument>(
-            VARCHAR(), makeConstant(StringView(column), 1, VARCHAR())));
-    return args;
-  }
 };
-
-TEST_F(TableFunctionInvocationTest, DISABLED_simple) {
-  auto plan = PlanBuilder()
-                  .addNode(addTvfNode(
-                      "simple_table_function", simpleTableFunctionArgs("col")))
-                  .planNode();
-
-  auto expected = makeRowVector({});
-  AssertQueryBuilder(plan).assertResults(expected);
-}
 
 TEST_F(TableFunctionInvocationTest, identity) {
   auto data = makeRowVector(
