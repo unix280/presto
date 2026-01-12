@@ -27,7 +27,6 @@ void registerAllTableFunctions(const std::string& prefix) {
   registerRemoteAnn(prefix + "remoteAnn");
   registerRepeatFunction(prefix + "repeat_table_function");
   registerIdentityFunction(prefix + "identity_table_function");
-  registerSimpleTableFunction(prefix + "simple_table_function");
 }
 
 } // namespace facebook::presto::tvf

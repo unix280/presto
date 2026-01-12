@@ -19,40 +19,6 @@ using namespace facebook::velox;
 
 namespace facebook::presto::tvf {
 
-class SimpleTableFunctionHandle : public TableFunctionHandle {
- public:
-  std::string_view name() const override {
-    return "SimpleTableFunctionHandle";
-  };
-
-  folly::dynamic serialize() const override {
-    folly::dynamic obj = folly::dynamic::object;
-    obj["name"] = fmt::format("{}", name());
-    return obj;
-  };
-
-  static std::shared_ptr<SimpleTableFunctionHandle> create(
-      const folly::dynamic& obj,
-      void* context) {
-    return std::shared_ptr<SimpleTableFunctionHandle>();
-  };
-
-  static void registerSerDe() {
-    auto& registry = velox::DeserializationWithContextRegistryForSharedPtr();
-    registry.Register("SimpleTableFunctionHandle", create);
-  }
-};
-
-class SimpleTableFunctionAnalysis : public TableFunctionAnalysis {};
-
-class SimpleTableFunction final : public TableFunction {
- public:
-  static std::unique_ptr<SimpleTableFunctionAnalysis> analyze(
-      const std::unordered_map<std::string, std::shared_ptr<Argument>>& args);
-};
-
-void registerSimpleTableFunction(const std::string& name);
-
 class IdentityFunctionHandle : public TableFunctionHandle {
   std::string_view name() const override {
     return "IdentityFunctionHandle";

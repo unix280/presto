@@ -21,40 +21,6 @@ using namespace facebook::velox;
 
 namespace facebook::presto::tvf {
 
-std::unique_ptr<SimpleTableFunctionAnalysis> SimpleTableFunction::analyze(
-    const std::unordered_map<std::string, std::shared_ptr<Argument>>& args) {
-  std::vector<std::string> returnNames;
-  std::vector<TypePtr> returnTypes;
-
-  const auto arg = std::dynamic_pointer_cast<ScalarArgument>(args.at("COLUMN"));
-  const auto val = arg->value()->as<ConstantVector<StringView>>()->valueAt(0);
-
-  returnNames.push_back(val);
-  returnTypes.push_back(BOOLEAN());
-
-  auto analysis = std::make_unique<SimpleTableFunctionAnalysis>();
-  analysis->tableFunctionHandle_ =
-      std::make_shared<SimpleTableFunctionHandle>();
-  analysis->returnType_ =
-      std::make_shared<Descriptor>(returnNames, returnTypes);
-  return analysis;
-}
-
-void registerSimpleTableFunction(const std::string& name) {
-  TableArgumentSpecList argSpecs;
-  argSpecs.insert(
-      std::make_shared<ScalarArgumentSpecification>("COLUMN", VARCHAR(), true));
-  argSpecs.insert(
-      std::make_shared<ScalarArgumentSpecification>(
-          "IGNORED", BIGINT(), false));
-
-  registerTableFunction(
-      name,
-      argSpecs,
-      std::make_shared<GenericTableReturnType>(),
-      SimpleTableFunction::analyze);
-}
-
 std::shared_ptr<TableFunctionResult> IdentityDataProcessor::apply(
     const std::vector<velox::RowVectorPtr>& input) {
   auto inputTable = input.at(0);
