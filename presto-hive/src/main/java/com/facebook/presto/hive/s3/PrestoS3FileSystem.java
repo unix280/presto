@@ -51,6 +51,7 @@ import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient;
@@ -90,6 +91,7 @@ import software.amazon.awssdk.services.s3.model.S3Response;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 import software.amazon.awssdk.services.s3.model.StorageClass;
 import software.amazon.awssdk.services.s3.model.UploadPartRequest;
+import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.s3.multipart.MultipartConfiguration;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
@@ -112,6 +114,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -472,18 +475,18 @@ public class PrestoS3FileSystem
 
         OutputStream outputStream;
         if (mrapEnabled) {
-            outputStream = new PrestoS3MultipartOutputStream(
-                    s3AsyncClient,
+            outputStream = new PrestoS3SyncMultipartOutputStream(
+                    s3SyncClient,
                     makeMrapArn(getBucketName(uri)),
                     key,
                     tempFile,
+                    multiPartUploadMinPartSize,
+                    multiPartUploadMinFileSize,
                     sseEnabled,
                     sseType,
                     sseKmsKeyId,
                     s3AclType,
-                    s3StorageClass,
-                    multiPartUploadMinPartSize,
-                    multiPartUploadMinFileSize);
+                    s3StorageClass);
         }
         else {
             outputStream = new PrestoS3TransferManagerOutputStream(
@@ -1614,7 +1617,300 @@ public class PrestoS3FileSystem
         }
     }
 
-    private static class PrestoS3MultipartOutputStream
+    private static class PrestoS3SyncMultipartOutputStream
+            extends FilterOutputStream
+    {
+        private final S3Client s3;
+        private final String bucket;
+        private final String key;
+        private final File tempFile;
+
+        private final long multipartUploadMinPartSize;
+        private final long multipartUploadMinFileSize;
+
+        private final boolean sseEnabled;
+        private final PrestoS3SseType sseType;
+        private final String sseKmsKeyId;
+        private final ObjectCannedACL acl;
+        private final StorageClass storageClass;
+
+        private boolean closed;
+
+        PrestoS3SyncMultipartOutputStream(
+                S3Client s3Client,
+                String bucket,
+                String key,
+                File tempFile,
+                long multipartUploadMinPartSize,
+                long multipartUploadMinFileSize,
+                boolean sseEnabled,
+                PrestoS3SseType sseType,
+                String sseKmsKeyId,
+                PrestoS3AclType aclType,
+                PrestoS3StorageClass storageClass)
+                throws IOException
+        {
+            super(new BufferedOutputStream(Files.newOutputStream(requireNonNull(tempFile, "tempFile is null").toPath())));
+
+            this.s3 = requireNonNull(s3Client, "s3Client is null");
+            this.bucket = requireNonNull(bucket, "bucket is null");
+            this.key = requireNonNull(key, "key is null");
+            this.tempFile = requireNonNull(tempFile, "tempFile is null");
+            this.multipartUploadMinPartSize = multipartUploadMinPartSize;
+            this.multipartUploadMinFileSize = multipartUploadMinFileSize;
+            this.sseEnabled = sseEnabled;
+            this.sseType = requireNonNull(sseType, "sseType is null");
+            this.sseKmsKeyId = sseKmsKeyId;
+            this.acl = requireNonNull(aclType, "aclType is null").getCannedACL();
+            this.storageClass = requireNonNull(storageClass, "storageClass is null").getS3StorageClass();
+
+            log.debug("Created S3 sync multipart output stream for %s/%s using temp file %s", bucket, key, tempFile);
+        }
+
+        @Override
+        public void close() throws IOException
+        {
+            if (closed) {
+                return;
+            }
+            closed = true;
+
+            try {
+                super.close();
+                upload();
+            }
+            finally {
+                if (!tempFile.delete()) {
+                    log.warn("Could not delete temp file: %s", tempFile);
+                }
+            }
+        }
+
+        private void upload() throws IOException
+        {
+            long size = tempFile.length();
+            STATS.uploadStarted();
+
+            try {
+                if (size < multipartUploadMinFileSize) {
+                    uploadSinglePart();
+                }
+                else {
+                    uploadMultipart();
+                }
+                STATS.uploadSuccessful();
+            }
+            catch (Exception e) {
+                STATS.uploadFailed();
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new InterruptedIOException();
+                }
+                throw new IOException("Upload failed for s3://" + bucket + "/" + key, e);
+            }
+        }
+
+        private void uploadSinglePart()
+        {
+            PutObjectRequest request = basePutRequest().build();
+
+            s3.putObject(request, RequestBody.fromFile(tempFile));
+        }
+
+        private void uploadMultipart()
+                throws IOException
+        {
+            CreateMultipartUploadRequest.Builder createRequestBuilder =
+                    CreateMultipartUploadRequest.builder()
+                            .bucket(bucket)
+                            .key(key)
+                            .storageClass(storageClass)
+                            .acl(acl);
+
+            applySse(createRequestBuilder);
+
+            CreateMultipartUploadResponse response = s3.createMultipartUpload(createRequestBuilder.build());
+
+            String uploadId = response.uploadId();
+            List<CompletedPart> completedParts = new ArrayList<>();
+
+            try {
+                long fileSize = tempFile.length();
+                long position = 0;
+                int partNumber = 1;
+
+                while (position < fileSize) {
+                    long partSize = Math.min(multipartUploadMinPartSize, fileSize - position);
+
+                    UploadPartRequest request = UploadPartRequest.builder()
+                            .bucket(bucket)
+                            .key(key)
+                            .uploadId(uploadId)
+                            .partNumber(partNumber)
+                            .contentLength(partSize)
+                            .build();
+
+                    long finalPosition = position;
+                    UploadPartResponse partResponse = s3.uploadPart(
+                            request,
+                            // MRAP + SigV4a requires replayable request bodies.
+                            // Use ContentProvider instead of InputStream for multipart uploads.
+                            RequestBody.fromContentProvider(
+                                    () -> {
+                                        try {
+                                            return openRangedStream(tempFile, finalPosition, partSize);
+                                        }
+                                        catch (IOException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    },
+                                    partSize,
+                                    "application/octet-stream"));
+
+                    completedParts.add(
+                            CompletedPart.builder()
+                                    .partNumber(partNumber)
+                                    .eTag(partResponse.eTag())
+                                    .build());
+
+                    position += partSize;
+                    partNumber++;
+                }
+
+                CompleteMultipartUploadRequest completeRequest = CompleteMultipartUploadRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .uploadId(uploadId)
+                        .multipartUpload(
+                                CompletedMultipartUpload.builder()
+                                        .parts(completedParts)
+                                        .build())
+                        .build();
+
+                s3.completeMultipartUpload(completeRequest);
+            }
+            catch (Exception e) {
+                abortMultipart(uploadId);
+                throw e;
+            }
+        }
+
+        private static InputStream openRangedStream(File file, long position, long size)
+                throws IOException
+        {
+            RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
+            randomAccessFile.seek(position);
+
+            return new InputStream()
+            {
+                private long remaining = size;
+
+                @Override
+                public int read()
+                        throws IOException
+                {
+                    if (remaining <= 0) {
+                        return -1;
+                    }
+                    int value = randomAccessFile.read();
+                    if (value != -1) {
+                        remaining--;
+                    }
+                    return value;
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len)
+                        throws IOException
+                {
+                    if (remaining <= 0) {
+                        return -1;
+                    }
+                    int toRead = (int) Math.min(len, remaining);
+                    int read = randomAccessFile.read(b, off, toRead);
+                    if (read > 0) {
+                        remaining -= read;
+                    }
+                    return read;
+                }
+
+                @Override
+                public void close()
+                        throws IOException
+                {
+                    randomAccessFile.close();
+                }
+            };
+        }
+
+        private void abortMultipart(String uploadId)
+        {
+            try {
+                s3.abortMultipartUpload(
+                        AbortMultipartUploadRequest.builder()
+                                .bucket(bucket)
+                                .key(key)
+                                .uploadId(uploadId)
+                                .build());
+            }
+            catch (Exception e) {
+                log.warn("Failed to abort multipart upload %s for %s/%s", uploadId, bucket, key, e);
+            }
+        }
+
+        private PutObjectRequest.Builder basePutRequest()
+        {
+            PutObjectRequest.Builder builder = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .storageClass(storageClass)
+                    .acl(acl);
+
+            applySse(builder);
+
+            return builder;
+        }
+
+        private void applySse(PutObjectRequest.Builder builder)
+        {
+            if (!sseEnabled) {
+                return;
+            }
+
+            switch (sseType) {
+                case KMS:
+                    builder.serverSideEncryption(ServerSideEncryption.AWS_KMS);
+                    if (sseKmsKeyId != null) {
+                        builder.ssekmsKeyId(sseKmsKeyId);
+                    }
+                    break;
+                case S3:
+                    builder.serverSideEncryption(ServerSideEncryption.AES256);
+                    break;
+            }
+        }
+
+        private void applySse(CreateMultipartUploadRequest.Builder builder)
+        {
+            if (!sseEnabled) {
+                return;
+            }
+
+            switch (sseType) {
+                case KMS:
+                    builder.serverSideEncryption(ServerSideEncryption.AWS_KMS);
+                    if (sseKmsKeyId != null) {
+                        builder.ssekmsKeyId(sseKmsKeyId);
+                    }
+                    break;
+                case S3:
+                    builder.serverSideEncryption(ServerSideEncryption.AES256);
+                    break;
+            }
+        }
+    }
+
+    private static class PrestoS3AsyncMultipartOutputStream
             extends FilterOutputStream
     {
         private static final int MAX_CONCURRENCY = 8;
@@ -1634,7 +1930,7 @@ public class PrestoS3FileSystem
 
         private boolean closed;
 
-        public PrestoS3MultipartOutputStream(
+        public PrestoS3AsyncMultipartOutputStream(
                 S3AsyncClient s3,
                 String bucket,
                 String key,
@@ -1662,7 +1958,7 @@ public class PrestoS3FileSystem
             this.multipartUploadMinPartSize = multipartUploadMinPartSize;
             this.multipartUploadMinFileSize = multipartUploadMinFileSize;
 
-            log.debug("Created S3 multipart output stream for %s/%s using temp file %s", bucket, key, tempFile);
+            log.debug("Created S3 async multipart output stream for %s/%s using temp file %s", bucket, key, tempFile);
         }
 
         @Override
