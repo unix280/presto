@@ -38,6 +38,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -53,6 +55,9 @@ public class CPGClient
     private static final String LH_INSTANCE_ID_PATH_LITE = "REAL_INSTANCE_ID_PATH";
     private static final String LH_INSTANCE_SECRET = "LH_INSTANCE_SECRET";
     private static final String ACL_STORAGE_API = "/lakehouse/api/v3/acl_storage";
+    private static final String VALIDATE_REGEX = "^crn:v1:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+/[^:]+:[^:]+::$";
+    private static final String WXD_INSTANCE_SCOPE = "WXD_INSTANCE_SCOPE";
+    private static final String ACCOUNT_SCOPE = "account";
     private static String baseUrl;
     private final LoadingCache<String, QualifiedObjectName> aclTableCache;
     private final LoadingCache<String, Boolean> isUnstructuredTableCache;
@@ -62,10 +67,12 @@ public class CPGClient
     private final String lhInstanceSecret;
     private final String lhInstanceId;
     private final String lhContext;
+    private final String instanceScope;
 
     public CPGClient()
     {
         this.lhContext = System.getenv("LH_CONTEXT");
+        this.instanceScope = System.getenv(WXD_INSTANCE_SCOPE);
         this.lhInstanceSecret = getLhInstanceSecret();
         this.lhInstanceId = getLhInstanceId(lhContext);
         this.httpClient = new OkHttpClient();
@@ -240,12 +247,24 @@ public class CPGClient
         }
         String baseUrl = getBaseUrl();
         String endPoint = format(
-                "/mds/metadata/v1/catalogs/%s/schemas/%s/tables/%s/properties/unstructured_flag",
+                "/api/v1/metadata/catalogs/%s/schemas/%s/tables/%s/properties/unstructured_flag",
                 encodedParts.get(0), encodedParts.get(1), encodedParts.get(2));
         String apiEndpoint = format("%s%s", baseUrl, endPoint);
-        Request request = new Request.Builder().url(apiEndpoint)
-                .addHeader("secret", lhInstanceSecret)
-                .build();
+        Request.Builder builder = new Request.Builder()
+                .url(apiEndpoint)
+                .addHeader("secret", lhInstanceSecret);
+        log.info("instance scope: %s", instanceScope); //make it debug after testing
+        if (ACCOUNT_SCOPE.equalsIgnoreCase(instanceScope)) {
+            String accountId = extractAccountId(getLhInstanceId(lhContext));
+            if (accountId != null && !accountId.isEmpty()) {
+                builder.addHeader("AccountId", accountId);
+                log.debug("AccountId = [%s]", accountId);
+            }
+            else {
+                log.warn("AccountId extraction failed. Header will not be added.");
+            }
+        }
+        Request request = builder.build();
 
         try (Response response = httpClient.newCall(request).execute()) {
             if (response.isSuccessful()) {
@@ -287,7 +306,7 @@ public class CPGClient
         }
     }
 
-    public Request.Builder addRequestHeaders(Request.Builder builder, String bearerToken)
+    private Request.Builder addRequestHeaders(Request.Builder builder, String bearerToken)
     {
         log.debug("cpglogs:lhInstanceId = %s", lhInstanceId);
         return builder
@@ -296,7 +315,7 @@ public class CPGClient
                 .addHeader("Content-Type", "application/json");
     }
 
-    public String getBaseUrl()
+    private String getBaseUrl()
     {
         String mdsUrl = System.getenv(MDS_REST_URL);
         if (isSwContext(lhContext)) {
@@ -317,7 +336,7 @@ public class CPGClient
         return baseUrl;
     }
 
-    public String getLhInstanceId(String lhContext)
+    private String getLhInstanceId(String lhContext)
     {
         if (isSwContext(lhContext)) {
             return System.getenv(LH_INSTANCE_ID_CPD);
@@ -345,7 +364,7 @@ public class CPGClient
         return System.getenv(LH_INSTANCE_ID_SAAS);
     }
 
-    public String getLhInstanceSecret()
+    private String getLhInstanceSecret()
     {
         String lhInstanceSecret = System.getenv(LH_INSTANCE_SECRET);
         String lHinstanceSecretSaaS;
@@ -389,6 +408,21 @@ public class CPGClient
         String catalogName = firstCatalog.getCatalogName();
         log.debug("Extracted catalog name: '{}'", catalogName);
         return catalogName;
+    }
+
+    private String extractAccountId(String crn)
+    {
+        if (crn == null || !crn.matches(VALIDATE_REGEX)) {
+            log.warn("Invalid CRN format. Please provide a valid CRN.");
+            return null;
+        }
+        String accountIdRegex = ":(a|sub)/([^:]+)";
+        Matcher matcher = Pattern.compile(accountIdRegex).matcher(crn);
+        if (matcher.find()) {
+            return matcher.group(2);
+        }
+        log.debug("Account ID not found in CRN.");
+        return null;
     }
 
     private static boolean isSwContext(String context)
