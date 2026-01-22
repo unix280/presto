@@ -139,7 +139,6 @@ public class IcebergUnstructuredAclBasedFiltering
                 return tableScanNode;
             }
             String bearerToken = session.toConnectorSession().getIdentity().getExtraCredentials().get("token");
-            ColumnHandle docIdColumnHandle = metadata.getColumnHandles(session, tableHandle).get(DOCUMENT_ID_COLUMN_NAME);
             String catalog = tableHandle.getConnectorId().getCatalogName();
             SchemaTableName tableName = metadata.getTableMetadata(session, tableHandle).getTable();
 
@@ -155,6 +154,7 @@ public class IcebergUnstructuredAclBasedFiltering
                 log.error(e, "Exception occurred while checking unstructured table for: %s", qualifiedObjectName.toString());
                 return tableScanNode;
             }
+            ColumnHandle docIdColumnHandle = metadata.getColumnHandles(session, tableHandle).get(DOCUMENT_ID_COLUMN_NAME);
             if (docIdColumnHandle == null) {
                 throw new PrestoException(COLUMN_NOT_FOUND, "Column not found: " + DOCUMENT_ID_COLUMN_NAME);
             }
