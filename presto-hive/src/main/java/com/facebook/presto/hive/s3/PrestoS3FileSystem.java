@@ -825,9 +825,12 @@ public class PrestoS3FileSystem
             }
         }
 
-        S3Configuration s3Configuration = S3Configuration.builder()
-                .chunkedEncodingEnabled(chunkedEncodingEnabled)
-                .build();
+        S3Configuration.Builder s3ConfigBuilder = S3Configuration.builder().chunkedEncodingEnabled(chunkedEncodingEnabled);
+        if (isHttpEndpoint && chunkedEncodingEnabled) {
+            s3ConfigBuilder.checksumValidationEnabled(false);
+        }
+
+        S3Configuration s3Configuration = s3ConfigBuilder.build();
 
         String kmsKeyId = hadoopConfig.get(S3_KMS_KEY_ID);
         if (!isNullOrEmpty(kmsKeyId)) {
