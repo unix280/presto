@@ -39,6 +39,7 @@
       "wxd-fedramp-baseline",
       "staging-rebase-pr"
     ],
+    "cloneSubmodules": true,
     "configMode": "LOCAL"
   },
   "hostRules": [
