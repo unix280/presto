@@ -129,6 +129,7 @@ import static com.facebook.presto.hive.metastore.MetastoreOperationResult.EMPTY_
 import static com.facebook.presto.hive.metastore.MetastoreUtil.DEFAULT_METASTORE_USER;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.PRESTO_VIEW_FLAG;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.convertPredicateToParts;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.createDirectory;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.deleteDirectoryRecursively;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getHiveBasicStatistics;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.isManagedTable;
@@ -954,6 +955,10 @@ public class ThriftHiveMetastore
         }
         catch (Exception e) {
             throw propagate(e);
+        }
+
+        if (!isNullOrEmpty(database.getLocationUri())) {
+            createDirectory(hdfsContext, hdfsEnvironment, new Path(database.getLocationUri()));
         }
     }
 

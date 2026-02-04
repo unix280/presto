@@ -70,6 +70,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Longs;
 import io.airlift.slice.Slice;
 import jakarta.annotation.Nullable;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -518,6 +519,19 @@ public class MetastoreUtil
     public static void renameFile(FileSystem fileSystem, Path source, Path target)
     {
         try {
+            // ADLS automatically creates parent directories during rename but not GCS
+            Path parent = target.getParent();
+            if (parent != null) {
+                try {
+                    fileSystem.mkdirs(parent);
+                }
+                catch (FileAlreadyExistsException e) {
+                    if (fileSystem.isFile(parent)) {
+                        throw new PrestoException(HIVE_FILESYSTEM_ERROR,
+                                format("Parent path is a file: %s", parent), e);
+                    }
+                }
+            }
             if (fileSystem.exists(target) || !fileSystem.rename(source, target)) {
                 throw new PrestoException(HIVE_FILESYSTEM_ERROR, getRenameErrorMessage(source, target));
             }
