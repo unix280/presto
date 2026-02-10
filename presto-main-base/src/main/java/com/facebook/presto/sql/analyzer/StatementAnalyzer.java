@@ -436,7 +436,12 @@ class StatementAnalyzer
         if (isExternallyRewrittenQuery) {
             // Since this query is rewritten, we need to first analyze the original query
             // This will set the `orignalXXX` access control maps on the Analysis
-            analyze(originalNode, outerQueryScope);
+            // If originalNode is an EXPLAIN, extract the inner SELECT statement
+            Node nodeToAnalyze = originalNode;
+            if (originalNode instanceof Explain) {
+                nodeToAnalyze = ((Explain) originalNode).getStatement();
+            }
+            analyze(nodeToAnalyze, outerQueryScope);
 
             //  Now we unset the flag and analyze the rewritten query
             // This will set the 'regular' access control maps on the Analysis
