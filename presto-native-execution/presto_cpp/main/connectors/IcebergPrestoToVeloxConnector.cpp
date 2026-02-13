@@ -150,22 +150,6 @@ toVeloxIcebergPartitionSpec(
       spec.specId, fields);
 }
 
-velox::parquet::ParquetFieldId toParquetField(
-    const protocol::iceberg::ColumnIdentity& column) {
-  std::vector<velox::parquet::ParquetFieldId> children;
-  if (!column.children.empty()) {
-    children.reserve(column.children.size());
-    for (const auto& child : column.children) {
-      children.push_back(toParquetField(child));
-    }
-  }
-  // ParquetFieldId does not declare a constructor that takes fieldId and
-  // children, so we use aggregate initialization to make it work for compilers
-  // that don't create the necessary constructors by default (e.g clang-15).
-  velox::parquet::ParquetFieldId pf{.fieldId = column.id, .children = children};
-  return pf;
-}
-
 } // namespace
 
 std::unique_ptr<velox::connector::ConnectorSplit>
@@ -262,16 +246,13 @@ IcebergPrestoToVeloxConnector::toVeloxColumnHandle(
 
   auto nestedField = collectNestedField(&icebergColumn->columnIdentity);
 
-  return std::make_unique<connector::hive::iceberg::IcebergColumnHandle>(
-
   return std::make_unique<velox::connector::hive::iceberg::IcebergColumnHandle>(
       icebergColumn->columnIdentity.name,
       toHiveColumnType(icebergColumn->columnType),
       type,
       type,
-      toParquetField(icebergColumn->columnIdentity),
-      toRequiredSubfields(icebergColumn->requiredSubfields),
-      columnParseParameters);
+      nestedField,
+      toRequiredSubfields(icebergColumn->requiredSubfields));
 }
 
 std::unique_ptr<velox::connector::ConnectorTableHandle>
