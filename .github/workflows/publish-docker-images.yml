@@ -97,6 +97,7 @@ env:
   INPUT_OS: ${{ inputs.os }}
   INPUT_TAG_LATEST: ${{ inputs.tag_latest }}
   INPUT_PUBLISH_DEPENDENCY: ${{ inputs.publish_dependency }}
+  EXTRA_CMAKE_FLAGS: ${{ vars.EXTRA_CMAKE_FLAGS || '-DPRESTO_ENABLE_PARQUET=ON -DPRESTO_ENABLE_REMOTE_FUNCTIONS=ON -DPRESTO_ENABLE_JWT=ON -DPRESTO_STATS_REPORTER_TYPE=PROMETHEUS -DPRESTO_MEMORY_CHECKER_TYPE=LINUX_MEMORY_CHECKER -DPRESTO_ENABLE_SPATIAL=ON -DPRESTO_ENABLE_TESTING=OFF -DPRESTO_ENABLE_S3=ON' }}
 
 jobs:
   prepare:
@@ -522,17 +523,10 @@ jobs:
           echo "Using image tag: $IMAGE_TAG"
           echo "Using dependency image: ${{ env.DEPENDENCY_IMAGE }}"
           echo "Using base image: $BASE_IMAGE"
-          EXTRA_CMAKE_FLAGS=" \
-            -DPRESTO_ENABLE_PARQUET=ON \
-            -DPRESTO_ENABLE_REMOTE_FUNCTIONS=ON \
-            -DPRESTO_ENABLE_JWT=ON \
-            -DPRESTO_STATS_REPORTER_TYPE=PROMETHEUS \
-            -DPRESTO_MEMORY_CHECKER_TYPE=LINUX_MEMORY_CHECKER \
-            -DPRESTO_ENABLE_SPATIAL=ON \
-            -DPRESTO_ENABLE_TESTING=OFF \
-            -DPRESTO_ENABLE_S3=ON"
+          # Use EXTRA_CMAKE_FLAGS from environment (set via GitHub Actions variable)
+          CMAKE_FLAGS="${EXTRA_CMAKE_FLAGS}"
           if [[ "${INPUT_OS}" == "ubuntu" ]]; then
-            EXTRA_CMAKE_FLAGS="$EXTRA_CMAKE_FLAGS -DCMAKE_CXX_FLAGS='-Wno-error=stringop-overflow -Wno-psabi'"
+            CMAKE_FLAGS="$CMAKE_FLAGS -DCMAKE_CXX_FLAGS='-Wno-error=stringop-overflow -Wno-psabi'"
           fi
           if [[ "${{ matrix.arch }}" == "arm64-generic" ]]; then
             BUILD_ARGS="--build-arg ARM_BUILD_TARGET=generic"
@@ -542,7 +536,7 @@ jobs:
 
           # Build the prestissimo image using standard Docker build
           docker build \
-            --build-arg EXTRA_CMAKE_FLAGS="$EXTRA_CMAKE_FLAGS" \
+            --build-arg EXTRA_CMAKE_FLAGS="$CMAKE_FLAGS" \
             --build-arg DEPENDENCY_IMAGE=${{ env.DEPENDENCY_IMAGE }} \
             --build-arg BASE_IMAGE=$BASE_IMAGE \
             --build-arg OSNAME=${INPUT_OS} \
