@@ -589,33 +589,108 @@ jobs:
 
       - name: Create and push multi-arch manifest
         run: |
-          # Create manifest for the versioned tag
-          MANIFEST_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}${TAG_SUFFIX}"
+          # Define image tags
           AMD64_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-amd64${TAG_SUFFIX}"
           ARM64_GENERIC_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64-generic${TAG_SUFFIX}"
           ARM64_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64${TAG_SUFFIX}"
 
-          echo "Creating manifest: ${MANIFEST_TAG}"
-          docker manifest create ${MANIFEST_TAG} ${AMD64_TAG} ${ARM64_TAG} ${ARM64_GENERIC_TAG}
+          # Create manifest with platform-specific ARM64 (AMD64 + ARM64)
+          MANIFEST_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}${TAG_SUFFIX}"
+          echo "Creating platform-specific manifest: ${MANIFEST_TAG}"
+          docker manifest create ${MANIFEST_TAG} ${AMD64_TAG} ${ARM64_TAG}
           docker manifest push ${MANIFEST_TAG}
 
-          # Create latest manifest if requested
+          # Create manifest with generic ARM64 (AMD64 + ARM64-generic)
+          MANIFEST_GENERIC_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-generic${TAG_SUFFIX}"
+          echo "Creating generic manifest: ${MANIFEST_GENERIC_TAG}"
+          docker manifest create ${MANIFEST_GENERIC_TAG} ${AMD64_TAG} ${ARM64_GENERIC_TAG}
+          docker manifest push ${MANIFEST_GENERIC_TAG}
+
+          # Create latest manifests if requested
           if [[ "${INPUT_TAG_LATEST}" == "true" ]]; then
-            # Create OS-specific latest manifest
-            LATEST_MANIFEST="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-latest"
             LATEST_AMD64="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-amd64-latest"
             LATEST_ARM64_GENERIC="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-arm64-generic-latest"
             LATEST_ARM64="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-arm64-latest"
 
             # If OS is centos, also tag as latest (without OS prefix)
             if [[ "${INPUT_OS}" == "centos" ]]; then
+              # Global latest with platform-specific ARM64
               GLOBAL_LATEST="${ORG_NAME}/${NATIVE_IMAGE_NAME}:latest"
-              echo "Creating global latest manifest: ${GLOBAL_LATEST}"
-              docker manifest create ${GLOBAL_LATEST} ${LATEST_AMD64} ${LATEST_ARM64} ${LATEST_ARM64_GENERIC}
+              echo "Creating global latest manifest (platform-specific): ${GLOBAL_LATEST}"
+              docker manifest create ${GLOBAL_LATEST} ${LATEST_AMD64} ${LATEST_ARM64}
               docker manifest push ${GLOBAL_LATEST}
+
+              # Global latest-generic with generic ARM64
+              GLOBAL_LATEST_GENERIC="${ORG_NAME}/${NATIVE_IMAGE_NAME}:latest-generic"
+              echo "Creating global latest-generic manifest: ${GLOBAL_LATEST_GENERIC}"
+              docker manifest create ${GLOBAL_LATEST_GENERIC} ${LATEST_AMD64} ${LATEST_ARM64_GENERIC}
+              docker manifest push ${GLOBAL_LATEST_GENERIC}
             else
-              echo "Creating OS-specific latest manifest: ${LATEST_MANIFEST}"
-              docker manifest create ${LATEST_MANIFEST} ${LATEST_AMD64} ${LATEST_ARM64} ${LATEST_ARM64_GENERIC}
+              # OS-specific latest with platform-specific ARM64
+              LATEST_MANIFEST="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-latest"
+              echo "Creating OS-specific latest manifest (platform-specific): ${LATEST_MANIFEST}"
+              docker manifest create ${LATEST_MANIFEST} ${LATEST_AMD64} ${LATEST_ARM64}
               docker manifest push ${LATEST_MANIFEST}
+
+              # OS-specific latest-generic with generic ARM64
+              LATEST_MANIFEST_GENERIC="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-latest-generic"
+              echo "Creating OS-specific latest-generic manifest: ${LATEST_MANIFEST_GENERIC}"
+              docker manifest create ${LATEST_MANIFEST_GENERIC} ${LATEST_AMD64} ${LATEST_ARM64_GENERIC}
+              docker manifest push ${LATEST_MANIFEST_GENERIC}
             fi
+          fi
+
+      - name: Delete standalone architecture images
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          # Function to delete image tag using Docker Hub API
+          delete_image() {
+            local IMAGE_TAG=$1
+            echo "Attempting to delete: ${IMAGE_TAG}"
+
+            # Extract tag from full image name
+            TAG=$(echo ${IMAGE_TAG} | cut -d':' -f2)
+
+            # Get Docker Hub token
+            TOKEN=$(curl -s -H "Content-Type: application/json" -X POST \
+              -d '{"username": "'${DOCKERHUB_USERNAME}'", "password": "'${DOCKERHUB_PASSWORD}'"}' \
+              https://hub.docker.com/v2/users/login/ | jq -r .token)
+
+            if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
+              echo "Failed to get Docker Hub token"
+              return 1
+            fi
+
+            # Delete the tag
+            RESPONSE=$(curl -s -X DELETE \
+              -H "Authorization: JWT ${TOKEN}" \
+              "https://hub.docker.com/v2/repositories/${ORG_NAME}/${NATIVE_IMAGE_NAME}/tags/${TAG}/")
+
+            if [[ $? -eq 0 ]]; then
+              echo "Successfully deleted: ${IMAGE_TAG}"
+            else
+              echo "Failed to delete: ${IMAGE_TAG}"
+            fi
+          }
+
+          # Delete architecture-specific images
+          AMD64_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-amd64${TAG_SUFFIX}"
+          ARM64_GENERIC_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64-generic${TAG_SUFFIX}"
+          ARM64_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64${TAG_SUFFIX}"
+
+          delete_image "${AMD64_TAG}"
+          delete_image "${ARM64_GENERIC_TAG}"
+          delete_image "${ARM64_TAG}"
+
+          # Delete latest architecture-specific images if they were created
+          if [[ "${INPUT_TAG_LATEST}" == "true" ]]; then
+            LATEST_AMD64="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-amd64-latest"
+            LATEST_ARM64_GENERIC="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-arm64-generic-latest"
+            LATEST_ARM64="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-arm64-latest"
+
+            delete_image "${LATEST_AMD64}"
+            delete_image "${LATEST_ARM64_GENERIC}"
+            delete_image "${LATEST_ARM64}"
           fi
