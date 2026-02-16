@@ -106,7 +106,15 @@ jobs:
       version: ${{ steps.extract-version.outputs.version }}
       commit_sha: ${{ steps.extract-commit.outputs.commit_sha }}
       presto_version: ${{ steps.extract-version.outputs.presto_version }}
+      build_date: ${{ steps.set-build-date.outputs.build_date }}
     steps:
+      - name: Set build date
+        id: set-build-date
+        run: |
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+          echo "Build date: ${BUILD_DATE}"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -290,34 +298,90 @@ jobs:
 
       - name: Create and push multi-arch manifest
         run: |
-          # Create manifest for the versioned tag
-          MANIFEST_TAG="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-${VERSION}${TAG_SUFFIX}"
+          # Define image tags
           AMD64_TAG="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-${VERSION}-amd64${TAG_SUFFIX}"
           ARM64_GENERIC_TAG="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64-generic${TAG_SUFFIX}"
           ARM64_TAG="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64${TAG_SUFFIX}"
 
-          echo "Creating manifest: ${MANIFEST_TAG}"
-          docker manifest create ${MANIFEST_TAG} ${AMD64_TAG} ${ARM64_TAG} ${ARM64_GENERIC_TAG}
+          # Prepare OCI annotations for manifests
+          BUILD_DATE="${{ needs.prepare.outputs.build_date }}"
+          GIT_COMMIT="${{ needs.prepare.outputs.commit_sha }}"
+          GIT_REF="${{ inputs.branch_or_tag }}"
+
+          # Function to annotate manifest images with OCI labels
+          annotate_manifest() {
+            local MANIFEST=$1
+            local IMAGE_TAG=$2
+            local DESCRIPTION=$3
+
+            docker manifest annotate ${MANIFEST} ${IMAGE_TAG} \
+              --annotation "org.opencontainers.image.title=Presto Native Dependency" \
+              --annotation "org.opencontainers.image.description=${DESCRIPTION}" \
+              --annotation "org.opencontainers.image.created=${BUILD_DATE}" \
+              --annotation "org.opencontainers.image.revision=${GIT_COMMIT}" \
+              --annotation "org.opencontainers.image.version=${VERSION}" \
+              --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --annotation "org.opencontainers.image.url=https://github.com/${{ github.repository }}" \
+              --annotation "org.opencontainers.image.vendor=${{ github.repository_owner }}" \
+              --annotation "org.opencontainers.image.ref.name=${GIT_REF}"
+          }
+
+          # Pull images to ensure they exist and are accessible
+          echo "Pulling architecture-specific images..."
+          docker pull ${AMD64_TAG} || echo "Warning: Failed to pull ${AMD64_TAG}"
+          docker pull ${ARM64_TAG} || echo "Warning: Failed to pull ${ARM64_TAG}"
+          docker pull ${ARM64_GENERIC_TAG} || echo "Warning: Failed to pull ${ARM64_GENERIC_TAG}"
+
+          # Create manifest with platform-specific ARM64 (AMD64 + ARM64)
+          MANIFEST_TAG="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-${VERSION}${TAG_SUFFIX}"
+          DESCRIPTION="Presto Native dependency image for ${INPUT_OS}"
+
+          echo "Creating platform-specific manifest: ${MANIFEST_TAG}"
+          docker manifest create --amend ${MANIFEST_TAG} ${AMD64_TAG} ${ARM64_TAG}
+
+          # Annotate each architecture in the manifest
+          annotate_manifest ${MANIFEST_TAG} ${AMD64_TAG} "${DESCRIPTION}"
+          annotate_manifest ${MANIFEST_TAG} ${ARM64_TAG} "${DESCRIPTION}"
+
           docker manifest push ${MANIFEST_TAG}
 
-          # Create latest manifest if requested
-          if [[ "${INPUT_TAG_LATEST}" == "true" ]]; then
-            # Create OS-specific latest manifest
-            LATEST_MANIFEST="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-latest"
-            LATEST_AMD64="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-amd64-latest"
-            LATEST_ARM64_GENERIC="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-arm64-generic-latest"
-            LATEST_ARM64="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-arm64-latest"
+          # Create manifest with generic ARM64 (AMD64 + ARM64-generic)
+          MANIFEST_GENERIC_TAG="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-${VERSION}-generic${TAG_SUFFIX}"
+          DESCRIPTION_GENERIC="Presto Native dependency image for ${INPUT_OS} - Generic ARM64"
 
+          echo "Creating generic manifest: ${MANIFEST_GENERIC_TAG}"
+          docker manifest create --amend ${MANIFEST_GENERIC_TAG} ${AMD64_TAG} ${ARM64_GENERIC_TAG}
+
+          # Annotate each architecture in the generic manifest
+          annotate_manifest ${MANIFEST_GENERIC_TAG} ${AMD64_TAG} "${DESCRIPTION_GENERIC}"
+          annotate_manifest ${MANIFEST_GENERIC_TAG} ${ARM64_GENERIC_TAG} "${DESCRIPTION_GENERIC}"
+
+          docker manifest push ${MANIFEST_GENERIC_TAG}
+
+          # Create latest manifests if requested using docker buildx imagetools
+          # This copies the manifest with all annotations, avoiding duplication
+          if [[ "${INPUT_TAG_LATEST}" == "true" ]]; then
             # If OS is centos, also tag as latest (without OS prefix)
             if [[ "${INPUT_OS}" == "centos" ]]; then
+              # Global latest with platform-specific ARM64
               GLOBAL_LATEST="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:latest"
-              echo "Creating global latest manifest: ${GLOBAL_LATEST}"
-              docker manifest create ${GLOBAL_LATEST} ${LATEST_AMD64} ${LATEST_ARM64} ${LATEST_ARM64_GENERIC}
-              docker manifest push ${GLOBAL_LATEST}
+              echo "Creating global latest manifest from ${MANIFEST_TAG}"
+              docker buildx imagetools create -t ${GLOBAL_LATEST} ${MANIFEST_TAG}
+
+              # Global latest-generic with generic ARM64
+              GLOBAL_LATEST_GENERIC="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:latest-generic"
+              echo "Creating global latest-generic manifest from ${MANIFEST_GENERIC_TAG}"
+              docker buildx imagetools create -t ${GLOBAL_LATEST_GENERIC} ${MANIFEST_GENERIC_TAG}
             else
-              echo "Creating OS-specific latest manifest: ${LATEST_MANIFEST}"
-              docker manifest create ${LATEST_MANIFEST} ${LATEST_AMD64} ${LATEST_ARM64} ${LATEST_ARM64_GENERIC}
-              docker manifest push ${LATEST_MANIFEST}
+              # OS-specific latest with platform-specific ARM64
+              LATEST_MANIFEST="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-latest"
+              echo "Creating OS-specific latest manifest from ${MANIFEST_TAG}"
+              docker buildx imagetools create -t ${LATEST_MANIFEST} ${MANIFEST_TAG}
+
+              # OS-specific latest-generic with generic ARM64
+              LATEST_MANIFEST_GENERIC="${ORG_NAME}/${DEPENDENCY_IMAGE_NAME}:${INPUT_OS}-latest-generic"
+              echo "Creating OS-specific latest-generic manifest from ${MANIFEST_GENERIC_TAG}"
+              docker buildx imagetools create -t ${LATEST_MANIFEST_GENERIC} ${MANIFEST_GENERIC_TAG}
             fi
           fi
 
@@ -426,6 +490,16 @@ jobs:
           tags: |
             ${{ env.IMAGE_TAG }}
             ${{ inputs.tag_latest == 'true' && format('{0}/{1}:latest', env.ORG_NAME, env.PRESTO_IMAGE_NAME) || '' }}
+          labels: |
+            org.opencontainers.image.title=Presto
+            org.opencontainers.image.description=Presto distributed SQL query engine
+            org.opencontainers.image.created=${{ needs.prepare.outputs.build_date }}
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.commit_sha }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.ref.name=${{ inputs.branch_or_tag }}
 
   publish-prestissimo-image:
     if: (!failure() && !cancelled() && inputs.publish_prestissimo)
@@ -523,6 +597,7 @@ jobs:
           echo "Using image tag: $IMAGE_TAG"
           echo "Using dependency image: ${{ env.DEPENDENCY_IMAGE }}"
           echo "Using base image: $BASE_IMAGE"
+
           # Use EXTRA_CMAKE_FLAGS from environment (set via GitHub Actions variable)
           CMAKE_FLAGS="${EXTRA_CMAKE_FLAGS}"
           if [[ "${INPUT_OS}" == "ubuntu" ]]; then
@@ -588,49 +663,85 @@ jobs:
           ARM64_GENERIC_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64-generic${TAG_SUFFIX}"
           ARM64_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-arm64${TAG_SUFFIX}"
 
+          # Prepare OCI annotations for manifests
+          BUILD_DATE="${{ needs.prepare.outputs.build_date }}"
+          GIT_COMMIT="${{ needs.prepare.outputs.commit_sha }}"
+          GIT_REF="${{ inputs.branch_or_tag }}"
+
+          # Function to annotate manifest images with OCI labels
+          annotate_manifest() {
+            local MANIFEST=$1
+            local IMAGE_TAG=$2
+            local DESCRIPTION=$3
+
+            docker manifest annotate ${MANIFEST} ${IMAGE_TAG} \
+              --annotation "org.opencontainers.image.title=Presto Native (Prestissimo)" \
+              --annotation "org.opencontainers.image.description=${DESCRIPTION}" \
+              --annotation "org.opencontainers.image.created=${BUILD_DATE}" \
+              --annotation "org.opencontainers.image.revision=${GIT_COMMIT}" \
+              --annotation "org.opencontainers.image.version=${VERSION}" \
+              --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --annotation "org.opencontainers.image.url=https://github.com/${{ github.repository }}" \
+              --annotation "org.opencontainers.image.vendor=${{ github.repository_owner }}" \
+              --annotation "org.opencontainers.image.ref.name=${GIT_REF}"
+          }
+
+          # Pull images to ensure they exist and are accessible
+          echo "Pulling architecture-specific images..."
+          docker pull ${AMD64_TAG} || echo "Warning: Failed to pull ${AMD64_TAG}"
+          docker pull ${ARM64_TAG} || echo "Warning: Failed to pull ${ARM64_TAG}"
+          docker pull ${ARM64_GENERIC_TAG} || echo "Warning: Failed to pull ${ARM64_GENERIC_TAG}"
+
           # Create manifest with platform-specific ARM64 (AMD64 + ARM64)
           MANIFEST_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}${TAG_SUFFIX}"
+          DESCRIPTION="Presto Native execution engine (Prestissimo) for ${INPUT_OS}"
+
           echo "Creating platform-specific manifest: ${MANIFEST_TAG}"
-          docker manifest create ${MANIFEST_TAG} ${AMD64_TAG} ${ARM64_TAG}
+          docker manifest create --amend ${MANIFEST_TAG} ${AMD64_TAG} ${ARM64_TAG}
+
+          # Annotate each architecture in the manifest
+          annotate_manifest ${MANIFEST_TAG} ${AMD64_TAG} "${DESCRIPTION}"
+          annotate_manifest ${MANIFEST_TAG} ${ARM64_TAG} "${DESCRIPTION}"
+
           docker manifest push ${MANIFEST_TAG}
 
           # Create manifest with generic ARM64 (AMD64 + ARM64-generic)
           MANIFEST_GENERIC_TAG="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-${VERSION}-generic${TAG_SUFFIX}"
+          DESCRIPTION_GENERIC="Presto Native execution engine (Prestissimo) for ${INPUT_OS} - Generic ARM64"
+
           echo "Creating generic manifest: ${MANIFEST_GENERIC_TAG}"
-          docker manifest create ${MANIFEST_GENERIC_TAG} ${AMD64_TAG} ${ARM64_GENERIC_TAG}
+          docker manifest create --amend ${MANIFEST_GENERIC_TAG} ${AMD64_TAG} ${ARM64_GENERIC_TAG}
+
+          # Annotate each architecture in the generic manifest
+          annotate_manifest ${MANIFEST_GENERIC_TAG} ${AMD64_TAG} "${DESCRIPTION_GENERIC}"
+          annotate_manifest ${MANIFEST_GENERIC_TAG} ${ARM64_GENERIC_TAG} "${DESCRIPTION_GENERIC}"
+
           docker manifest push ${MANIFEST_GENERIC_TAG}
 
-          # Create latest manifests if requested
+          # Create latest manifests if requested using docker buildx imagetools
+          # This copies the manifest with all annotations, avoiding duplication
           if [[ "${INPUT_TAG_LATEST}" == "true" ]]; then
-            LATEST_AMD64="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-amd64-latest"
-            LATEST_ARM64_GENERIC="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-arm64-generic-latest"
-            LATEST_ARM64="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-arm64-latest"
-
             # If OS is centos, also tag as latest (without OS prefix)
             if [[ "${INPUT_OS}" == "centos" ]]; then
               # Global latest with platform-specific ARM64
               GLOBAL_LATEST="${ORG_NAME}/${NATIVE_IMAGE_NAME}:latest"
-              echo "Creating global latest manifest (platform-specific): ${GLOBAL_LATEST}"
-              docker manifest create ${GLOBAL_LATEST} ${LATEST_AMD64} ${LATEST_ARM64}
-              docker manifest push ${GLOBAL_LATEST}
+              echo "Creating global latest manifest from ${MANIFEST_TAG}"
+              docker buildx imagetools create -t ${GLOBAL_LATEST} ${MANIFEST_TAG}
 
               # Global latest-generic with generic ARM64
               GLOBAL_LATEST_GENERIC="${ORG_NAME}/${NATIVE_IMAGE_NAME}:latest-generic"
-              echo "Creating global latest-generic manifest: ${GLOBAL_LATEST_GENERIC}"
-              docker manifest create ${GLOBAL_LATEST_GENERIC} ${LATEST_AMD64} ${LATEST_ARM64_GENERIC}
-              docker manifest push ${GLOBAL_LATEST_GENERIC}
+              echo "Creating global latest-generic manifest from ${MANIFEST_GENERIC_TAG}"
+              docker buildx imagetools create -t ${GLOBAL_LATEST_GENERIC} ${MANIFEST_GENERIC_TAG}
             else
               # OS-specific latest with platform-specific ARM64
               LATEST_MANIFEST="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-latest"
-              echo "Creating OS-specific latest manifest (platform-specific): ${LATEST_MANIFEST}"
-              docker manifest create ${LATEST_MANIFEST} ${LATEST_AMD64} ${LATEST_ARM64}
-              docker manifest push ${LATEST_MANIFEST}
+              echo "Creating OS-specific latest manifest from ${MANIFEST_TAG}"
+              docker buildx imagetools create -t ${LATEST_MANIFEST} ${MANIFEST_TAG}
 
               # OS-specific latest-generic with generic ARM64
               LATEST_MANIFEST_GENERIC="${ORG_NAME}/${NATIVE_IMAGE_NAME}:${INPUT_OS}-latest-generic"
-              echo "Creating OS-specific latest-generic manifest: ${LATEST_MANIFEST_GENERIC}"
-              docker manifest create ${LATEST_MANIFEST_GENERIC} ${LATEST_AMD64} ${LATEST_ARM64_GENERIC}
-              docker manifest push ${LATEST_MANIFEST_GENERIC}
+              echo "Creating OS-specific latest-generic manifest from ${MANIFEST_GENERIC_TAG}"
+              docker buildx imagetools create -t ${LATEST_MANIFEST_GENERIC} ${MANIFEST_GENERIC_TAG}
             fi
           fi
 
