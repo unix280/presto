@@ -22,6 +22,7 @@ import com.facebook.presto.hive.metastore.hms.BridgingHiveMetastore;
 import com.facebook.presto.hive.metastore.hms.HiveCluster;
 import com.facebook.presto.hive.metastore.hms.HiveMetastoreClient;
 import com.facebook.presto.hive.metastore.hms.MockHiveMetastoreClient;
+import com.facebook.presto.hive.metastore.hms.StaticMetastoreConfig;
 import com.facebook.presto.hive.metastore.hms.ThriftHiveMetastore;
 import com.facebook.presto.hive.metastore.hms.ThriftHiveMetastoreStats;
 import com.facebook.presto.spi.constraints.NotNullConstraint;
@@ -97,7 +98,9 @@ public class TestInMemoryCachingHiveMetastore
         metastoreClientConfig.setMetastoreCacheMaximumSize(1000);
         metastoreClientConfig.setEnabledCaches(ALL.name());
 
-        ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(mockHiveCluster, metastoreClientConfig, HDFS_ENVIRONMENT);
+        StaticMetastoreConfig staticMetastoreConfig = new StaticMetastoreConfig();
+
+        ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(mockHiveCluster, metastoreClientConfig, HDFS_ENVIRONMENT, staticMetastoreConfig);
         PartitionMutator hivePartitionMutator = new HivePartitionMutator();
         metastoreWithAllCachesEnabled = new InMemoryCachingHiveMetastore(
                 new BridgingHiveMetastore(thriftHiveMetastore, hivePartitionMutator),
@@ -117,7 +120,7 @@ public class TestInMemoryCachingHiveMetastore
         metastoreClientConfigWithSelectiveCaching.setMetastoreCacheMaximumSize(1000);
         metastoreClientConfigWithSelectiveCaching.setDisabledCaches(TABLE.name());
 
-        ThriftHiveMetastore thriftHiveMetastoreWithSelectiveCaching = new ThriftHiveMetastore(mockHiveCluster, metastoreClientConfigWithSelectiveCaching, HDFS_ENVIRONMENT);
+        ThriftHiveMetastore thriftHiveMetastoreWithSelectiveCaching = new ThriftHiveMetastore(mockHiveCluster, metastoreClientConfigWithSelectiveCaching, HDFS_ENVIRONMENT, staticMetastoreConfig);
         metastoreWithSelectiveCachesEnabled = new InMemoryCachingHiveMetastore(
                 new BridgingHiveMetastore(thriftHiveMetastoreWithSelectiveCaching, hivePartitionMutator),
                 executor,
@@ -668,7 +671,7 @@ public class TestInMemoryCachingHiveMetastore
         }
 
         @Override
-        public HiveMetastoreClient createMetastoreClient(Optional<String> token)
+        public HiveMetastoreClient createMetastoreClient(Optional<String> token, Optional<MetastoreContext> metastoreContext)
         {
             return client;
         }

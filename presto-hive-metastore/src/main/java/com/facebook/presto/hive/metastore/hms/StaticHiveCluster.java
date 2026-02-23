@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.hms;
 
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.google.common.collect.ImmutableList;
 import jakarta.inject.Inject;
 import org.apache.thrift.TException;
@@ -62,7 +63,7 @@ public class StaticHiveCluster
      * connection succeeds or there are no more fallback metastores.
      */
     @Override
-    public HiveMetastoreClient createMetastoreClient(Optional<String> token)
+    public HiveMetastoreClient createMetastoreClient(Optional<String> token, Optional<MetastoreContext> metastoreContext)
             throws TException
     {
         if (metastoreLoadBalancingEnabled) {
@@ -72,7 +73,7 @@ public class StaticHiveCluster
         TException lastException = null;
         for (URI metastoreUri : metastoreUris) {
             try {
-                HiveMetastoreClient client = clientFactory.create(metastoreUri, token);
+                HiveMetastoreClient client = clientFactory.create(metastoreUri, token, metastoreContext);
 
                 if (!isNullOrEmpty(metastoreUsername)) {
                     client.setUGI(metastoreUsername);

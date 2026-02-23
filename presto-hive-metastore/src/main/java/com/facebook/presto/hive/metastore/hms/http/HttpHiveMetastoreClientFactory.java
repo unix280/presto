@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.metastore.hms.http;
 
 import com.facebook.presto.hive.HiveCommonClientConfig;
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.hms.HiveMetastoreClient;
 import com.facebook.presto.hive.metastore.hms.MetastoreClientFactory;
 import com.facebook.presto.hive.metastore.hms.ThriftHiveMetastoreClient;
@@ -54,6 +55,7 @@ import static org.apache.http.conn.ssl.SSLConnectionSocketFactory.getDefaultHost
 public class HttpHiveMetastoreClientFactory
         implements MetastoreClientFactory
 {
+    private static final String HIVE_PROXY_USER_HEADER = "X-Proxy-User";
     private final HttpHiveMetastoreConfig.HttpHiveMetastoreClientAuthenticationType authType;
     private final int readTimeoutMillis;
     private final Optional<SSLContext> sslContext;
@@ -88,13 +90,13 @@ public class HttpHiveMetastoreClientFactory
     }
 
     @Override
-    public HiveMetastoreClient create(URI uri, Optional<String> delegationToken)
+    public HiveMetastoreClient create(URI uri, Optional<String> delegationToken, Optional<MetastoreContext> metastoreContext)
             throws TTransportException
     {
-        return new ThriftHiveMetastoreClient(createHttpTransport(uri), catalogName);
+        return new ThriftHiveMetastoreClient(createHttpTransport(uri, metastoreContext), catalogName);
     }
 
-    private TTransport createHttpTransport(URI uri) throws TTransportException
+    private TTransport createHttpTransport(URI uri, Optional<MetastoreContext> metastoreContext) throws TTransportException
     {
         HttpClientBuilder httpClientBuilder = HttpClientBuilder.create();
         if ("https".equals(uri.getScheme().toLowerCase(ENGLISH))) {
@@ -133,6 +135,9 @@ public class HttpHiveMetastoreClientFactory
         httpClientBuilder.addInterceptorFirst((HttpRequest request, HttpContext context) -> {
             httpAdditionalHeaders.forEach(request::addHeader);
         });
+
+        httpClientBuilder.addInterceptorFirst((HttpRequest request, HttpContext context) ->
+                metastoreContext.ifPresent(mc -> request.addHeader(HIVE_PROXY_USER_HEADER, mc.getUsername())));
 
         RequestConfig requestConfig = RequestConfig.custom()
                 .setSocketTimeout(readTimeoutMillis)

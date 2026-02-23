@@ -1007,7 +1007,7 @@ public abstract class AbstractTestHiveClient
         HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(hiveClientConfig, metastoreClientConfig), ImmutableSet.of(), hiveClientConfig);
         hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
         ExtendedHiveMetastore metastore = new InMemoryCachingHiveMetastore(
-                new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster, metastoreClientConfig, hdfsEnvironment), new HivePartitionMutator()),
+                new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster, metastoreClientConfig, hdfsEnvironment, staticMetastoreConfig), new HivePartitionMutator()),
                 executor,
                 false,
                 10000,
