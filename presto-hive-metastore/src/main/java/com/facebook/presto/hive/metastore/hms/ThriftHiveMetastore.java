@@ -99,6 +99,7 @@ import org.weakref.jmx.Managed;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -185,12 +186,17 @@ public class ThriftHiveMetastore
     private final boolean impersonationEnabled;
     private final HiveMetastoreAuthenticationType hiveMetastoreAuthenticationType;
     private final boolean deleteFilesOnTableDrop;
+    private final boolean isHttpMetastoreUri;
 
     private volatile boolean metastoreKnownToSupportTableParamEqualsPredicate;
     private volatile boolean metastoreKnownToSupportTableParamLikePredicate;
 
     @Inject
-    public ThriftHiveMetastore(HiveCluster hiveCluster, MetastoreClientConfig config, HdfsEnvironment hdfsEnvironment)
+    public ThriftHiveMetastore(
+            HiveCluster hiveCluster,
+            MetastoreClientConfig config,
+            HdfsEnvironment hdfsEnvironment,
+            StaticMetastoreConfig staticMetastoreConfig)
     {
         this(
                 hiveCluster,
@@ -199,7 +205,8 @@ public class ThriftHiveMetastore
                 hdfsEnvironment,
                 requireNonNull(config, "config is null").isMetastoreImpersonationEnabled(),
                 requireNonNull(config, "config is null").isDeleteFilesOnTableDrop(),
-                requireNonNull(config, "config is null").getHiveMetastoreAuthenticationType());
+                requireNonNull(config, "config is null").getHiveMetastoreAuthenticationType(),
+                requireNonNull(staticMetastoreConfig, "staticMetastoreConfig is null").getMetastoreUris());
     }
 
     public ThriftHiveMetastore(
@@ -209,7 +216,8 @@ public class ThriftHiveMetastore
             HdfsEnvironment hdfsEnvironment,
             boolean impersonationEnabled,
             boolean deleteFilesOnTableDrop,
-            HiveMetastoreAuthenticationType hiveMetastoreAuthenticationType)
+            HiveMetastoreAuthenticationType hiveMetastoreAuthenticationType,
+            List<URI> metastoreUris)
     {
         this.clientProvider = requireNonNull(hiveCluster, "hiveCluster is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
@@ -218,6 +226,8 @@ public class ThriftHiveMetastore
         this.impersonationEnabled = impersonationEnabled;
         this.deleteFilesOnTableDrop = deleteFilesOnTableDrop;
         this.hiveMetastoreAuthenticationType = hiveMetastoreAuthenticationType;
+        this.isHttpMetastoreUri = metastoreUris.stream()
+                .anyMatch(uri -> ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())));
     }
 
     private static boolean isPrestoView(Table table)
@@ -1274,22 +1284,22 @@ public class ThriftHiveMetastore
         String filterWithEquals = HIVE_FILTER_FIELD_PARAMS + PRESTO_VIEW_FLAG + " = \"true\"";
         String filterWithLike = HIVE_FILTER_FIELD_PARAMS + PRESTO_VIEW_FLAG + " LIKE \"true\"";
         if (metastoreKnownToSupportTableParamEqualsPredicate) {
-            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
+            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty(), Optional.empty())) {
                 return client.getTableNamesByFilter(databaseName, filterWithEquals);
             }
         }
         if (metastoreKnownToSupportTableParamLikePredicate) {
-            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
+            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty(), Optional.empty())) {
                 return client.getTableNamesByFilter(databaseName, filterWithLike);
             }
         }
-        try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
+        try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty(), Optional.empty())) {
             List<String> views = client.getTableNamesByFilter(databaseName, filterWithEquals);
             metastoreKnownToSupportTableParamEqualsPredicate = true;
             return views;
         }
         catch (TException | RuntimeException firstException) {
-            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
+            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty(), Optional.empty())) {
                 List<String> views = client.getTableNamesByFilter(databaseName, filterWithLike);
                 metastoreKnownToSupportTableParamLikePredicate = true;
                 return views;
@@ -1340,23 +1350,27 @@ public class ThriftHiveMetastore
             throws Exception
     {
         if (!impersonationEnabled) {
-            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
+            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty(), Optional.empty())) {
                 return callable.call(client);
             }
         }
 
         if (hiveMetastoreAuthenticationType.equals(KERBEROS)) {
             String token;
-            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty())) {
+            try (HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty(), Optional.empty())) {
                 token = client.getDelegationToken(metastoreContext.getUsername(), metastoreContext.getUsername());
             }
-            try (HiveMetastoreClient realClient = clientProvider.createMetastoreClient(Optional.of(token))) {
+            try (HiveMetastoreClient realClient = clientProvider.createMetastoreClient(Optional.of(token), Optional.empty())) {
                 return callable.call(realClient);
             }
         }
 
-        HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty());
-        setMetastoreUserOrClose(client, metastoreContext.getUsername());
+        // As setUGI makes an additional client call, for THRIFT-OVER-HTTP we will pass the impersonated username as a HTTP request header
+        HiveMetastoreClient client = clientProvider.createMetastoreClient(Optional.empty(), Optional.of(metastoreContext));
+
+        if (!isHttpMetastoreUri) {
+            setMetastoreUserOrClose(client, metastoreContext.getUsername());
+        }
         return callable.call(client);
     }
 

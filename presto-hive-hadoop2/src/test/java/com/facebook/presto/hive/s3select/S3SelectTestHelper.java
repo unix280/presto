@@ -115,6 +115,7 @@ public class S3SelectTestHelper
     private MetastoreClientConfig metastoreClientConfig;
     private ThriftHiveMetastoreConfig thriftHiveMetastoreConfig;
     private HttpHiveMetastoreConfig httpHiveMetastoreConfig;
+    private StaticMetastoreConfig staticMetastoreConfig;
 
     public S3SelectTestHelper(String host,
             int port,
@@ -135,13 +136,14 @@ public class S3SelectTestHelper
         metastoreClientConfig = new MetastoreClientConfig();
         thriftHiveMetastoreConfig = new ThriftHiveMetastoreConfig();
         httpHiveMetastoreConfig = new HttpHiveMetastoreConfig();
+        staticMetastoreConfig = new StaticMetastoreConfig();
 
         String proxy = System.getProperty("hive.metastore.thrift.client.socks-proxy");
         if (proxy != null) {
             metastoreClientConfig.setMetastoreSocksProxy(HostAndPort.fromString(proxy));
         }
 
-        HiveCluster hiveCluster = new TestingHiveCluster(metastoreClientConfig, thriftHiveMetastoreConfig, httpHiveMetastoreConfig, host, port, new HiveCommonClientConfig(), new StaticMetastoreConfig());
+        HiveCluster hiveCluster = new TestingHiveCluster(metastoreClientConfig, thriftHiveMetastoreConfig, httpHiveMetastoreConfig, host, port, new HiveCommonClientConfig(), staticMetastoreConfig);
         executor = newCachedThreadPool(daemonThreadsNamed("hive-%s"));
         HivePartitionManager hivePartitionManager = new HivePartitionManager(FUNCTION_AND_TYPE_MANAGER, config);
 
@@ -153,7 +155,7 @@ public class S3SelectTestHelper
         hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
         ColumnConverterProvider columnConverterProvider = HiveColumnConverterProvider.DEFAULT_COLUMN_CONVERTER_PROVIDER;
         metastoreClient = new TestingHiveMetastore(
-                new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster, metastoreClientConfig, hdfsEnvironment), new HivePartitionMutator()),
+                new BridgingHiveMetastore(new ThriftHiveMetastore(hiveCluster, metastoreClientConfig, hdfsEnvironment, staticMetastoreConfig), new HivePartitionMutator()),
                 executor,
                 metastoreClientConfig,
                 new Path(format("s3://%s/", writableBucket)),

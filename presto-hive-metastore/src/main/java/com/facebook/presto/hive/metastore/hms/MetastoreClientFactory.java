@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.hms;
 
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import org.apache.thrift.transport.TTransportException;
 
 import java.net.URI;
@@ -20,6 +21,6 @@ import java.util.Optional;
 
 public interface MetastoreClientFactory
 {
-    HiveMetastoreClient create(URI uri, Optional<String> delegationToken)
+    HiveMetastoreClient create(URI uri, Optional<String> delegationToken, Optional<MetastoreContext> metastoreContext)
             throws TTransportException;
 }

@@ -17,6 +17,7 @@ import com.facebook.airlift.units.Duration;
 import com.facebook.presto.hive.HiveCommonClientConfig;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.authentication.HiveMetastoreAuthentication;
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.hms.HiveMetastoreClient;
 import com.facebook.presto.hive.metastore.hms.MetastoreClientFactory;
 import com.facebook.presto.hive.metastore.hms.ThriftHiveMetastoreClient;
@@ -68,7 +69,7 @@ public class ThriftHiveMetastoreClientFactory
                 metastoreClientConfig.getMetastoreTimeout(), metastoreAuthentication, hiveCommonClientConfig.getCatalogName());
     }
 
-    public HiveMetastoreClient create(URI uri, Optional<String> token)
+    public HiveMetastoreClient create(URI uri, Optional<String> token, Optional<MetastoreContext> metastoreContext)
             throws TTransportException
     {
         return new ThriftHiveMetastoreClient(Transport.create(HostAndPort.fromParts(uri.getHost(), uri.getPort()), sslContext, socksProxy, timeoutMillis, metastoreAuthentication, token), catalogName);

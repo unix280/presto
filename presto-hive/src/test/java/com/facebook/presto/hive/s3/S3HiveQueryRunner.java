@@ -114,7 +114,8 @@ public final class S3HiveQueryRunner
                                         httpHiveMetastoreConfig,
                                         hiveEndpoint.getHost(),
                                         hiveEndpoint.getPort(), new HiveCommonClientConfig(), staticMetastoreConfig), metastoreClientConfig,
-                                HDFS_ENVIRONMENT),
+                                HDFS_ENVIRONMENT,
+                                staticMetastoreConfig),
                         new HivePartitionMutator())),
                 ImmutableMap.of());
     }

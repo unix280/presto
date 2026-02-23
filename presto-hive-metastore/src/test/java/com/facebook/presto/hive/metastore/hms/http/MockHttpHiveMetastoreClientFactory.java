@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.metastore.hms.http;
 
 import com.facebook.presto.hive.HiveCommonClientConfig;
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.hms.HiveMetastoreClient;
 import org.apache.thrift.transport.TTransportException;
 
@@ -37,7 +38,7 @@ public class MockHttpHiveMetastoreClientFactory
     }
 
     @Override
-    public HiveMetastoreClient create(URI uri, Optional<String> token)
+    public HiveMetastoreClient create(URI uri, Optional<String> token, Optional<MetastoreContext> metastoreContext)
             throws TTransportException
     {
         checkState(!clients.isEmpty(), "mock not given enough clients");

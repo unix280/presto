@@ -17,11 +17,13 @@ package com.facebook.presto.hive;
 import com.facebook.presto.cache.CacheConfig;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.HivePartitionMutator;
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
 import com.facebook.presto.hive.metastore.hms.BridgingHiveMetastore;
 import com.facebook.presto.hive.metastore.hms.HiveCluster;
 import com.facebook.presto.hive.metastore.hms.HiveMetastoreClient;
 import com.facebook.presto.hive.metastore.hms.MockHiveMetastoreClient;
+import com.facebook.presto.hive.metastore.hms.StaticMetastoreConfig;
 import com.facebook.presto.hive.metastore.hms.ThriftHiveMetastore;
 import com.facebook.presto.hive.metastore.hms.ThriftHiveMetastoreStats;
 import com.facebook.presto.spi.ConnectorSession;
@@ -67,7 +69,7 @@ public class TestHiveTableConstraints
         PartitionMutator hivePartitionMutator = new HivePartitionMutator();
         HdfsConfiguration hdfsConfiguration = new HiveHdfsConfiguration(new HdfsConfigurationInitializer(config, metastoreClientConfig), ImmutableSet.of(), config);
         HdfsEnvironment hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, metastoreClientConfig, new NoHdfsAuthentication());
-        ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(mockHiveCluster, metastoreClientConfig, hdfsEnvironment);
+        ThriftHiveMetastore thriftHiveMetastore = new ThriftHiveMetastore(mockHiveCluster, metastoreClientConfig, hdfsEnvironment, new StaticMetastoreConfig());
         metastore = new SemiTransactionalHiveMetastore(
                 hdfsEnvironment,
                 new BridgingHiveMetastore(thriftHiveMetastore, hivePartitionMutator),
@@ -114,7 +116,7 @@ public class TestHiveTableConstraints
         }
 
         @Override
-        public HiveMetastoreClient createMetastoreClient(Optional<String> token)
+        public HiveMetastoreClient createMetastoreClient(Optional<String> token, Optional<MetastoreContext> metastoreContext)
         {
             return client;
         }

@@ -16,6 +16,7 @@ package com.facebook.presto.hive.metastore.hms;
 import com.facebook.presto.hive.HiveCommonClientConfig;
 import com.facebook.presto.hive.MetastoreClientConfig;
 import com.facebook.presto.hive.authentication.NoHiveMetastoreAuthentication;
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.hms.http.HttpHiveMetastoreClientFactory;
 import com.facebook.presto.hive.metastore.hms.http.HttpHiveMetastoreConfig;
 import com.facebook.presto.hive.metastore.hms.thrift.ThriftHiveMetastoreClientFactory;
@@ -60,11 +61,11 @@ public class TestingHiveCluster
     }
 
     @Override
-    public HiveMetastoreClient createMetastoreClient(Optional<String> token)
+    public HiveMetastoreClient createMetastoreClient(Optional<String> token, Optional<MetastoreContext> metastoreContext)
             throws TException
     {
-        return (httpEnabled) ? new HttpHiveMetastoreClientFactory(httpHiveMetastoreConfig, hiveCommonClientConfig).create(uri, token)
-                             : new ThriftHiveMetastoreClientFactory(metastoreClientConfig, thriftHiveMetastoreConfig, new NoHiveMetastoreAuthentication(), hiveCommonClientConfig).create(uri, token);
+        return (httpEnabled) ? new HttpHiveMetastoreClientFactory(httpHiveMetastoreConfig, hiveCommonClientConfig).create(uri, token, metastoreContext)
+                             : new ThriftHiveMetastoreClientFactory(metastoreClientConfig, thriftHiveMetastoreConfig, new NoHiveMetastoreAuthentication(), hiveCommonClientConfig).create(uri, token, metastoreContext);
     }
 
     @Override

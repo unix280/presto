@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.hms;
 
+import com.facebook.presto.hive.metastore.MetastoreContext;
 import org.apache.thrift.TException;
 
 import java.util.Optional;
@@ -31,6 +32,6 @@ public interface HiveCluster
     /**
      * Create a connected {@link HiveMetastoreClient} to this HiveCluster
      */
-    HiveMetastoreClient createMetastoreClient(Optional<String> token)
+    HiveMetastoreClient createMetastoreClient(Optional<String> token, Optional<MetastoreContext> metastoreContext)
             throws TException;
 }
