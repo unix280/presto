@@ -222,8 +222,8 @@ TEST_F(PrestoToVeloxConnectorTest, icebergColumnHandleSimple) {
 
   EXPECT_EQ(icebergHandle->name(), "col1");
   EXPECT_EQ(icebergHandle->dataType()->kind(), TypeKind::INTEGER);
-  EXPECT_EQ(icebergHandle->field().fieldId, 1);
-  EXPECT_TRUE(icebergHandle->field().children.empty());
+  EXPECT_EQ(icebergHandle->nestedField().id, 1);
+  EXPECT_TRUE(icebergHandle->nestedField().children.empty());
 }
 
 TEST_F(PrestoToVeloxConnectorTest, icebergColumnHandleNested) {
@@ -254,10 +254,10 @@ TEST_F(PrestoToVeloxConnectorTest, icebergColumnHandleNested) {
 
   EXPECT_EQ(icebergHandle->name(), "struct_col");
   EXPECT_EQ(icebergHandle->dataType()->kind(), TypeKind::ROW);
-  EXPECT_EQ(icebergHandle->field().fieldId, 1);
-  ASSERT_EQ(icebergHandle->field().children.size(), 2);
-  EXPECT_EQ(icebergHandle->field().children[0].fieldId, 2);
-  EXPECT_EQ(icebergHandle->field().children[1].fieldId, 3);
+  EXPECT_EQ(icebergHandle->nestedField().id, 1);
+  ASSERT_EQ(icebergHandle->nestedField().children.size(), 2);
+  EXPECT_EQ(icebergHandle->nestedField().children[0].id, 2);
+  EXPECT_EQ(icebergHandle->nestedField().children[1].id, 3);
 }
 
 TEST_F(PrestoToVeloxConnectorTest, icebergColumnHandleDeeplyNested) {
@@ -288,11 +288,11 @@ TEST_F(PrestoToVeloxConnectorTest, icebergColumnHandleDeeplyNested) {
   ASSERT_NE(icebergHandle, nullptr);
 
   EXPECT_EQ(icebergHandle->name(), "outer");
-  EXPECT_EQ(icebergHandle->field().fieldId, 1);
-  ASSERT_EQ(icebergHandle->field().children.size(), 1);
-  EXPECT_EQ(icebergHandle->field().children[0].fieldId, 2);
-  ASSERT_EQ(icebergHandle->field().children[0].children.size(), 1);
-  EXPECT_EQ(icebergHandle->field().children[0].children[0].fieldId, 3);
+  EXPECT_EQ(icebergHandle->nestedField().id, 1);
+  ASSERT_EQ(icebergHandle->nestedField().children.size(), 1);
+  EXPECT_EQ(icebergHandle->nestedField().children[0].id, 2);
+  ASSERT_EQ(icebergHandle->nestedField().children[0].children.size(), 1);
+  EXPECT_EQ(icebergHandle->nestedField().children[0].children[0].id, 3);
 }
 
 TEST_F(PrestoToVeloxConnectorTest, ctasPassesTextfileSerdeParameters) {
@@ -329,7 +329,7 @@ TEST_F(PrestoToVeloxConnectorTest, ctasPassesTextfileSerdeParameters) {
 
   HivePrestoToVeloxConnector hiveConnector("hive");
   auto result =
-      hiveConnector.toVeloxInsertTableHandle(&createHandle, *typeParser_);
+      hiveConnector.toVeloxInsertTableHandle(&createHandle, *typeParser_, pool_.get());
   ASSERT_NE(result, nullptr);
 
   auto* hiveInsert =
@@ -381,7 +381,7 @@ TEST_F(PrestoToVeloxConnectorTest, ctasPassesNimbleSerdeParameters) {
 
   HivePrestoToVeloxConnector hiveConnector("hive");
   auto result =
-      hiveConnector.toVeloxInsertTableHandle(&createHandle, *typeParser_);
+      hiveConnector.toVeloxInsertTableHandle(&createHandle, *typeParser_, pool_.get());
   ASSERT_NE(result, nullptr);
 
   auto* hiveInsert =
@@ -426,7 +426,7 @@ TEST_F(PrestoToVeloxConnectorTest, ctasEmptySerdeParameters) {
 
   HivePrestoToVeloxConnector hiveConnector("hive");
   auto result =
-      hiveConnector.toVeloxInsertTableHandle(&createHandle, *typeParser_);
+      hiveConnector.toVeloxInsertTableHandle(&createHandle, *typeParser_, pool_.get());
   ASSERT_NE(result, nullptr);
 
   auto* hiveInsert =
