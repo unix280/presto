@@ -189,7 +189,6 @@ public class AccessControlContext
                 Objects.equals(this.queryType, other.queryType) &&
                 Objects.equals(this.catalog, other.catalog) &&
                 Objects.equals(this.schema, other.schema) &&
-                Objects.equals(this.sqlText, other.sqlText) &&
-                Objects.equals(this.innerQueryType, other.innerQueryType);
+                Objects.equals(this.sqlText, other.sqlText);
     }
 }
