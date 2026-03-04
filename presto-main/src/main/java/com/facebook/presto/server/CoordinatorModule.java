@@ -149,7 +149,7 @@ public class CoordinatorModule
 {
     private static final String DEFAULT_WEBUI_CSP =
             "default-src 'self'; style-src 'self' 'nonce-cHJlc3RvLXVpCg==' https://fonts.googleapis.com; " +
-                    "font-src 'self' https://fonts.gstatic.com; frame-ancestors 'self'; img-src 'self' http: https: data:; form-action 'self'";
+                    "font-src 'self' https://fonts.gstatic.com; frame-ancestors 'self'; img-src 'self' data:; form-action 'self'";
 
     private final boolean isWebUIEnabled;
 
