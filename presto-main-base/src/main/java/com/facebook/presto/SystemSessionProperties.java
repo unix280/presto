@@ -18,6 +18,8 @@ import com.facebook.airlift.units.Duration;
 import com.facebook.presto.common.WarningHandlingLevel;
 import com.facebook.presto.common.plan.PlanCanonicalizationStrategy;
 import com.facebook.presto.common.resourceGroups.QueryType;
+import com.facebook.presto.common.type.TimeZoneKey;
+import com.facebook.presto.common.type.TimeZoneNotSupportedException;
 import com.facebook.presto.cost.HistoryBasedOptimizationConfig;
 import com.facebook.presto.execution.QueryManagerConfig;
 import com.facebook.presto.execution.QueryManagerConfig.ExchangeMaterializationStrategy;
@@ -96,6 +98,7 @@ public final class SystemSessionProperties
     public static final String IS_QUERY_REWRITER_PLUGIN_ENABLED = "is_query_rewriter_plugin_enabled";
     public static final String IS_QUERY_REWRITER_PLUGIN_SUCCEEDED = "is_query_rewriter_plugin_succeeded";
     public static final String USE_MATERIALIZED_VIEW = "use_materialized_views";
+    public static final String TIME_ZONE_ID = "time_zone_id";
 
     public static final String SIZE_BASED_JOIN_FLIPPING_ENABLED = "optimizer_size_based_join_flipping_enabled";
     public static final String MAX_PREFIXES_COUNT = "max_prefixes_count";
@@ -940,6 +943,26 @@ public final class SystemSessionProperties
                         "Use legacy TIME & TIMESTAMP semantics (warning: this will be removed)",
                         functionsConfig.isLegacyTimestamp(),
                         true),
+                new PropertyMetadata<>(
+                        TIME_ZONE_ID,
+                        "Session time zone ID (e.g., 'America/Los_Angeles', '+05:30')",
+                        VARCHAR,
+                        TimeZoneKey.class,
+                        null,
+                        false,
+                        value -> {
+                            if (value == null) {
+                                return null;
+                            }
+                            try {
+                                return TimeZoneKey.getTimeZoneKey((String) value);
+                            }
+                            catch (TimeZoneNotSupportedException e) {
+                                throw new PrestoException(INVALID_SESSION_PROPERTY,
+                                    format("Invalid time zone: %s", value), e);
+                            }
+                        },
+                        value -> value == null ? null : ((TimeZoneKey) value).getId()),
                 booleanProperty(
                         ENABLE_INTERMEDIATE_AGGREGATIONS,
                         "Enable the use of intermediate aggregations",
