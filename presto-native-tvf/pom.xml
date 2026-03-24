@@ -80,6 +80,12 @@
                 <artifactId>jackson-core</artifactId>
             </dependency>
 
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-internal-communication</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
             <!-- Presto SPI -->
             <dependency>
                 <groupId>com.facebook.presto</groupId>

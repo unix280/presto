@@ -1169,7 +1169,8 @@ public class DistributedQueryRunner
         for (TestingPrestoServer server : servers) {
             server.getMetadata().getFunctionAndTypeManager().loadTVFProvider(
                     tvfProviderName,
-                    server.getPluginNodeManager());
+                    server.getPluginNodeManager(),
+                    server.getAuthClientConfigs());
         }
     }
 

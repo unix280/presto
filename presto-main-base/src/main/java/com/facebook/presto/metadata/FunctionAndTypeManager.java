@@ -391,22 +391,22 @@ public class FunctionAndTypeManager
         }
     }
 
-    public void loadTVFProvider(String tvfProviderName, NodeManager nodeManager)
+    public void loadTVFProvider(String tvfProviderName, NodeManager nodeManager, AuthClientConfigs authClientConfigs)
     {
         requireNonNull(tvfProviderName, "tvfProviderName is null");
         TVFProviderFactory factory = tvfProviderFactories.get(tvfProviderName);
         checkState(factory != null, "No factory for tvf provider %s", tvfProviderName);
-        TVFProvider tvfProvider = factory.createTVFProvider(ImmutableMap.of(), new TVFProviderContext(nodeManager, this));
+        TVFProvider tvfProvider = factory.createTVFProvider(ImmutableMap.of(), new TVFProviderContext(nodeManager, this, authClientConfigs));
 
         if (tvfProviders.putIfAbsent(new ConnectorId(tvfProviderName), tvfProvider) != null) {
             throw new IllegalArgumentException(format("TVF provider [%s] is already registered", tvfProvider));
         }
     }
 
-    public void loadTVFProviders(NodeManager nodeManager)
+    public void loadTVFProviders(NodeManager nodeManager, AuthClientConfigs authClientConfigs)
     {
         for (String tvfProviderName : tvfProviderFactories.keySet()) {
-            loadTVFProvider(tvfProviderName, nodeManager);
+            loadTVFProvider(tvfProviderName, nodeManager, authClientConfigs);
         }
     }
 
@@ -858,6 +858,12 @@ public class FunctionAndTypeManager
     public Map<String, FunctionNamespaceManager<? extends SqlFunction>> getFunctionNamespaceManagers()
     {
         return ImmutableMap.copyOf(functionNamespaceManagers);
+    }
+
+    @VisibleForTesting
+    public Map<ConnectorId, TVFProvider> getTvfProviders()
+    {
+        return ImmutableMap.copyOf(tvfProviders);
     }
 
     public FunctionHandle resolveOperator(OperatorType operatorType, List<TypeSignatureProvider> argumentTypes)

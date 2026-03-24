@@ -28,6 +28,7 @@ import com.facebook.presto.spi.function.table.ConnectorTableFunction;
 import com.facebook.presto.spi.tvf.TVFProvider;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -98,6 +99,27 @@ public class NativeTVFProvider
                 .port(workerHttpUri.getPort())
                 .appendPath(endpoint)
                 .build();
+    }
+
+    public static String extractReasonFromVeloxError(String errorMessage)
+    {
+        // Look for "Reason: " line in the Velox error message
+        String[] lines = errorMessage.split("\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("Reason:")) {
+                // Extract everything after "Reason: "
+                return trimmed.substring("Reason:".length()).trim();
+            }
+        }
+        // If no "Reason:" found, return the full message
+        return errorMessage;
+    }
+
+    @VisibleForTesting
+    public HttpClient getHttpClient()
+    {
+        return httpClient;
     }
 
     private synchronized List<ConnectorTableFunction> loadConnectorTableFunctions()
