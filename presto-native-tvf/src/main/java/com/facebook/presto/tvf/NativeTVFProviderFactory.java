@@ -64,7 +64,7 @@ public class NativeTVFProviderFactory
         try {
             Bootstrap app = new Bootstrap(
                     new NativeTVFProviderModule(context.getNodeManager(), context.getTypeManager()),
-                    new NativeWorkerCommunicationModule());
+                    new NativeWorkerCommunicationModule(context.getAuthClientConfigs()));
 
             Injector injector = app
                     .doNotInitializeLogging()

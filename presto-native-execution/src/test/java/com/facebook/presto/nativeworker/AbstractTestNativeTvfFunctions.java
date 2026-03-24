@@ -13,25 +13,40 @@
  */
 package com.facebook.presto.nativeworker;
 
+import com.facebook.airlift.http.client.HttpClient;
+import com.facebook.airlift.http.client.HttpRequestFilter;
+import com.facebook.airlift.http.client.jetty.JettyHttpClient;
+import com.facebook.presto.server.InternalAuthenticationManager;
+import com.facebook.presto.spi.ConnectorId;
+import com.facebook.presto.spi.tvf.TVFProvider;
 import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.tests.AbstractTestQueryFramework;
+import com.facebook.presto.tvf.NativeTVFProvider;
 import com.facebook.presto.tvf.TvfPlugin;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.List;
+
+import static com.facebook.presto.common.Utils.checkArgument;
 import static com.facebook.presto.nativeworker.NativeQueryRunnerUtils.createRegion;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 @Test
 public abstract class AbstractTestNativeTvfFunctions
         extends AbstractTestQueryFramework
 {
+    private static final String TVF_PROVIDER_NAME = "system";
+
     @BeforeClass
     @Override
-    public void init() throws Exception
+    public void init()
+            throws Exception
     {
         super.init();
         getQueryRunner().installCoordinatorPlugin(new TvfPlugin());
-        getQueryRunner().loadTVFProvider("system");
+        getQueryRunner().loadTVFProvider(TVF_PROVIDER_NAME);
     }
 
     @Override
@@ -50,5 +65,29 @@ public abstract class AbstractTestNativeTvfFunctions
     public void testExcludeColumns()
     {
         assertQuery("SELECT * FROM TABLE(exclude_columns(input => TABLE(region), columns => DESCRIPTOR(regionkey, comment)))");
+    }
+
+    @Test
+    public void testInternalAuthenticationFilterPresent()
+    {
+        TVFProvider tvfProvider =
+                getQueryRunner().getMetadata().getFunctionAndTypeManager()
+                        .getTvfProviders().get(
+                                new ConnectorId(TVF_PROVIDER_NAME));
+        checkArgument(tvfProvider instanceof NativeTVFProvider, "Expected  NativeTVFProvider but got  %s", tvfProvider);
+        HttpClient httpClient = ((NativeTVFProvider) tvfProvider).getHttpClient();
+
+        // check if filter present
+        List<HttpRequestFilter> filters = ((JettyHttpClient) httpClient).getRequestFilters();
+
+        InternalAuthenticationManager authenticationManager = filters.stream()
+                .filter(InternalAuthenticationManager.class::isInstance)
+                .map(InternalAuthenticationManager.class::cast)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("InternalAuthenticationManager filter not found"));
+
+        // Verify that the test shared secret is propagated all the way through
+        assertTrue(authenticationManager.getSharedSecret().isPresent());
+        assertEquals(authenticationManager.getSharedSecret().get(), "internal-shared-secret");
     }
 }

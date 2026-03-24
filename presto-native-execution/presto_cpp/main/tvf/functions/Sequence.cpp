@@ -195,31 +195,77 @@ class Sequence : public TableFunctionSplitProcessor {
   static std::vector<TableSplitHandlePtr> getSplits(
       const TableFunctionHandlePtr& handle) {
     static const int64_t kMaxSteps = 1000000;
+    static const int64_t kMaxSplits = 1000000;
     auto sequenceHandle =
         std::dynamic_pointer_cast<const SequenceHandle>(handle);
+    VELOX_CHECK_NOT_NULL(sequenceHandle, "Invalid sequence handle");
+    
     auto start = sequenceHandle->start();
     auto stop = sequenceHandle->stop();
     auto step = sequenceHandle->step();
 
-    auto numSteps = (stop - start) / step + 1;
+    // if start == stop, return single element (step doesn't matter)
+    if (start == stop) {
+      auto split = std::make_shared<SequenceSplitHandle>(start, 1);
+      return {split};
+    }
 
-    std::vector<TableSplitHandlePtr> splits = {};
-    splits.reserve((numSteps / kMaxSteps) + 1);
-    auto splitStart = start;
+    VELOX_USER_CHECK_NE(step, 0, "Step cannot be zero when start != stop");
+
+    VELOX_USER_CHECK(
+        (stop > start && step > 0) || (stop < start && step < 0),
+        "Step sign does not move start toward stop: start={}, stop={}, step={}",
+        start,
+        stop,
+        step);
+
+    int128_t numSteps =
+        (static_cast<int128_t>(stop) - static_cast<int128_t>(start)) / step + 1;
+
+    // ensure numSteps is positive
+    VELOX_USER_CHECK_GT(
+        numSteps,
+        0,
+        "Invalid sequence: start={}, stop={}, step={} produces no elements",
+        start,
+        stop,
+        step);
+
+    int128_t numSplits = numSteps / kMaxSteps + 1;
+    VELOX_USER_CHECK(
+        numSplits <= static_cast<int128_t>(kMaxSplits),
+        "Sequence generates too many splits: {} , max allowed: {}",
+        numSplits,
+        kMaxSplits);
+
+    std::vector<TableSplitHandlePtr> splits;
+    splits.reserve(static_cast<int64_t>(numSplits));
+    
+    int64_t splitStart = start;
     while (numSteps > 0) {
-      auto splitSteps = numSteps < kMaxSteps ? numSteps : kMaxSteps;
+      int64_t splitSteps = numSteps < static_cast<int128_t>(kMaxSteps)
+          ? static_cast<int64_t>(numSteps)
+          : kMaxSteps;
       auto sequenceSplit =
           std::make_shared<SequenceSplitHandle>(splitStart, splitSteps);
       splits.push_back(sequenceSplit);
-      numSteps -= kMaxSteps;
-      splitStart = start + (kMaxSteps * step);
+      numSteps -= splitSteps;
+      if (numSteps > 0) {
+        int128_t newSplitStart = splitStart + (splitSteps * step);
+        VELOX_USER_CHECK(
+          (newSplitStart < std::numeric_limits<int64_t>::min() || 
+          newSplitStart > std::numeric_limits<int64_t>::max()),
+          "Split start out of int64_t range={}",
+          newSplitStart);
+        splitStart = static_cast<int64_t>(newSplitStart);
+      }
     }
     return splits;
   }
 
  private:
   int64_t step_;
-  bool processed_;
+  bool processed_{false};
 };
 } // namespace
 

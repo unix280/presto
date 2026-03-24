@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.spi.tvf;
 
+import com.facebook.presto.common.AuthClientConfigs;
 import com.facebook.presto.common.type.TypeManager;
 import com.facebook.presto.spi.NodeManager;
 
@@ -22,11 +23,13 @@ public class TVFProviderContext
 {
     private final NodeManager nodeManager;
     private final TypeManager typeManager;
+    private final AuthClientConfigs authClientConfigs;
 
-    public TVFProviderContext(NodeManager nodeManager, TypeManager typeManager)
+    public TVFProviderContext(NodeManager nodeManager, TypeManager typeManager, AuthClientConfigs authClientConfigs)
     {
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
+        this.authClientConfigs = requireNonNull(authClientConfigs, "authClientConfigs is null");
     }
 
     public NodeManager getNodeManager()
@@ -37,5 +40,10 @@ public class TVFProviderContext
     public TypeManager getTypeManager()
     {
         return typeManager;
+    }
+
+    public AuthClientConfigs getAuthClientConfigs()
+    {
+        return authClientConfigs;
     }
 }
