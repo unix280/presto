@@ -286,7 +286,7 @@ public class DispatchManager
             // decode session
             sessionBuilder = sessionSupplier.createSessionBuilder(queryId, sessionContext, warningCollectorFactory);
             session = sessionBuilder.build();
-            if (query.startsWith("ExecuteWxdQueryOptimizer '") && !SystemSessionProperties.isQueryRewriterPluginEnabled(session)) {
+            if (query.trim().matches("^ExecuteWxdQueryOptimizer\\s+'.*") && !SystemSessionProperties.isQueryRewriterPluginEnabled(session)) {
                 throw new PrestoException(GENERIC_USER_ERROR, "Query rewriter must be enabled to be able to run queries starting ExecuteWxdQueryOptimizer.");
             }
 
