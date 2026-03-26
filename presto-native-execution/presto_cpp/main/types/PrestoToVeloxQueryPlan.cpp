@@ -1635,7 +1635,7 @@ VeloxQueryPlanConverterBase::toVeloxQueryPlan(
   auto& connector = getPrestoToVeloxConnector(
       executeProcedureHandle->handle.connectorHandle->_type);
   auto veloxHandle = connector.toVeloxInsertTableHandle(
-      executeProcedureHandle.get(), typeParser_);
+      executeProcedureHandle.get(), typeParser_, pool_);
   auto connectorInsertHandle = std::shared_ptr(std::move(veloxHandle));
 
   if (!connectorInsertHandle) {

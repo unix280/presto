@@ -790,6 +790,7 @@ TEST_F(PrestoToVeloxQueryConfigTest, systemConfigsWithoutSessionOverride) {
   expectedExactConfigs += 2; // kAdjustTimestampToTimezone,
                              // kDriverCpuTimeSliceLimitMs
   expectedExactConfigs += 1; // kSessionStartTime
+  expectedExactConfigs += 1; // exchange_checksum
 
   // Use exact matching to catch any config additions/removals
   EXPECT_EQ(veloxConfigs.size(), expectedExactConfigs)

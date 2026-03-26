@@ -16,15 +16,15 @@ target_link_libraries(
   presto_partition_and_serialize_replayer_test
   presto_tool_trace_replayers
   presto_operators
-  presto_plan_builder
+  presto_operators_plan_builder
   velox_core
   velox_exec
   velox_exec_test_lib
   velox_hive_connector
   velox_hive_iceberg_splitreader
   velox_query_trace_replayer_base
-  gtest
-  gtest_main
+  GTest::gtest
+  GTest::gtest_main
   ${FOLLY_WITH_DEPENDENCIES}
   ${GFLAGS_LIBRARIES}
 )

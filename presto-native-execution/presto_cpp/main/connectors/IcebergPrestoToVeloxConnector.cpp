@@ -319,7 +319,8 @@ IcebergPrestoToVeloxConnector::toVeloxTableHandle(
 std::unique_ptr<velox::connector::ConnectorInsertTableHandle>
 IcebergPrestoToVeloxConnector::toVeloxInsertTableHandle(
     const protocol::ExecuteProcedureHandle* executeProcedureHandle,
-    const TypeParser& typeParser) const {
+    const TypeParser& typeParser,
+    velox::memory::MemoryPool* pool) const {
   auto icebergDistributedProcedureHandle = std::dynamic_pointer_cast<
       protocol::iceberg::IcebergDistributedProcedureHandle>(
       executeProcedureHandle->handle.connectorHandle);
@@ -339,9 +340,11 @@ IcebergPrestoToVeloxConnector::toVeloxInsertTableHandle(
           fmt::format("{}/data", icebergDistributedProcedureHandle->outputPath),
           fmt::format("{}/data", icebergDistributedProcedureHandle->outputPath),
           velox::connector::hive::LocationHandle::TableType::kExisting),
-      toVeloxFileFormat(icebergDistributedProcedureHandle->fileFormat),
       toVeloxIcebergPartitionSpec(
           icebergDistributedProcedureHandle->partitionSpec, typeParser),
+      pool,
+      toVeloxFileFormat(icebergDistributedProcedureHandle->fileFormat),
+      std::vector<velox::connector::hive::iceberg::IcebergSortingColumn>{},
       std::optional(toFileCompressionKind(
           icebergDistributedProcedureHandle->compressionCodec)));
 }

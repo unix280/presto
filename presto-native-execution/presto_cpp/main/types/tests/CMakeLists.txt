@@ -99,6 +99,8 @@ target_link_libraries(
   velox_hive_iceberg_splitreader
   velox_tpch_connector
   velox_tpcds_connector
+  velox_dwio_arrow_parquet_writer
+  velox_dwio_arrow_parquet_writer_lib
   GTest::gtest
   GTest::gtest_main
 )
