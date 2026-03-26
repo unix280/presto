@@ -10,27 +10,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(presto_tool_trace_replayers PartitionAndSerializeReplayer.cpp)
+add_library(presto_tool_trace_replayers PartitionAndSerializeReplayer.cpp BroadcastWriteReplayer.cpp)
 
 target_link_libraries(
   presto_tool_trace_replayers
   presto_operators
+  presto_types
   velox_core
   velox_exec
   velox_query_trace_replayer_base
 )
 
-add_executable(presto_trace_replayer TraceReplayerMain.cpp)
+add_executable(presto_trace_replayer TraceReplayerMain.cpp BroadcastWriteReplayer.cpp)
 
 target_link_libraries(
   presto_trace_replayer
   presto_tool_trace_replayers
   presto_operators
+  presto_types
   presto_type_converter
+  presto_protocol
+  presto_connectors
   velox_core
   velox_exec
   velox_query_trace_replayer_base
   ${FOLLY_WITH_DEPENDENCIES}
+  ${WANGLE}
   ${GFLAGS_LIBRARIES}
 )
 
