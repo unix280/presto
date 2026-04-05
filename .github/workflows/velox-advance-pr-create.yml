@@ -76,29 +76,17 @@ jobs:
           VELOX_UPDATE_BRANCH: ${{ env.VELOX_UPDATE_BRANCH }}
           FORCE_ADVANCE: ${{ env.FORCE_ADVANCE }}
         run: |
-          # Determine which commit to use as "current"
-          # If force_advance is true, always use base branch (treat as new PR)
-          # If PR exists and not forcing, use commit from PR branch
-          # Otherwise use base branch
-          if [ "$FORCE_ADVANCE" = "true" ]; then
-            # Force advance: always use base branch's velox commit
+          if [ "$FORCE_ADVANCE" = "true" ] || [ "$PR_EXISTS" != "true" ]; then
             CURRENT_COMMIT=$(cd presto-native-execution/velox && git rev-parse HEAD)
-            echo "Force advance mode: using base branch's velox commit"
-          elif [ "$PR_EXISTS" = "true" ]; then
-            # PR exists and not forcing: try to get velox commit from the PR branch
+            echo "Using base branch's velox commit"
+          else
             if git fetch origin "$VELOX_UPDATE_BRANCH" 2>/dev/null; then
-              # Get the velox submodule commit from the PR branch
               CURRENT_COMMIT=$(git ls-tree "origin/$VELOX_UPDATE_BRANCH" presto-native-execution/velox | awk '{print $3}')
               echo "Using velox commit from PR branch: $VELOX_UPDATE_BRANCH"
             else
-              # Branch doesn't exist yet, use current HEAD's velox commit
               CURRENT_COMMIT=$(cd presto-native-execution/velox && git rev-parse HEAD)
-              echo "PR branch not found, using current HEAD's velox commit"
+              echo "PR branch not found, using base branch's velox commit"
             fi
-          else
-            # No PR exists, use current HEAD's velox commit
-            CURRENT_COMMIT=$(cd presto-native-execution/velox && git rev-parse HEAD)
-            echo "No PR exists: using base branch's velox commit"
           fi
 
           # Get commit details for current commit
@@ -187,18 +175,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          # Configure git remote with token for pushing (since persist-credentials: false)
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-          # Ensure we're on the base branch
-          git checkout "$BASE_BRANCH"
-          # Create and switch to new branch (or switch if it exists)
-          git checkout -B "$VELOX_UPDATE_BRANCH"
-          # Stage the submodule changes
+          git switch "$BASE_BRANCH"
+          git switch -C "$VELOX_UPDATE_BRANCH"
           git add presto-native-execution/velox
-          # Commit the changes
-          git commit -m "Update Velox submodule to $VELOX_COMMIT"
-          # Force push the branch to handle updates
+          git commit -m "chore(ci): Advance velox ($(date +'%Y-%m-%d'))"
           git push -f origin "$VELOX_UPDATE_BRANCH"
 
       - name: Create or Update Pull Request
@@ -218,7 +200,6 @@ jobs:
         run: |
           PR_TITLE="chore(ci): Advance velox ($(date +'%Y-%m-%d'))"
 
-          # Create PR body file (used for both new and existing PRs)
           cat > /tmp/pr_body.txt <<EOF
           **Velox Update Information:**
           - **Commit:** \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE](https://github.com/facebookincubator/velox/commits/$LATEST_COMMIT)

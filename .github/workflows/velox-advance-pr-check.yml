@@ -2,7 +2,7 @@ name: Advance velox PR check
 
 on:
   workflow_run:
-    workflows: [test, prestocpp-linux-build, prestocpp-linux-build-and-unit-test]
+    workflows: [test, prestocpp-linux-build, prestocpp-linux-build-and-unit-test, arrow flight tests, prestocpp-macos-build]
     types: [completed]
     branches: [velox-update]
   workflow_dispatch: {}
