@@ -6,21 +6,21 @@ on:
     - cron: '0 9 * * *' # Daily at 09:00 UTC
   workflow_dispatch:
     inputs:
-      force_advance:
-        description: Force advance velox
+      close_pr:
+        description: Close existing PR
         required: false
         default: false
         type: boolean
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: true
 
 env:
   NOTIFICATION_GROUP: ${{ vars.VELOX_UPDATE_NOTIFICATION_GROUP || '@prestodb/team-velox' }}
   BASE_BRANCH: ${{ github.event_name == 'schedule' && 'master' || github.ref_name }}
   VELOX_UPDATE_BRANCH: velox-update
-  FORCE_ADVANCE: ${{ github.event_name == 'schedule' || github.event.inputs.force_advance == 'true' }}
+  CREATE_NEW_PR: ${{ github.event.inputs.close_pr == 'true' }}
 
 jobs:
   create-pr:
@@ -28,12 +28,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    outputs:
-      pr_number: ${{ steps.pr_info.outputs.pr_number }}
-      pr_url: ${{ steps.pr_info.outputs.pr_url }}
-      should_monitor: ${{ steps.pr_info.outputs.should_monitor }}
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -41,168 +37,139 @@ jobs:
           ref: ${{ env.BASE_BRANCH }}
           persist-credentials: false
 
-      - name: Configure Git
+      - name: Setup Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Check for existing PR
+      - name: Check existing PR
         id: check_pr
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
-          VELOX_UPDATE_BRANCH: ${{ env.VELOX_UPDATE_BRANCH }}
         run: |
           # Check if PR already exists for this branch
-          EXISTING_PR=$(gh pr list --head "$VELOX_UPDATE_BRANCH" --base "$BASE_BRANCH" --state open --json number,url --jq '.[0]')
+          EXISTING_PR=$(gh pr list --head "${{ env.VELOX_UPDATE_BRANCH }}" --base "${{ env.BASE_BRANCH }}" --state open --json number,url --jq '.[0]')
 
           if [ -n "$EXISTING_PR" ] && [ "$EXISTING_PR" != "null" ]; then
-            PR_NUMBER=$(echo "$EXISTING_PR" | jq -r '.number')
-            PR_URL=$(echo "$EXISTING_PR" | jq -r '.url')
-
-            echo "pr_exists=true" >> $GITHUB_OUTPUT
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
-            echo "Found existing PR #$PR_NUMBER: $PR_URL"
+            echo "PR_EXISTS=true" >> $GITHUB_ENV
+            echo "pr_number=$(echo "$EXISTING_PR" | jq -r '.number')" >> $GITHUB_OUTPUT
+            echo "pr_url=$(echo "$EXISTING_PR" | jq -r '.url')" >> $GITHUB_OUTPUT
+            echo "Found existing PR: $(echo "$EXISTING_PR" | jq -r '.url')"
           else
-            echo "pr_exists=false" >> $GITHUB_OUTPUT
+            echo "PR_EXISTS=false" >> $GITHUB_ENV
             echo "No existing PR found"
           fi
 
-      - name: Check for new Velox changes
-        id: check_new_changes
+      - name: Close existing PR
+        if: env.PR_EXISTS == 'true' && env.CREATE_NEW_PR == 'true'
+        id: close_pr
         env:
-          PR_EXISTS: ${{ steps.check_pr.outputs.pr_exists }}
-          VELOX_UPDATE_BRANCH: ${{ env.VELOX_UPDATE_BRANCH }}
-          FORCE_ADVANCE: ${{ env.FORCE_ADVANCE }}
+          GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
         run: |
-          if [ "$FORCE_ADVANCE" = "true" ] || [ "$PR_EXISTS" != "true" ]; then
-            CURRENT_COMMIT=$(cd presto-native-execution/velox && git rev-parse HEAD)
-            echo "Using base branch's velox commit"
-          else
-            if git fetch origin "$VELOX_UPDATE_BRANCH" 2>/dev/null; then
-              CURRENT_COMMIT=$(git ls-tree "origin/$VELOX_UPDATE_BRANCH" presto-native-execution/velox | awk '{print $3}')
-              echo "Using velox commit from PR branch: $VELOX_UPDATE_BRANCH"
-            else
-              CURRENT_COMMIT=$(cd presto-native-execution/velox && git rev-parse HEAD)
-              echo "PR branch not found, using base branch's velox commit"
-            fi
-          fi
+          # Close existing PR when creating a new one (will add comment with new PR link later)
+          gh pr close ${{ steps.check_pr.outputs.pr_number }}
+          echo "closed_pr_number=${{ steps.check_pr.outputs.pr_number }}" >> $GITHUB_OUTPUT
+          echo "PR_EXISTS=false" >> $GITHUB_ENV
+          echo "Closed existing PR #${{ steps.check_pr.outputs.pr_number }}"
 
-          # Get commit details for current commit
+      - name: Check Velox changes
+        id: check_new_changes
+        run: |
+          # Get current and latest velox commits
           cd presto-native-execution/velox
-          CURRENT_COMMIT_SHORT=$(git rev-parse --short $CURRENT_COMMIT)
-          CURRENT_DATE=$(git show -s --format=%ci $CURRENT_COMMIT | cut -d' ' -f1)
-          CURRENT_TITLE=$(git show -s --format=%s $CURRENT_COMMIT)
-
-          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
-          echo "current_commit_short=$CURRENT_COMMIT_SHORT" >> $GITHUB_OUTPUT
-          echo "current_date=$CURRENT_DATE" >> $GITHUB_OUTPUT
-          echo "current_title=$CURRENT_TITLE" >> $GITHUB_OUTPUT
 
           # Fetch latest from velox main branch
           git fetch origin main
           LATEST_COMMIT=$(git rev-parse origin/main)
-          LATEST_COMMIT_SHORT=$(git rev-parse --short origin/main)
-          LATEST_DATE=$(git show -s --format=%ci origin/main | cut -d' ' -f1)
-          LATEST_TITLE=$(git show -s --format=%s origin/main)
 
+          # Get latest commit details
           echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
-          echo "latest_commit_short=$LATEST_COMMIT_SHORT" >> $GITHUB_OUTPUT
-          echo "latest_date=$LATEST_DATE" >> $GITHUB_OUTPUT
-          echo "latest_title=$LATEST_TITLE" >> $GITHUB_OUTPUT
+          echo "latest_commit_short=$(git rev-parse --short $LATEST_COMMIT)" >> $GITHUB_OUTPUT
+          echo "latest_date=$(git show -s --format=%ci $LATEST_COMMIT | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "latest_title=$(git show -s --format=%s $LATEST_COMMIT)" >> $GITHUB_OUTPUT
 
-          if [ "$CURRENT_COMMIT" != "$LATEST_COMMIT" ]; then
-            echo "new_changes_available=true" >> $GITHUB_OUTPUT
-            echo "New Velox changes available: $CURRENT_COMMIT -> $LATEST_COMMIT"
+          # Only check for new changes if PR exists and we're not creating a new one
+          if [ "${{ env.PR_EXISTS }}" = "true" ]; then
+            # Get current commit from PR branch (fetch from main presto repo)
+            cd ../..
+            if git fetch origin "${{ env.VELOX_UPDATE_BRANCH }}" 2>/dev/null; then
+              CURRENT_COMMIT=$(git ls-tree "origin/${{ env.VELOX_UPDATE_BRANCH }}" presto-native-execution/velox | awk '{print $3}')
+              echo "Using velox commit from PR branch"
+            else
+              CURRENT_COMMIT=$(git -C presto-native-execution/velox rev-parse HEAD)
+              echo "PR branch not found, using base branch's velox commit"
+            fi
+            cd presto-native-execution/velox
+
+            # Get current commit details
+            echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+            echo "current_commit_short=$(git rev-parse --short $CURRENT_COMMIT)" >> $GITHUB_OUTPUT
+            echo "current_date=$(git show -s --format=%ci $CURRENT_COMMIT | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+            echo "current_title=$(git show -s --format=%s $CURRENT_COMMIT)" >> $GITHUB_OUTPUT
+
+            # Check if new changes are available
+            if [ "$CURRENT_COMMIT" != "$LATEST_COMMIT" ]; then
+              echo "new_changes_available=true" >> $GITHUB_OUTPUT
+              echo "New Velox changes available"
+            else
+              echo "new_changes_available=false" >> $GITHUB_OUTPUT
+              echo "Velox is up to date"
+            fi
           else
+            # When creating new PR or no PR exists, don't check for changes
             echo "new_changes_available=false" >> $GITHUB_OUTPUT
-            echo "Velox is up to date at commit: $CURRENT_COMMIT"
+            echo "Will create PR with latest velox commit"
           fi
 
-      - name: Notify about new changes on existing PR
-        if: steps.check_pr.outputs.pr_exists == 'true' && steps.check_new_changes.outputs.new_changes_available == 'true' && env.FORCE_ADVANCE != 'true'
+      - name: Notify new changes
+        if: steps.check_new_changes.outputs.new_changes_available == 'true'
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          PR_NUMBER: ${{ steps.check_pr.outputs.pr_number }}
-          CURRENT_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.current_commit_short }}
-          CURRENT_DATE: ${{ steps.check_new_changes.outputs.current_date }}
-          CURRENT_TITLE: ${{ steps.check_new_changes.outputs.current_title }}
-          CURRENT_COMMIT: ${{ steps.check_new_changes.outputs.current_commit }}
-          LATEST_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.latest_commit_short }}
-          LATEST_DATE: ${{ steps.check_new_changes.outputs.latest_date }}
-          LATEST_TITLE: ${{ steps.check_new_changes.outputs.latest_title }}
-          LATEST_COMMIT: ${{ steps.check_new_changes.outputs.latest_commit }}
-          NOTIFICATION_GROUP: ${{ env.NOTIFICATION_GROUP }}
         run: |
-          VELOX_REPO_URL="https://github.com/facebookincubator/velox"
+          # Notify about new changes without creating a new PR
+          VELOX_REPO="https://github.com/facebookincubator/velox"
 
-          gh pr comment "$PR_NUMBER" --body "🔔 **New Velox Changes Available**
+          gh pr comment ${{ steps.check_pr.outputs.pr_number }} --body "🔔 **New Velox Changes Available**
 
           New changes are available in the Velox repository:
 
-          - **Current commit:** \`$CURRENT_COMMIT_SHORT\` $CURRENT_DATE [$CURRENT_TITLE]($VELOX_REPO_URL/commits/$CURRENT_COMMIT)
-          - **Latest commit:** \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE]($VELOX_REPO_URL/commits/$LATEST_COMMIT)
+          - **Current commit:** \`${{ steps.check_new_changes.outputs.current_commit_short }}\` ${{ steps.check_new_changes.outputs.current_date }} [${{ steps.check_new_changes.outputs.current_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.current_commit }})
+          - **Latest commit:** \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})
 
-          $NOTIFICATION_GROUP To update this PR with the latest changes, re-run this workflow with \`force_advance: true\`."
+          ${{ env.NOTIFICATION_GROUP }} To create a new PR with the latest changes, re-run this workflow with \`create_new_pr: true\`."
 
-      - name: Update Velox submodule
-        if: (steps.check_pr.outputs.pr_exists != 'true' || env.FORCE_ADVANCE == 'true') && steps.check_new_changes.outputs.new_changes_available == 'true'
-        run: |
-          git -C presto-native-execution/velox checkout main
-          git -C presto-native-execution/velox pull
-
-      - name: Check for changes after update
-        if: (steps.check_pr.outputs.pr_exists != 'true' || env.FORCE_ADVANCE == 'true') && steps.check_new_changes.outputs.new_changes_available == 'true'
-        id: check_changes
-        run: |
-          if git diff --quiet presto-native-execution/velox; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "No changes detected in Velox submodule"
-          else
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            VELOX_COMMIT=$(cd presto-native-execution/velox && git rev-parse HEAD)
-            echo "velox_commit=$VELOX_COMMIT" >> $GITHUB_OUTPUT
-            echo "Changes detected in Velox submodule (commit: $VELOX_COMMIT)"
-          fi
-
-      - name: Create branch and push changes
-        if: (steps.check_pr.outputs.pr_exists != 'true' || env.FORCE_ADVANCE == 'true') && steps.check_changes.outputs.has_changes == 'true'
-        env:
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
-          VELOX_UPDATE_BRANCH: ${{ env.VELOX_UPDATE_BRANCH }}
-          VELOX_COMMIT: ${{ steps.check_changes.outputs.velox_commit }}
-          GITHUB_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
-          git switch "$BASE_BRANCH"
-          git switch -C "$VELOX_UPDATE_BRANCH"
-          git add presto-native-execution/velox
-          git commit -m "chore(ci): Advance velox ($(date +'%Y-%m-%d'))"
-          git push -f origin "$VELOX_UPDATE_BRANCH"
-
-      - name: Create or Update Pull Request
-        if: (steps.check_pr.outputs.pr_exists != 'true' || env.FORCE_ADVANCE == 'true') && steps.check_changes.outputs.has_changes == 'true'
+      - name: Create PR
+        if: env.PR_EXISTS != 'true'
         id: create_pr
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          BASE_BRANCH: ${{ env.BASE_BRANCH }}
-          VELOX_UPDATE_BRANCH: ${{ env.VELOX_UPDATE_BRANCH }}
-          PR_EXISTS: ${{ steps.check_pr.outputs.pr_exists }}
-          PR_NUMBER: ${{ steps.check_pr.outputs.pr_number }}
-          PR_URL: ${{ steps.check_pr.outputs.pr_url }}
-          LATEST_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.latest_commit_short }}
-          LATEST_DATE: ${{ steps.check_new_changes.outputs.latest_date }}
-          LATEST_TITLE: ${{ steps.check_new_changes.outputs.latest_title }}
-          LATEST_COMMIT: ${{ steps.check_new_changes.outputs.latest_commit }}
+          GITHUB_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
         run: |
+          # Update velox submodule to latest
+          git -C presto-native-execution/velox checkout main
+          git -C presto-native-execution/velox pull
+
+          # Check if there are actual changes
+          if git diff --quiet presto-native-execution/velox; then
+            echo "No changes detected in Velox submodule"
+            exit 0
+          fi
+
+          # Push changes to branch
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git switch "${{ env.BASE_BRANCH }}"
+          git switch -C "${{ env.VELOX_UPDATE_BRANCH }}"
+          git add presto-native-execution/velox
+          git commit -m "chore(ci): Advance velox ($(date +'%Y-%m-%d'))"
+          git push -f origin "${{ env.VELOX_UPDATE_BRANCH }}"
+
+          # Create new PR
           PR_TITLE="chore(ci): Advance velox ($(date +'%Y-%m-%d'))"
+          VELOX_REPO="https://github.com/facebookincubator/velox"
 
           cat > /tmp/pr_body.txt <<EOF
           **Velox Update Information:**
-          - **Commit:** \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE](https://github.com/facebookincubator/velox/commits/$LATEST_COMMIT)
+          - **Commit:** \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})
 
           ---
 
@@ -216,98 +183,52 @@ jobs:
           - Update the Velox dependency reference under presto-native-execution to the latest desired commit.
           EOF
 
-          if [ "$PR_EXISTS" = "true" ]; then
-            # PR exists, update it
+          PR_URL=$(gh pr create --title "$PR_TITLE" --body-file /tmp/pr_body.txt --base "${{ env.BASE_BRANCH }}" --head "${{ env.VELOX_UPDATE_BRANCH }}")
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
-            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_exists=true" >> $GITHUB_OUTPUT
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Created new PR #$PR_NUMBER: $PR_URL"
 
-            gh pr edit "$PR_NUMBER" \
-              --title "$PR_TITLE" \
-              --body-file /tmp/pr_body.txt
-            echo "Updated existing PR #$PR_NUMBER with new title and body"
-          else
-            # No existing PR, create new one
-            PR_URL=$(gh pr create \
-              --title "$PR_TITLE" \
-              --body-file /tmp/pr_body.txt \
-              --base "$BASE_BRANCH" \
-              --head "$VELOX_UPDATE_BRANCH")
-
-            PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-
-            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_exists=false" >> $GITHUB_OUTPUT
-            echo "Created new PR #$PR_NUMBER: $PR_URL"
-          fi
-
-      - name: Set PR info for monitoring
-        id: pr_info
+      - name: Link PRs
+        if: steps.close_pr.outputs.closed_pr_number != '' && steps.create_pr.outputs.pr_number != ''
         env:
-          PR_EXISTS: ${{ steps.check_pr.outputs.pr_exists }}
-          FORCE_ADVANCE: ${{ env.FORCE_ADVANCE }}
-          CHECK_PR_NUMBER: ${{ steps.check_pr.outputs.pr_number }}
-          CHECK_PR_URL: ${{ steps.check_pr.outputs.pr_url }}
-          CREATE_PR_NUMBER: ${{ steps.create_pr.outputs.pr_number }}
-          CREATE_PR_URL: ${{ steps.create_pr.outputs.pr_url }}
+          GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
         run: |
-          if [ "$PR_EXISTS" = "true" ] && [ "$FORCE_ADVANCE" != "true" ]; then
-            # Use existing PR info
-            echo "pr_number=$CHECK_PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_url=$CHECK_PR_URL" >> $GITHUB_OUTPUT
-          else
-            # Use newly created/updated PR info
-            echo "pr_number=$CREATE_PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_url=$CREATE_PR_URL" >> $GITHUB_OUTPUT
-          fi
-
-          # Determine if we should monitor CI
-          if [ -n "$CHECK_PR_NUMBER" ] || [ -n "$CREATE_PR_NUMBER" ]; then
-            echo "should_monitor=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_monitor=false" >> $GITHUB_OUTPUT
-          fi
+          # Add comment to closed PR with link to new PR
+          gh pr comment ${{ steps.close_pr.outputs.closed_pr_number }} --body "Closed in favor of new PR #${{ steps.create_pr.outputs.pr_number }}"
+          echo "Added link to new PR #${{ steps.create_pr.outputs.pr_number }} on closed PR #${{ steps.close_pr.outputs.closed_pr_number }}"
 
       - name: Summary
         if: always()
-        env:
-          PR_EXISTS: ${{ steps.check_pr.outputs.pr_exists }}
-          FORCE_ADVANCE: ${{ env.FORCE_ADVANCE }}
-          PR_URL: ${{ steps.pr_info.outputs.pr_url }}
-          NEW_CHANGES_AVAILABLE: ${{ steps.check_new_changes.outputs.new_changes_available }}
-          CURRENT_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.current_commit_short }}
-          CURRENT_DATE: ${{ steps.check_new_changes.outputs.current_date }}
-          CURRENT_TITLE: ${{ steps.check_new_changes.outputs.current_title }}
-          CURRENT_COMMIT: ${{ steps.check_new_changes.outputs.current_commit }}
-          LATEST_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.latest_commit_short }}
-          LATEST_DATE: ${{ steps.check_new_changes.outputs.latest_date }}
-          LATEST_TITLE: ${{ steps.check_new_changes.outputs.latest_title }}
-          LATEST_COMMIT: ${{ steps.check_new_changes.outputs.latest_commit }}
-          HAS_CHANGES: ${{ steps.check_changes.outputs.has_changes }}
-          VELOX_COMMIT: ${{ steps.check_changes.outputs.velox_commit }}
         run: |
+          # Generate job summary
+          VELOX_REPO="https://github.com/facebookincubator/velox"
           echo "## Create PR Job Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Check if we updated or just monitored existing PR
-          if [ "$PR_EXISTS" = "true" ] && [ "$FORCE_ADVANCE" != "true" ]; then
+          if [ "${{ env.PR_EXISTS }}" = "true" ]; then
+            # Existing PR found, not creating new one
             echo "ℹ️ Existing PR found" >> $GITHUB_STEP_SUMMARY
-            echo "📝 Pull Request: $PR_URL" >> $GITHUB_STEP_SUMMARY
+            echo "📝 Pull Request: ${{ steps.check_pr.outputs.pr_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
 
-            # Check if new changes are available
-            if [ "$NEW_CHANGES_AVAILABLE" = "true" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.check_new_changes.outputs.new_changes_available }}" = "true" ]; then
               echo "🔔 **New Velox changes available:**" >> $GITHUB_STEP_SUMMARY
-              echo "- **Current commit:** \`$CURRENT_COMMIT_SHORT\` $CURRENT_DATE [$CURRENT_TITLE](https://github.com/facebookincubator/velox/commits/$CURRENT_COMMIT)" >> $GITHUB_STEP_SUMMARY
-              echo "- **Latest commit:** \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE](https://github.com/facebookincubator/velox/commits/$LATEST_COMMIT)" >> $GITHUB_STEP_SUMMARY
+              echo "- **Current commit:** \`${{ steps.check_new_changes.outputs.current_commit_short }}\` ${{ steps.check_new_changes.outputs.current_date }} [${{ steps.check_new_changes.outputs.current_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.current_commit }})" >> $GITHUB_STEP_SUMMARY
+              echo "- **Latest commit:** \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "💡 Re-run with \`force_advance: true\` to update the PR" >> $GITHUB_STEP_SUMMARY
+              echo "💡 Re-run with \`close_pr: true\` to create a new PR" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ Velox is up to date at commit: \`${{ steps.check_new_changes.outputs.current_commit_short }}\` ${{ steps.check_new_changes.outputs.current_date }} [${{ steps.check_new_changes.outputs.current_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.current_commit }})" >> $GITHUB_STEP_SUMMARY
             fi
-          elif [ "$NEW_CHANGES_AVAILABLE" = "false" ]; then
-            echo "ℹ️ Velox is up to date at commit: \`$CURRENT_COMMIT_SHORT\` $CURRENT_DATE [$CURRENT_TITLE](https://github.com/facebookincubator/velox/commits/$CURRENT_COMMIT)" >> $GITHUB_STEP_SUMMARY
-          elif [ "$HAS_CHANGES" = "true" ]; then
-            echo "✅ Velox submodule updated to commit: \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE](https://github.com/facebookincubator/velox/commits/$LATEST_COMMIT)" >> $GITHUB_STEP_SUMMARY
-            echo "📝 Pull Request: $PR_URL" >> $GITHUB_STEP_SUMMARY
+          else
+            # PR was closed or no PR existed, new PR created
+            echo "✅ Velox submodule updated to commit: \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})" >> $GITHUB_STEP_SUMMARY
+
+            if [ -n "${{ steps.close_pr.outputs.closed_pr_number }}" ]; then
+              echo "🔄 Closed PR #${{ steps.close_pr.outputs.closed_pr_number }}" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "📝 Pull Request: ${{ steps.create_pr.outputs.pr_url }}" >> $GITHUB_STEP_SUMMARY
           fi
