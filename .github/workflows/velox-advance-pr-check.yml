@@ -21,7 +21,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ env.VELOX_UPDATE_BRANCH }}
@@ -31,31 +31,28 @@ jobs:
         id: pr_info
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          VELOX_UPDATE_BRANCH: ${{ env.VELOX_UPDATE_BRANCH }}
         run: |
-          PR_JSON=$(gh pr view "$VELOX_UPDATE_BRANCH" --json number,url 2>/dev/null)
+          # Check if PR exists for velox-update branch
+          PR_JSON=$(gh pr view "${{ env.VELOX_UPDATE_BRANCH }}" --json number,url 2>/dev/null)
 
           if [ -n "$PR_JSON" ] && [ "$PR_JSON" != "null" ]; then
-            PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
-            PR_URL=$(echo "$PR_JSON" | jq -r '.url')
-
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+            echo "pr_number=$(echo "$PR_JSON" | jq -r '.number')" >> $GITHUB_OUTPUT
+            echo "pr_url=$(echo "$PR_JSON" | jq -r '.url')" >> $GITHUB_OUTPUT
             echo "pr_found=true" >> $GITHUB_OUTPUT
-            echo "Found PR #$PR_NUMBER: $PR_URL"
+            echo "Found PR: $(echo "$PR_JSON" | jq -r '.url')"
           else
             echo "pr_found=false" >> $GITHUB_OUTPUT
-            echo "No PR found for branch $VELOX_UPDATE_BRANCH"
+            echo "No PR found for branch ${{ env.VELOX_UPDATE_BRANCH }}"
           fi
 
-      - name: Monitor CI status
+      - name: Check CI status
         if: steps.pr_info.outputs.pr_found == 'true'
         id: ci_status
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          PR_NUMBER: ${{ steps.pr_info.outputs.pr_number }}
         run: |
-          CHECKS_JSON=$(gh pr checks $PR_NUMBER --json state,name,workflow 2>&1)
+          # Get CI check status for the PR
+          CHECKS_JSON=$(gh pr checks ${{ steps.pr_info.outputs.pr_number }} --json state 2>&1)
 
           if [ -z "$CHECKS_JSON" ] || [ "$CHECKS_JSON" = "[]" ]; then
             echo "ci_result=no_checks" >> $GITHUB_OUTPUT
@@ -65,73 +62,67 @@ jobs:
 
           STATES=$(echo "$CHECKS_JSON" | jq -r '.[].state' | sort -u)
 
+          # Check if any checks are still running
           if echo "$STATES" | grep -qE "PENDING|QUEUED|IN_PROGRESS"; then
             echo "ci_result=still_running" >> $GITHUB_OUTPUT
-            echo "CI checks still running, cannot determine final result"
+            echo "CI checks still running"
             exit 0
           fi
 
+          # Check for failures
           if echo "$STATES" | grep -qE "FAILURE|CANCELLED|TIMED_OUT|ERROR"; then
             echo "ci_result=failure" >> $GITHUB_OUTPUT
             echo "CI checks failed"
-          elif echo "$STATES" | grep -q "SUCCESS"; then
-            FAILED_COUNT=$(echo "$CHECKS_JSON" | jq '[.[] | select(.state != "SUCCESS")] | length')
-            if [ "$FAILED_COUNT" -eq 0 ]; then
-              echo "ci_result=success" >> $GITHUB_OUTPUT
-              echo "All CI checks passed"
-            else
-              echo "ci_result=failure" >> $GITHUB_OUTPUT
-              echo "Some CI checks failed"
-            fi
+          # Verify all checks passed
+          elif [ "$(echo "$CHECKS_JSON" | jq '[.[] | select(.state != "SUCCESS")] | length')" -eq 0 ]; then
+            echo "ci_result=success" >> $GITHUB_OUTPUT
+            echo "All CI checks passed"
           else
             echo "ci_result=failure" >> $GITHUB_OUTPUT
-            echo "CI checks completed with non-success states: $STATES"
+            echo "CI checks completed with non-success states"
           fi
 
-      - name: Notify on CI success
-        if: steps.ci_status.outputs.ci_result == 'success'
+      - name: Notify CI result
+        if: steps.ci_status.outputs.ci_result == 'success' || steps.ci_status.outputs.ci_result == 'failure'
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          PR_NUMBER: ${{ steps.pr_info.outputs.pr_number }}
-          NOTIFICATION_GROUP: ${{ env.NOTIFICATION_GROUP }}
         run: |
-          gh pr comment "$PR_NUMBER" --body "✅ **CI Checks Passed**
+          # Post notification comment based on CI result
+          if [ "${{ steps.ci_status.outputs.ci_result }}" = "success" ]; then
+            gh pr comment ${{ steps.pr_info.outputs.pr_number }} --body "✅ **CI Checks Passed**
 
           All CI checks have completed successfully for this Velox submodule update.
 
-          $NOTIFICATION_GROUP This PR is ready for review."
-
-      - name: Notify on CI failure
-        if: steps.ci_status.outputs.ci_result == 'failure'
-        env:
-          GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
-          PR_NUMBER: ${{ steps.pr_info.outputs.pr_number }}
-          NOTIFICATION_GROUP: ${{ env.NOTIFICATION_GROUP }}
-        run: |
-          gh pr comment "$PR_NUMBER" --body "❌ **CI Checks Failed**
+          ${{ env.NOTIFICATION_GROUP }} This PR is ready for review."
+          else
+            gh pr comment ${{ steps.pr_info.outputs.pr_number }} --body "❌ **CI Checks Failed**
 
           Some CI checks have failed for this Velox submodule update.
 
-          $NOTIFICATION_GROUP Please review the failed checks and take appropriate action."
+          ${{ env.NOTIFICATION_GROUP }} Please review the failed checks and take appropriate action."
+          fi
 
       - name: Summary
         if: always() && steps.pr_info.outputs.pr_found == 'true'
-        env:
-          CI_RESULT: ${{ steps.ci_status.outputs.ci_result }}
-          PR_URL: ${{ steps.pr_info.outputs.pr_url }}
         run: |
+          # Generate job summary
           echo "## Check Status Job Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📝 Pull Request: $PR_URL" >> $GITHUB_STEP_SUMMARY
+          echo "📝 Pull Request: ${{ steps.pr_info.outputs.pr_url }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "$CI_RESULT" = "success" ]; then
-            echo "✅ CI Status: All checks passed" >> $GITHUB_STEP_SUMMARY
-          elif [ "$CI_RESULT" = "failure" ]; then
-            echo "❌ CI Status: Some checks failed" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          elif [ "$CI_RESULT" = "still_running" ]; then
-            echo "⏳ CI Status: Checks still running" >> $GITHUB_STEP_SUMMARY
-          elif [ "$CI_RESULT" = "no_checks" ]; then
-            echo "⚠️ CI Status: No checks found" >> $GITHUB_STEP_SUMMARY
-          fi
+          case "${{ steps.ci_status.outputs.ci_result }}" in
+            success)
+              echo "✅ CI Status: All checks passed" >> $GITHUB_STEP_SUMMARY
+              ;;
+            failure)
+              echo "❌ CI Status: Some checks failed" >> $GITHUB_STEP_SUMMARY
+              exit 1
+              ;;
+            still_running)
+              echo "⏳ CI Status: Checks still running" >> $GITHUB_STEP_SUMMARY
+              ;;
+            no_checks)
+              echo "⚠️ CI Status: No checks found" >> $GITHUB_STEP_SUMMARY
+              ;;
+          esac
