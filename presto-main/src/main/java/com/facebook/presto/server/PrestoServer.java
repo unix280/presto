@@ -164,7 +164,7 @@ public class PrestoServer
 
         modules.addAll(getAdditionalModules());
 
-        Bootstrap app = new Bootstrap(modules.build());
+        Bootstrap app = new Bootstrap(modules.build()).noStrictConfig();
 
         try {
             Injector injector = app.initialize();
