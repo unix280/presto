@@ -5,6 +5,12 @@ on:
     workflows: [test, prestocpp-linux-build, prestocpp-linux-build-and-unit-test, arrow flight tests, prestocpp-macos-build]
     types: [completed]
     branches: [velox-update]
+
+  # Note: workflow_run trigger with dangerous-triggers suppression is safe here because:
+  # 1. Permissions are scoped to pull-requests: write only (no contents: write)
+  # 2. Checkout uses persist-credentials: false
+  # 3. No code execution from untrusted sources
+
   workflow_dispatch: {}
 
 concurrency:
@@ -33,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
         run: |
           # Check if PR exists for velox-update branch
-          PR_JSON=$(gh pr view "${{ env.VELOX_UPDATE_BRANCH }}" --json number,url 2>/dev/null)
+          PR_JSON=$(gh pr list --head "${{ env.VELOX_UPDATE_BRANCH }}" --state open --json number,url --jq '.[0]' 2>/dev/null)
 
           if [ -n "$PR_JSON" ] && [ "$PR_JSON" != "null" ]; then
             echo "pr_number=$(echo "$PR_JSON" | jq -r '.number')" >> $GITHUB_OUTPUT

@@ -125,18 +125,27 @@ jobs:
         if: steps.check_new_changes.outputs.new_changes_available == 'true'
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
+          CURRENT_COMMIT: ${{ steps.check_new_changes.outputs.current_commit }}
+          CURRENT_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.current_commit_short }}
+          CURRENT_DATE: ${{ steps.check_new_changes.outputs.current_date }}
+          CURRENT_TITLE: ${{ steps.check_new_changes.outputs.current_title }}
+          LATEST_COMMIT: ${{ steps.check_new_changes.outputs.latest_commit }}
+          LATEST_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.latest_commit_short }}
+          LATEST_DATE: ${{ steps.check_new_changes.outputs.latest_date }}
+          LATEST_TITLE: ${{ steps.check_new_changes.outputs.latest_title }}
         run: |
           # Notify about new changes without creating a new PR
+          # Note: pr_number is only set when a PR was found and not closed
           VELOX_REPO="https://github.com/facebookincubator/velox"
 
           gh pr comment ${{ steps.check_pr.outputs.pr_number }} --body "🔔 **New Velox Changes Available**
 
           New changes are available in the Velox repository:
 
-          - **Current commit:** \`${{ steps.check_new_changes.outputs.current_commit_short }}\` ${{ steps.check_new_changes.outputs.current_date }} [${{ steps.check_new_changes.outputs.current_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.current_commit }})
-          - **Latest commit:** \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})
+          - **Current commit:** \`$CURRENT_COMMIT_SHORT\` $CURRENT_DATE [$CURRENT_TITLE]($VELOX_REPO/commits/$CURRENT_COMMIT)
+          - **Latest commit:** \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE]($VELOX_REPO/commits/$LATEST_COMMIT)
 
-          ${{ env.NOTIFICATION_GROUP }} To create a new PR with the latest changes, re-run this workflow with \`create_new_pr: true\`."
+          ${{ env.NOTIFICATION_GROUP }} To create a new PR with the latest changes, re-run this workflow with \`close_pr: true\`."
 
       - name: Create PR
         if: env.PR_EXISTS != 'true'
@@ -144,6 +153,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.PRESTODB_CI_TOKEN }}
+          LATEST_COMMIT: ${{ steps.check_new_changes.outputs.latest_commit }}
+          LATEST_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.latest_commit_short }}
+          LATEST_DATE: ${{ steps.check_new_changes.outputs.latest_date }}
+          LATEST_TITLE: ${{ steps.check_new_changes.outputs.latest_title }}
         run: |
           # Update velox submodule to latest
           git -C presto-native-execution/velox checkout main
@@ -151,13 +164,13 @@ jobs:
 
           # Check if there are actual changes
           if git diff --quiet presto-native-execution/velox; then
+            echo "No changes detected in Velox submodule" >> $GITHUB_STEP_SUMMARY
             echo "No changes detected in Velox submodule"
             exit 0
           fi
 
           # Push changes to branch
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-          git switch "${{ env.BASE_BRANCH }}"
           git switch -C "${{ env.VELOX_UPDATE_BRANCH }}"
           git add presto-native-execution/velox
           git commit -m "chore(ci): Advance velox ($(date +'%Y-%m-%d'))"
@@ -169,7 +182,7 @@ jobs:
 
           cat > /tmp/pr_body.txt <<EOF
           **Velox Update Information:**
-          - **Commit:** \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})
+          - **Commit:** \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE]($VELOX_REPO/commits/$LATEST_COMMIT)
 
           ---
 
@@ -201,6 +214,15 @@ jobs:
 
       - name: Summary
         if: always()
+        env:
+          CURRENT_COMMIT: ${{ steps.check_new_changes.outputs.current_commit }}
+          CURRENT_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.current_commit_short }}
+          CURRENT_DATE: ${{ steps.check_new_changes.outputs.current_date }}
+          CURRENT_TITLE: ${{ steps.check_new_changes.outputs.current_title }}
+          LATEST_COMMIT: ${{ steps.check_new_changes.outputs.latest_commit }}
+          LATEST_COMMIT_SHORT: ${{ steps.check_new_changes.outputs.latest_commit_short }}
+          LATEST_DATE: ${{ steps.check_new_changes.outputs.latest_date }}
+          LATEST_TITLE: ${{ steps.check_new_changes.outputs.latest_title }}
         run: |
           # Generate job summary
           VELOX_REPO="https://github.com/facebookincubator/velox"
@@ -215,16 +237,16 @@ jobs:
 
             if [ "${{ steps.check_new_changes.outputs.new_changes_available }}" = "true" ]; then
               echo "🔔 **New Velox changes available:**" >> $GITHUB_STEP_SUMMARY
-              echo "- **Current commit:** \`${{ steps.check_new_changes.outputs.current_commit_short }}\` ${{ steps.check_new_changes.outputs.current_date }} [${{ steps.check_new_changes.outputs.current_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.current_commit }})" >> $GITHUB_STEP_SUMMARY
-              echo "- **Latest commit:** \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})" >> $GITHUB_STEP_SUMMARY
+              echo "- **Current commit:** \`$CURRENT_COMMIT_SHORT\` $CURRENT_DATE [$CURRENT_TITLE]($VELOX_REPO/commits/$CURRENT_COMMIT)" >> $GITHUB_STEP_SUMMARY
+              echo "- **Latest commit:** \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE]($VELOX_REPO/commits/$LATEST_COMMIT)" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "💡 Re-run with \`close_pr: true\` to create a new PR" >> $GITHUB_STEP_SUMMARY
             else
-              echo "✅ Velox is up to date at commit: \`${{ steps.check_new_changes.outputs.current_commit_short }}\` ${{ steps.check_new_changes.outputs.current_date }} [${{ steps.check_new_changes.outputs.current_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.current_commit }})" >> $GITHUB_STEP_SUMMARY
+              echo "✅ Velox is up to date at commit: \`$CURRENT_COMMIT_SHORT\` $CURRENT_DATE [$CURRENT_TITLE]($VELOX_REPO/commits/$CURRENT_COMMIT)" >> $GITHUB_STEP_SUMMARY
             fi
           else
             # PR was closed or no PR existed, new PR created
-            echo "✅ Velox submodule updated to commit: \`${{ steps.check_new_changes.outputs.latest_commit_short }}\` ${{ steps.check_new_changes.outputs.latest_date }} [${{ steps.check_new_changes.outputs.latest_title }}]($VELOX_REPO/commits/${{ steps.check_new_changes.outputs.latest_commit }})" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Velox submodule updated to commit: \`$LATEST_COMMIT_SHORT\` $LATEST_DATE [$LATEST_TITLE]($VELOX_REPO/commits/$LATEST_COMMIT)" >> $GITHUB_STEP_SUMMARY
 
             if [ -n "${{ steps.close_pr.outputs.closed_pr_number }}" ]; then
               echo "🔄 Closed PR #${{ steps.close_pr.outputs.closed_pr_number }}" >> $GITHUB_STEP_SUMMARY
