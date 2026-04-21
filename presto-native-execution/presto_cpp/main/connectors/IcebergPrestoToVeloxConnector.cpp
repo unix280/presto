@@ -102,6 +102,7 @@ std::unique_ptr<velox::connector::ConnectorTableHandle> toIcebergTableHandle(
       std::move(subfieldFilters),
       remainingFilter,
       finalDataColumns,
+      std::unordered_map<std::string, std::string>{},
       columnHandles);
 }
 
