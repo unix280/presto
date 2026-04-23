@@ -222,6 +222,11 @@ set(VELOX_MONO_LIBRARY OFF CACHE BOOL "Build Velox mono library")
 
 add_subdirectory(velox)
 
+if(NOT TARGET velox_enums)
+  add_library(velox_enums INTERFACE)
+  target_link_libraries(velox_enums INTERFACE velox_enum_declare)
+endif()
+
 if(PRESTO_ENABLE_TESTING)
   set(BUILD_TESTING ON) # some third-party dependency could have disabled this.
   include(CTest) # include after project() but before add_subdirectory()
