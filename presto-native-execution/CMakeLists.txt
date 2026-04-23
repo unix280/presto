@@ -17,6 +17,14 @@ project(PrestoCpp)
 set(VELOX_ROOT ${CMAKE_BINARY_DIR}/velox)
 list(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/velox/CMake")
 
+# Workaround: Define missing velox_enums target that velox/common/config/CMakeLists.txt expects.
+# The recent velox commit split Enums.h into EnumDeclare.h and EnumDefine.h but config/CMakeLists.txt
+# still references velox_enums. This creates an alias that combines both enum libraries.
+if(NOT TARGET velox_enums)
+  add_library(velox_enums INTERFACE)
+  target_link_libraries(velox_enums INTERFACE velox_enum_declare velox_enum_define)
+endif()
+
 execute_process(
   COMMAND
     bash -c
