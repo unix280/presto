@@ -391,6 +391,7 @@ jobs:
              - What changes were made to fix them
              - Any important notes about the fixes
           5. Do NOT commit the ADVANCE_VELOX_FIX.md file
+          6. Before fix, investigate recent velox git history
 
           Build and verify command(stash the changes in velox and then build):
           cd presto-native-execution/velox && git stash
