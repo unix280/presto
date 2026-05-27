@@ -340,7 +340,7 @@ jobs:
     if: needs.create-pr.outputs.pr_created == 'true' || github.event.inputs.ai_fix == 'true'
     runs-on: ubuntu-latest
     container:
-      image: prestodb/presto-native-dependency:${{ env.DEPENDENCY_IMAGE_TAG }}
+      image: prestodb/presto-native-dependency:${{ vars.DEPENDENCY_IMAGE_TAG || '0.297-202602271419-160459b8' }}
     env:
       CCACHE_DIR: "${{ github.workspace }}/.ccache"
       CMAKE_BUILD_OPTIONS: |
